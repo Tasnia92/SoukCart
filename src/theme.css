@@ -1,0 +1,142 @@
+/* =============================================================================
+ * Soukcart theme tokens — Warm Terracotta Editorial (cream + ink + terracotta)
+ * -----------------------------------------------------------------------------
+ * Every colour, type, radius and shadow value lives here, and only here.
+ * Component CSS in style.css references these variables and never raw values.
+ *
+ * To restyle the whole app later, replace this file with another theme's token
+ * sheet (or edit the values below). Keep the variable NAMES intact — style.css
+ * depends on them. That is the entire theme-swap contract.
+ *
+ * Warm Terracotta Editorial: warm cream canvas (#faf9f5), olive-brown body ink
+ * (#3d3929), near-black headings (#141413), terracotta brand (#c96442) reserved
+ * for actions and active states, sand tinted surfaces, monochrome destructive.
+ * Sharp geometry (radius 0), Space Grotesk + JetBrains Mono, hairline borders
+ * and near-invisible neutral shadows. Dark values mirror the .dark sheet and
+ * apply when the `dark` class is set on <html>.
+ * ========================================================================== */
+
+:root {
+  color-scheme: light;
+  font-family:
+    "Space Grotesk",
+    ui-sans-serif,
+    system-ui,
+    -apple-system,
+    BlinkMacSystemFont,
+    "Segoe UI",
+    sans-serif;
+  font-synthesis: none;
+  text-rendering: optimizeLegibility;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+  letter-spacing: 0;
+
+  /* Brand — drives CTAs, sidebars, the auth story band, status accents. */
+  --color-primary: #c96442; /* terracotta — the only saturated hue; actions, active nav, delivered states */
+  --color-primary-hover: #b05730; /* deeper terracotta on hover/press (sheet chart-1) */
+  --color-on-dark: #ffffff; /* text on primary fills */
+  --color-on-dark-muted: rgba(255, 255, 255, 0.75); /* muted text on primary fills */
+
+  /* Canvas — the page ground (warm cream). */
+  --color-canvas: #faf9f5; /* background — page ground */
+  --color-canvas-soft: #ede9de; /* muted wash — stat cards, tinted panels, chips, art tiles */
+  --color-canvas-softer: #e9e6dc; /* deeper wash — table headers, hover rows, drop zones, tiles */
+  --color-surface-pressed: #ded8c4; /* deepest sand — pressed states (sheet chart-3) */
+
+  /* Surfaces — tinted cards and white input wells on the cream canvas. */
+  --color-card: #f5f4ef; /* card — slightly deeper than canvas, so cards read as panels */
+  --color-input: #ffffff; /* popover white — input wells */
+  --color-sidebar: #f5f4ee; /* sidebar — auth story band & admin sidebar */
+
+  /* Text roles */
+  --color-ink: #141413; /* headings, labels, strong values — near-black ink */
+  --color-body: #3d3929; /* supporting copy — warm olive-brown */
+  --color-mute: #6e6d68; /* placeholders, quiet labels, timestamps */
+  --color-hairline-mid: #535146; /* quiet-but-readable links (legal text) */
+
+  /* Hairlines & borders */
+  --color-hairline: #dad9d4; /* card borders, dividers */
+  --color-hairline-dark: #b4b2a7; /* strong borders — selects, hover borders */
+
+  /* Semantic accents */
+  --color-accent: #e9e6dc; /* selected payment method, add-to-order success flash */
+  --color-accent-foreground: #28261b;
+  --color-destructive: #141413; /* monochrome destructive — errors, cancel, out-of-stock */
+  --color-destructive-foreground: #ffffff;
+
+  /* Focus ring */
+  --color-ring: #c96442;
+
+  /* Type */
+  --font-sans:
+    "Space Grotesk", ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI",
+    sans-serif;
+  --font-mono: "JetBrains Mono", ui-monospace, SFMono-Regular, Consolas, monospace;
+
+  /* Radius scale — sharp editorial geometry; true circles use 50% in CSS. */
+  --radius: 0rem; /* base card radius */
+  --radius-sm: 0rem;
+  --radius-md: 0rem;
+  --radius-lg: 0rem;
+  --radius-xl: 0rem;
+  --radius-pill: 0rem;
+  --radius-pill-tab: 0rem;
+
+  /* Elevation — near-invisible neutral shadows; depth comes from tints & hairlines. */
+  --shadow-s: 0 1px 3px 0 rgb(0 0 0 / 0.05);
+  --shadow-m: 0 1px 3px 0 rgb(0 0 0 / 0.1), 0 1px 2px -1px rgb(0 0 0 / 0.1);
+  --shadow-l: 0 1px 3px 0 rgb(0 0 0 / 0.1), 0 4px 6px -1px rgb(0 0 0 / 0.1);
+  --shadow-inset: inset 0 1px 2px rgb(0 0 0 / 0.05);
+
+  /* Button treatments — flat fill + faint shadow; secondary gets a 1px ring. */
+  --shadow-pillow-primary: 0 1px 2px 0 rgb(0 0 0 / 0.1);
+  --shadow-pillow-primary-hover: 0 2px 4px 0 rgb(0 0 0 / 0.12);
+  --shadow-pillow-secondary: 0 0 0 1px #dad9d4, 0 1px 2px 0 rgb(0 0 0 / 0.05);
+  --shadow-pillow-secondary-hover: 0 0 0 1px #b4b2a7, 0 1px 3px 0 rgb(0 0 0 / 0.08);
+
+  /* Back-compat elevation aliases (style.css uses these names). */
+  --shadow-level-1: var(--shadow-s);
+  --shadow-level-2: var(--shadow-m);
+  --shadow-level-3: var(--shadow-l);
+}
+
+.dark {
+  color-scheme: dark;
+
+  /* Brand */
+  --color-primary: #d97757;
+  --color-primary-hover: #e58a66; /* derived lighter terracotta for hover */
+  --color-on-dark: #fbfbfb;
+  --color-on-dark-muted: rgba(255, 255, 255, 0.8);
+
+  /* Canvas */
+  --color-canvas: #262624;
+  --color-canvas-soft: #30302e;
+  --color-canvas-softer: #1b1b19;
+  --color-surface-pressed: #3e3e38;
+
+  /* Surfaces */
+  --color-card: #2c2c2b;
+  --color-input: #1b1b19;
+  --color-sidebar: #1f1e1d;
+
+  /* Text roles */
+  --color-ink: #faf9f5;
+  --color-body: #e5e5e2;
+  --color-mute: #b7b5a9;
+  --color-hairline-mid: #c3c0b6;
+
+  /* Hairlines & borders */
+  --color-hairline: #3e3e38;
+  --color-hairline-dark: #52514a;
+
+  /* Semantic accents */
+  --color-accent: #1a1915;
+  --color-accent-foreground: #f5f4ee;
+  --color-destructive: #ef4444;
+  --color-destructive-foreground: #ffffff;
+
+  /* Focus ring */
+  --color-ring: #d97757;
+}

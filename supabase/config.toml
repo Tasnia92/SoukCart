@@ -1,0 +1,11 @@
+[functions.admin-user-management]
+verify_jwt = true
+
+[functions.sslcommerz-checkout]
+verify_jwt = false
+
+[functions.sslcommerz-ipn]
+verify_jwt = false
+
+[functions.sslcommerz-return]
+verify_jwt = false
