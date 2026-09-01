@@ -14,6 +14,7 @@ import {
   loadSupplierProduct,
   MAX_IMAGE_BYTES,
   PRODUCT_CATEGORIES,
+  productValidationError,
   removeStoredImage,
   updateSupplierProduct,
   uploadProductImage,
@@ -143,9 +144,14 @@ export function SupplierProductForm({
       description: readText(formData, "description").trim(),
       price: Number(readText(formData, "price")),
       unit: readText(formData, "unit").trim() || "piece",
-      stock: Math.max(0, Math.floor(Number(readText(formData, "stock")))),
+      stock: Number(readText(formData, "stock")),
       category: readText(formData, "category").trim() || null,
     };
+    const validationMessage = productValidationError(payload);
+    if (validationMessage) {
+      setFeedback({ message: validationMessage, state: "error" });
+      return;
+    }
 
     const file = fileInputRef.current?.files?.[0] ?? null;
     if (file) {
@@ -260,9 +266,9 @@ export function SupplierProductForm({
             <input
               name="price"
               type="number"
-              min="0"
+              min="0.01"
               step="0.01"
-              placeholder="0.00"
+              placeholder="0.01"
               defaultValue={editing ? String(editing.price) : ""}
               required
             />
@@ -298,9 +304,9 @@ export function SupplierProductForm({
             <input
               name="stock"
               type="number"
-              min="0"
+              min="1"
               step="1"
-              defaultValue={editing ? String(editing.stock) : "0"}
+              defaultValue={editing ? String(editing.stock) : "1"}
               required
             />
           </label>

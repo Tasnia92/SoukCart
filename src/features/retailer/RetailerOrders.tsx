@@ -42,6 +42,11 @@ function CancelAction({
   onCancel: (order: RetailerOrder) => void;
 }) {
   if (order.status === "pending") {
+    if (order.cancel_requested) {
+      return (
+        <span className="admin-muted">Cancellation requested · waiting for admin approval</span>
+      );
+    }
     return (
       <button
         className="text-button rt-cancel-button"
@@ -50,7 +55,7 @@ function CancelAction({
         onClick={() => onCancel(order)}
       >
         <Icon name="trash" />
-        <span>Cancel order</span>
+        <span>Request cancellation</span>
       </button>
     );
   }
@@ -170,30 +175,17 @@ export function RetailerOrders({
     if (!canCancelOrder(order)) return;
     const total = orderTotal(order);
     const paid = order.payment_status === "paid";
-    const requesting = order.status === "confirmed";
-    const message = requesting
-      ? `Request cancellation of order #${shortId(order.id)}? The admin team will review it${paid ? ` and arrange the refund of ${formatPrice(total)}` : ""}.`
-      : paid
-        ? `Cancel order #${shortId(order.id)}? You paid ${formatPrice(total)} and the supplier will arrange your refund.`
-        : `Cancel order #${shortId(order.id)}? This cannot be undone.`;
+    const message = `Request cancellation of order #${shortId(order.id)}? The admin team will review it${paid ? ` and arrange the refund of ${formatPrice(total)}` : ""}.`;
     if (!window.confirm(message)) return;
 
     setBusyId(order.id);
     void requestOrderCancellation(order.id)
-      .then((result) => {
-        if (result === "requested") {
-          updateOrder(order.id, { cancel_requested: true });
-          setNotice({
-            message: `Cancellation of order #${shortId(order.id)} was requested. The admin team will review it.`,
-            state: "info",
-          });
-        } else {
-          updateOrder(order.id, { status: "cancelled" });
-          setNotice({
-            message: `Order #${shortId(order.id)} has been cancelled.`,
-            state: "success",
-          });
-        }
+      .then(() => {
+        updateOrder(order.id, { cancel_requested: true });
+        setNotice({
+          message: `Cancellation of order #${shortId(order.id)} was requested. The admin team will review it.`,
+          state: "info",
+        });
         setBusyId(null);
       })
       .catch((cancelError: unknown) => {
@@ -201,7 +193,7 @@ export function RetailerOrders({
           message:
             cancelError instanceof Error
               ? cancelError.message
-              : "The order could not be cancelled.",
+              : "The cancellation request could not be submitted.",
           state: "error",
         });
         setBusyId(null);

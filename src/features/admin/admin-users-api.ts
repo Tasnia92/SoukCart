@@ -22,8 +22,24 @@ export type CreateUserInput = {
   role: string;
 };
 
+export type UpdateUserInput = {
+  userId: string;
+  name: string;
+  email: string;
+  role: string;
+};
+
+type UserResponse = {
+  user: AdminUser;
+};
+
 export async function createAdminUser(input: CreateUserInput): Promise<void> {
   await invokeAdmin<unknown>({ action: "create", ...input });
+}
+
+export async function updateAdminUser(input: UpdateUserInput): Promise<AdminUser> {
+  const response = await invokeAdmin<UserResponse>({ action: "update", ...input });
+  return response.user;
 }
 
 export async function deleteAdminUser(userId: string): Promise<void> {

@@ -31,6 +31,21 @@ export type ProductPayload = {
   category: string | null;
 };
 
+export function productValidationError(payload: ProductPayload): string | null {
+  if (!Number.isFinite(payload.price) || payload.price <= 0) {
+    return "Price must be greater than 0.";
+  }
+  if (!Number.isInteger(payload.stock) || payload.stock < 1) {
+    return "Quantity must be a whole number of at least 1.";
+  }
+  return null;
+}
+
+function assertValidProduct(payload: ProductPayload): void {
+  const message = productValidationError(payload);
+  if (message) throw new Error(message);
+}
+
 export function filterSupplierProducts(
   products: readonly SupplierProduct[],
   searchTerm: string,
@@ -81,6 +96,9 @@ export async function saveProductStock(
   productId: string,
   stock: number,
 ): Promise<void> {
+  if (!Number.isInteger(stock) || stock < 1) {
+    throw new Error("Quantity must be a whole number of at least 1.");
+  }
   const { error } = await supabase
     .from("products")
     .update({ stock })
@@ -114,6 +132,7 @@ export async function createSupplierProduct(
   payload: ProductPayload,
   imageUrl: string | null,
 ): Promise<void> {
+  assertValidProduct(payload);
   const { error } = await supabase.from("products").insert({
     ...payload,
     seller_id: sellerId,
@@ -129,6 +148,7 @@ export async function updateSupplierProduct(
   payload: ProductPayload,
   imageUrl: string | null,
 ): Promise<void> {
+  assertValidProduct(payload);
   const { error } = await supabase
     .from("products")
     .update({ ...payload, image_url: imageUrl })

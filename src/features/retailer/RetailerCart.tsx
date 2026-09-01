@@ -9,6 +9,7 @@ import {
   WorkspaceError,
   type NoticeState,
 } from "../../components/ui/Workspace.tsx";
+import { useProductChanges } from "../../product-realtime.ts";
 import { useSessionSnapshot, useSessionStore } from "../../session.tsx";
 import { formatPrice } from "../workspace/format.ts";
 import { RouterLink, WorkspaceShell } from "../workspace/WorkspaceShell.tsx";
@@ -61,6 +62,11 @@ export function RetailerCart({
   const [checkingOut, setCheckingOut] = useState(false);
 
   const retailerId = state.status === "retailer" ? state.session.user.id : "";
+
+  useProductChanges({
+    enabled: Boolean(retailerId),
+    onChange: () => setLoadVersion((version) => version + 1),
+  });
 
   useEffect(() => {
     if (!retailerId) return;

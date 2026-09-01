@@ -114,12 +114,11 @@ export async function clearCart(userId: string): Promise<void> {
   await supabase.from("cart_items").delete().eq("user_id", userId);
 }
 
-export async function requestOrderCancellation(
-  orderId: string,
-): Promise<"requested" | "cancelled"> {
+export async function requestOrderCancellation(orderId: string): Promise<"requested"> {
   const { data, error } = await supabase.rpc("request_order_cancellation", { p_order_id: orderId });
-  if (error) throw new Error("The order could not be cancelled.");
-  return data === "requested" ? "requested" : "cancelled";
+  if (error) throw new Error("The cancellation request could not be submitted.");
+  if (data !== "requested") throw new Error("The cancellation request was not confirmed.");
+  return "requested";
 }
 
 export function orderTotal(order: RetailerOrder): number {
@@ -127,5 +126,5 @@ export function orderTotal(order: RetailerOrder): number {
 }
 
 export function canCancelOrder(order: RetailerOrder): boolean {
-  return order.status === "pending" || (order.status === "confirmed" && !order.cancel_requested);
+  return (order.status === "pending" || order.status === "confirmed") && !order.cancel_requested;
 }

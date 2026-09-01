@@ -17,6 +17,7 @@ import {
   deleteAdminUser,
   filterAdminUsers,
   loadAdminUsers,
+  updateAdminUser,
   type AdminUser,
 } from "./admin-users-api.ts";
 
@@ -27,21 +28,35 @@ type AdminUsersProps = {
 type Notice = { message: string; state: NoticeState } | null;
 
 const CREATE_PANEL_ID = "admin-create-panel";
+const EDIT_PANEL_ID = "admin-edit-panel";
 
 function readText(formData: FormData, name: string): string {
   const value = formData.get(name);
   return typeof value === "string" ? value : "";
 }
 
+function RoleOptions() {
+  return (
+    <>
+      <option value="">Let the user choose later</option>
+      <option value="seller">Seller</option>
+      <option value="retailer">Retailer</option>
+      <option value="admin">Administrator</option>
+    </>
+  );
+}
+
 function UserRow({
   user,
   currentAdminId,
-  deleting,
+  busy,
+  onEdit,
   onDelete,
 }: {
   user: AdminUser;
   currentAdminId: string;
-  deleting: boolean;
+  busy: boolean;
+  onEdit: (user: AdminUser) => void;
   onDelete: (user: AdminUser) => void;
 }) {
   const status = user.email_confirmed_at ? "Verified" : "Pending";
@@ -74,18 +89,28 @@ function UserRow({
         )}
       </td>
       <td className="admin-action-cell">
-        {user.id === currentAdminId ? (
-          <span className="admin-current-user">You</span>
-        ) : (
+        <div className="admin-create-actions">
           <button
-            className="delete-button"
+            className="text-button"
             type="button"
-            disabled={deleting}
-            onClick={() => onDelete(user)}
+            disabled={busy}
+            onClick={() => onEdit(user)}
           >
-            Delete
+            Edit
           </button>
-        )}
+          {user.id === currentAdminId ? (
+            <span className="admin-current-user">You</span>
+          ) : (
+            <button
+              className="delete-button"
+              type="button"
+              disabled={busy}
+              onClick={() => onDelete(user)}
+            >
+              Delete
+            </button>
+          )}
+        </div>
       </td>
     </tr>
   );
@@ -101,14 +126,15 @@ export function AdminUsers({ loadUsers = loadAdminUsers }: AdminUsersProps) {
   const [notice, setNotice] = useState<Notice>(null);
   const [createOpen, setCreateOpen] = useState(false);
   const [creating, setCreating] = useState(false);
-  const [createFeedback, setCreateFeedback] = useState<{
-    message: string;
-    state: NoticeState;
-  } | null>(null);
+  const [createFeedback, setCreateFeedback] = useState<Notice>(null);
+  const [editingUser, setEditingUser] = useState<AdminUser | null>(null);
+  const [updating, setUpdating] = useState(false);
+  const [editFeedback, setEditFeedback] = useState<Notice>(null);
   const [deletingId, setDeletingId] = useState<string | null>(null);
 
-  const formRef = useRef<HTMLFormElement>(null);
-  const nameRef = useRef<HTMLInputElement>(null);
+  const createFormRef = useRef<HTMLFormElement>(null);
+  const createNameRef = useRef<HTMLInputElement>(null);
+  const editNameRef = useRef<HTMLInputElement>(null);
   const triggerRef = useRef<HTMLButtonElement>(null);
 
   useEffect(() => {
@@ -131,8 +157,12 @@ export function AdminUsers({ loadUsers = loadAdminUsers }: AdminUsersProps) {
   }, [loadUsers, loadVersion]);
 
   useEffect(() => {
-    if (createOpen) nameRef.current?.focus();
+    if (createOpen) createNameRef.current?.focus();
   }, [createOpen]);
+
+  useEffect(() => {
+    if (editingUser) editNameRef.current?.focus();
+  }, [editingUser]);
 
   if (state.status !== "admin") return null;
 
@@ -158,6 +188,8 @@ export function AdminUsers({ loadUsers = loadAdminUsers }: AdminUsersProps) {
   const reload = () => setLoadVersion((version) => version + 1);
 
   const openCreate = () => {
+    setEditingUser(null);
+    setEditFeedback(null);
     setCreateFeedback(null);
     setCreateOpen(true);
   };
@@ -165,8 +197,20 @@ export function AdminUsers({ loadUsers = loadAdminUsers }: AdminUsersProps) {
   const closeCreate = () => {
     setCreateOpen(false);
     setCreateFeedback(null);
-    formRef.current?.reset();
+    createFormRef.current?.reset();
     triggerRef.current?.focus();
+  };
+
+  const openEdit = (user: AdminUser) => {
+    setCreateOpen(false);
+    setCreateFeedback(null);
+    setEditFeedback(null);
+    setEditingUser(user);
+  };
+
+  const closeEdit = () => {
+    setEditingUser(null);
+    setEditFeedback(null);
   };
 
   const onCreate = async (event: FormEvent<HTMLFormElement>) => {
@@ -200,6 +244,39 @@ export function AdminUsers({ loadUsers = loadAdminUsers }: AdminUsersProps) {
     }
   };
 
+  const onUpdate = async (event: FormEvent<HTMLFormElement>) => {
+    event.preventDefault();
+    if (!editingUser) return;
+    const form = event.currentTarget;
+    if (!form.reportValidity()) return;
+
+    setUpdating(true);
+    setEditFeedback({ message: "Saving changes...", state: "info" });
+    const formData = new FormData(form);
+    try {
+      const updated = await updateAdminUser({
+        userId: editingUser.id,
+        name: readText(formData, "name"),
+        email: readText(formData, "email"),
+        role: readText(formData, "role"),
+      });
+      setUsers(
+        (current) => current?.map((user) => (user.id === updated.id ? updated : user)) ?? current,
+      );
+      setEditingUser(null);
+      setEditFeedback(null);
+      setNotice({ message: `${updated.name || updated.email} was updated.`, state: "success" });
+    } catch (updateError) {
+      setEditFeedback({
+        message:
+          updateError instanceof Error ? updateError.message : "The user could not be updated.",
+        state: "error",
+      });
+    } finally {
+      setUpdating(false);
+    }
+  };
+
   const onDelete = (user: AdminUser) => {
     const displayName = user.name || user.email;
     if (!window.confirm(`Delete ${displayName}'s account? This cannot be undone.`)) return;
@@ -215,8 +292,8 @@ export function AdminUsers({ loadUsers = loadAdminUsers }: AdminUsersProps) {
             deleteError instanceof Error ? deleteError.message : "The user could not be deleted.",
           state: "error",
         });
-        setDeletingId(null);
-      });
+      })
+      .finally(() => setDeletingId(null));
   };
 
   const filtered = users ? filterAdminUsers(users, searchTerm) : [];
@@ -237,7 +314,7 @@ export function AdminUsers({ loadUsers = loadAdminUsers }: AdminUsersProps) {
       <PageHeader
         eyebrow="People & access"
         title="User directory"
-        copy="Search by ID number, inspect account activity, or manage access."
+        copy="Search by ID number and create, edit, or remove user accounts."
         actions={
           <button
             ref={triggerRef}
@@ -269,11 +346,11 @@ export function AdminUsers({ loadUsers = loadAdminUsers }: AdminUsersProps) {
                 ×
               </button>
             </div>
-            <form className="admin-create-form" ref={formRef} onSubmit={onCreate} noValidate>
+            <form className="admin-create-form" ref={createFormRef} onSubmit={onCreate} noValidate>
               <label className="admin-field">
                 <span>Full name</span>
                 <input
-                  ref={nameRef}
+                  ref={createNameRef}
                   name="name"
                   type="text"
                   autoComplete="name"
@@ -298,10 +375,7 @@ export function AdminUsers({ loadUsers = loadAdminUsers }: AdminUsersProps) {
               <label className="admin-field">
                 <span>Account type</span>
                 <select name="role" defaultValue="">
-                  <option value="">Let the user choose later</option>
-                  <option value="seller">Seller</option>
-                  <option value="retailer">Retailer</option>
-                  <option value="admin">Administrator</option>
+                  <RoleOptions />
                 </select>
               </label>
               <div className="admin-create-actions">
@@ -321,6 +395,75 @@ export function AdminUsers({ loadUsers = loadAdminUsers }: AdminUsersProps) {
               </p>
             </form>
           </div>
+
+          {editingUser ? (
+            <div className="admin-create-panel" id={EDIT_PANEL_ID}>
+              <div className="admin-create-heading">
+                <div>
+                  <p className="eyebrow">Account details</p>
+                  <h3 className="display-sm">Edit user</h3>
+                </div>
+                <button
+                  className="icon-button"
+                  type="button"
+                  onClick={closeEdit}
+                  aria-label="Close edit user form"
+                >
+                  ×
+                </button>
+              </div>
+              <form
+                className="admin-create-form"
+                key={editingUser.id}
+                onSubmit={onUpdate}
+                noValidate
+              >
+                <label className="admin-field">
+                  <span>Full name</span>
+                  <input
+                    ref={editNameRef}
+                    name="name"
+                    type="text"
+                    autoComplete="name"
+                    maxLength={100}
+                    defaultValue={editingUser.name}
+                    required
+                  />
+                </label>
+                <label className="admin-field">
+                  <span>Email address</span>
+                  <input
+                    name="email"
+                    type="email"
+                    autoComplete="email"
+                    defaultValue={editingUser.email}
+                    required
+                  />
+                </label>
+                <label className="admin-field">
+                  <span>Account type</span>
+                  <select name="role" defaultValue={editingUser.role ?? ""}>
+                    <RoleOptions />
+                  </select>
+                </label>
+                <div className="admin-create-actions">
+                  <Button variant="secondary" onClick={closeEdit}>
+                    Cancel
+                  </Button>
+                  <Button type="submit" disabled={updating}>
+                    <span>Save changes</span>
+                  </Button>
+                </div>
+                <p
+                  className={`admin-form-feedback${editFeedback ? ` is-visible is-${editFeedback.state}` : ""}`}
+                  role="status"
+                  aria-live="polite"
+                >
+                  {editFeedback?.message}
+                </p>
+              </form>
+            </div>
+          ) : null}
 
           <SearchToolbar
             label="Search users"
@@ -352,7 +495,8 @@ export function AdminUsers({ loadUsers = loadAdminUsers }: AdminUsersProps) {
                       key={user.id}
                       user={user}
                       currentAdminId={currentAdminId}
-                      deleting={deletingId === user.id}
+                      busy={deletingId === user.id || (updating && editingUser?.id === user.id)}
+                      onEdit={openEdit}
                       onDelete={onDelete}
                     />
                   ))

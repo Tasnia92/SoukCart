@@ -44,17 +44,17 @@ Deno.serve(async (request) => {
     }
 
     const body = await readBody(request);
+    const caller = await authorize(request);
+    if (caller instanceof Response) {
+      return caller;
+    }
     if (body.action === "complete") {
-      return await complete(body);
+      return await complete(caller.id, body);
     }
     if (body.action === "query") {
-      return await queryByTranId(body);
+      return await queryByTranId(caller.id, body);
     }
     if (body.action === "initiate") {
-      const caller = await authorize(request);
-      if (caller instanceof Response) {
-        return caller;
-      }
       return await initiate(caller.id, body);
     }
     return json({ error: "Choose a valid checkout action." }, 400);
@@ -71,34 +71,27 @@ type CartLine = {
   price: number;
 };
 
+type ReservedCheckout = {
+  orderId: string;
+  total: number;
+  lines: CartLine[];
+};
+
 async function initiate(userId: string, body: Record<string, unknown>): Promise<Response> {
-  const { data: cartRows, error: cartError } = await admin
-    .from("cart_items")
-    .select("product_id, quantity, products(name, price)")
-    .eq("user_id", userId);
-  if (cartError) {
-    throw cartError;
+  const checkout = isRecord(body.checkout) ? body.checkout : {};
+  const phone = readText(checkout.phone).trim();
+  const address = readText(checkout.address).trim();
+  const city = readText(checkout.city).trim();
+  const postcode = readText(checkout.postcode).trim();
+  const notes = readText(checkout.notes).trim();
+  if (!phone || !address || !city || !postcode) {
+    return json({ error: "Enter your phone number, delivery address, city, and postcode." }, 400);
   }
 
-  const lines: CartLine[] = [];
-  for (const row of cartRows ?? []) {
-    const product = Array.isArray(row.products) ? row.products[0] : row.products;
-    if (product && Number(row.quantity) > 0) {
-      lines.push({
-        product_id: row.product_id,
-        quantity: Number(row.quantity),
-        product_name: String(product.name),
-        price: Number(product.price),
-      });
-    }
-  }
-  if (!lines.length) {
-    return json({ error: "Your cart is empty." }, 400);
-  }
-
-  const total = round2(lines.reduce((sum, line) => sum + line.price * line.quantity, 0));
-  if (total < 10) {
-    return json({ error: "The order total must be at least 10.00 BDT." }, 400);
+  const paymentMethod = readText(body.paymentMethod).trim() === "cod" ? "cod" : "online";
+  const baseUrl = readText(body.baseUrl).trim().replace(/\/+$/, "");
+  if (paymentMethod === "online" && (!baseUrl || !baseUrl.startsWith("http"))) {
+    return json({ error: "A valid callback base URL is required." }, 400);
   }
 
   const { data: profile, error: profileError } = await admin
@@ -110,52 +103,34 @@ async function initiate(userId: string, body: Record<string, unknown>): Promise<
     return json({ error: "Your profile could not be loaded." }, 400);
   }
 
-  const checkout = isRecord(body.checkout) ? body.checkout : {};
-  const phone = readText(checkout.phone).trim();
-  const address = readText(checkout.address).trim();
-  const city = readText(checkout.city).trim();
-  const postcode = readText(checkout.postcode).trim();
-  const notes = readText(checkout.notes).trim() || null;
-  if (!phone || !address || !city || !postcode) {
-    return json({ error: "Enter your phone number, delivery address, city, and postcode." }, 400);
+  const { data: reservedData, error: reserveError } = await admin.rpc("create_order_from_cart", {
+    p_retailer_id: userId,
+    p_notes: notes,
+    p_payment_method: paymentMethod,
+  });
+  if (reserveError) {
+    return json({ error: reserveError.message }, 409);
   }
 
-  const paymentMethod = readText(body.paymentMethod).trim() === "cod" ? "cod" : "online";
-
-  const { data: orderRow, error: orderError } = await admin
-    .from("orders")
-    .insert({ retailer_id: userId, status: "pending", payment_status: "unpaid", notes })
-    .select("id")
-    .single();
-  if (orderError || !orderRow) {
-    throw orderError ?? new Error("The order could not be created.");
-  }
-
-  const { error: itemsError } = await admin.from("order_items").insert(
-    lines.map((line) => ({
-      order_id: orderRow.id,
-      product_id: line.product_id,
-      quantity: line.quantity,
-      unit_price: line.price,
-    })),
-  );
-  if (itemsError) {
-    throw itemsError;
+  const reserved = parseReservedCheckout(reservedData);
+  if (!reserved) {
+    throw new Error("The reserved order returned invalid details.");
   }
 
   if (paymentMethod === "cod") {
-    await admin.from("orders").update({ payment_method: "cod" }).eq("id", orderRow.id);
-    return json({ orderId: orderRow.id, paymentStatus: "unpaid", method: "cod" });
+    return json({ orderId: reserved.orderId, paymentStatus: "unpaid", method: "cod" });
   }
 
-  const baseUrl = readText(body.baseUrl).trim().replace(/\/+$/, "") || "";
-  if (!baseUrl || !baseUrl.startsWith("http")) {
-    return json({ error: "A valid callback base URL is required." }, 400);
-  }
   const ipnUrl = readText(body.ipnUrl).trim();
-
-  const tranId = `SOUK-${orderRow.id.replaceAll("-", "").slice(0, 12).toUpperCase()}`;
-  await admin.from("orders").update({ tran_id: tranId }).eq("id", orderRow.id);
+  const tranId = `SOUK-${reserved.orderId.replaceAll("-", "").slice(0, 12).toUpperCase()}`;
+  const { error: referenceError } = await admin
+    .from("orders")
+    .update({ tran_id: tranId })
+    .eq("id", reserved.orderId);
+  if (referenceError) {
+    await failReservedOrder(reserved.orderId);
+    throw referenceError;
+  }
 
   // Browser-visible callbacks must land on a server that can read SSLCommerz's
   // POST fields and redirect; the SPA itself cannot receive form POSTs.
@@ -166,7 +141,7 @@ async function initiate(userId: string, body: Record<string, unknown>): Promise<
   const params = new URLSearchParams({
     store_id: storeId,
     store_passwd: storePasswd,
-    total_amount: total.toFixed(2),
+    total_amount: reserved.total.toFixed(2),
     currency: "BDT",
     tran_id: tranId,
     success_url: returnEndpoint ? `${returnEndpoint}?app=${appParam}` : `${baseUrl}/`,
@@ -182,8 +157,8 @@ async function initiate(userId: string, body: Record<string, unknown>): Promise<
     cus_country: "Bangladesh",
     cus_phone: phone,
     shipping_method: "NO",
-    num_of_item: String(lines.reduce((sum, line) => sum + line.quantity, 0)),
-    product_name: lines
+    num_of_item: String(reserved.lines.reduce((sum, line) => sum + line.quantity, 0)),
+    product_name: reserved.lines
       .map((line) => line.product_name)
       .join(", ")
       .slice(0, 255),
@@ -194,33 +169,83 @@ async function initiate(userId: string, body: Record<string, unknown>): Promise<
     params.set("ipn_url", ipnUrl);
   }
 
-  const response = await fetch(`${apiBase}/gwprocess/v4/api.php`, {
-    method: "POST",
-    headers: { "Content-Type": "application/x-www-form-urlencoded" },
-    body: params,
-  });
-  const data: unknown = await response.json();
+  try {
+    const response = await fetch(`${apiBase}/gwprocess/v4/api.php`, {
+      method: "POST",
+      headers: { "Content-Type": "application/x-www-form-urlencoded" },
+      body: params,
+    });
+    const data: unknown = await response.json();
 
-  if (!isRecord(data) || data.status !== "SUCCESS") {
-    const reason = isRecord(data) && typeof data.failedreason === "string" ? data.failedreason : "";
-    await admin.from("orders").update({ payment_status: "failed" }).eq("id", orderRow.id);
-    return json({ error: reason || "The payment could not be started. Please try again." }, 502);
+    if (!isRecord(data) || data.status !== "SUCCESS") {
+      const reason =
+        isRecord(data) && typeof data.failedreason === "string" ? data.failedreason : "";
+      await failReservedOrder(reserved.orderId);
+      return json({ error: reason || "The payment could not be started. Please try again." }, 502);
+    }
+
+    const gatewayUrl = typeof data.GatewayPageURL === "string" ? data.GatewayPageURL : "";
+    if (!gatewayUrl) {
+      await failReservedOrder(reserved.orderId);
+      return json({ error: "The payment could not be started. Please try again." }, 502);
+    }
+
+    if (typeof data.sessionkey === "string") {
+      await admin.from("orders").update({ sessionkey: data.sessionkey }).eq("id", reserved.orderId);
+    }
+
+    return json({ url: gatewayUrl, orderId: reserved.orderId, tranId });
+  } catch (error) {
+    await failReservedOrder(reserved.orderId);
+    throw error;
   }
-
-  const gatewayUrl = typeof data.GatewayPageURL === "string" ? data.GatewayPageURL : "";
-  if (!gatewayUrl) {
-    await admin.from("orders").update({ payment_status: "failed" }).eq("id", orderRow.id);
-    return json({ error: "The payment could not be started. Please try again." }, 502);
-  }
-
-  if (typeof data.sessionkey === "string") {
-    await admin.from("orders").update({ sessionkey: data.sessionkey }).eq("id", orderRow.id);
-  }
-
-  return json({ url: gatewayUrl, orderId: orderRow.id, tranId });
 }
 
-async function complete(body: Record<string, unknown>): Promise<Response> {
+function parseReservedCheckout(value: unknown): ReservedCheckout | null {
+  if (!isRecord(value)) return null;
+  const orderId = readText(value.orderId);
+  const total = Number(value.total);
+  const rawLines = Array.isArray(value.lines) ? value.lines : [];
+  const lines: CartLine[] = [];
+
+  for (const rawLine of rawLines) {
+    if (!isRecord(rawLine)) return null;
+    const line = {
+      product_id: readText(rawLine.product_id),
+      quantity: Number(rawLine.quantity),
+      product_name: readText(rawLine.product_name),
+      price: Number(rawLine.price),
+    };
+    if (
+      !line.product_id ||
+      !line.product_name ||
+      !Number.isInteger(line.quantity) ||
+      line.quantity < 1 ||
+      !Number.isFinite(line.price) ||
+      line.price <= 0
+    ) {
+      return null;
+    }
+    lines.push(line);
+  }
+
+  return orderId && Number.isFinite(total) && total > 0 && lines.length
+    ? { orderId, total, lines }
+    : null;
+}
+
+async function failReservedOrder(orderId: string): Promise<void> {
+  const { error } = await admin
+    .from("orders")
+    .update({ payment_status: "failed" })
+    .eq("id", orderId)
+    .neq("payment_status", "paid");
+  if (error) {
+    console.error("Reserved stock could not be released", error);
+  }
+}
+
+async function complete(userId: string, body: Record<string, unknown>): Promise<Response> {
   const tranId = readText(body.tranId).trim();
   const valId = readText(body.valId).trim();
   const status = readText(body.status).trim().toUpperCase();
@@ -232,6 +257,7 @@ async function complete(body: Record<string, unknown>): Promise<Response> {
     .from("orders")
     .select("id, tran_id, payment_status")
     .eq("tran_id", tranId)
+    .eq("retailer_id", userId)
     .maybeSingle();
   if (orderError) {
     throw orderError;
@@ -239,23 +265,56 @@ async function complete(body: Record<string, unknown>): Promise<Response> {
   if (!order) {
     return json({ error: "The order could not be found." }, 404);
   }
+  if (order.payment_status === "paid") {
+    return json({ orderId: order.id, paymentStatus: "paid" });
+  }
 
   const validation = await validateTransaction(valId);
   const paid =
     (validation.status === "VALID" || validation.status === "VALIDATED") &&
     validation.amount === (await orderTotal(order.id));
 
-  await admin
-    .from("orders")
-    .update({
-      payment_status: paid ? "paid" : status === "CANCELLED" ? "cancelled" : "failed",
-      val_id: valId,
-      bank_tran_id: paid ? (validation.bank_tran_id ?? null) : null,
-      paid_at: paid ? new Date().toISOString() : null,
-    })
-    .eq("id", order.id);
+  if (paid) {
+    const { data: updated, error: updateError } = await admin
+      .from("orders")
+      .update({
+        payment_status: "paid",
+        val_id: valId,
+        bank_tran_id: validation.bank_tran_id ?? null,
+        paid_at: new Date().toISOString(),
+      })
+      .eq("id", order.id)
+      .neq("payment_status", "paid")
+      .select("payment_status")
+      .maybeSingle();
+    if (updateError) {
+      return json(
+        {
+          error:
+            "Payment was captured, but stock could not be reserved. Contact an administrator for fulfillment or refund support.",
+        },
+        409,
+      );
+    }
+    return json({ orderId: order.id, paymentStatus: updated?.payment_status ?? "paid" });
+  }
 
-  return json({ orderId: order.id, paymentStatus: paid ? "paid" : "failed" });
+  const nextStatus = status === "CANCELLED" ? "cancelled" : "failed";
+  const { data: updated, error: updateError } = await admin
+    .from("orders")
+    .update({ payment_status: nextStatus, val_id: valId })
+    .eq("id", order.id)
+    .eq("payment_status", "unpaid")
+    .select("payment_status")
+    .maybeSingle();
+  if (updateError) {
+    throw updateError;
+  }
+
+  return json({
+    orderId: order.id,
+    paymentStatus: updated?.payment_status ?? order.payment_status,
+  });
 }
 
 type ValidationResult = {
@@ -264,7 +323,7 @@ type ValidationResult = {
   bank_tran_id: string | null;
 };
 
-async function queryByTranId(body: Record<string, unknown>): Promise<Response> {
+async function queryByTranId(userId: string, body: Record<string, unknown>): Promise<Response> {
   const tranId = readText(body.tranId).trim();
   if (!tranId) {
     return json({ error: "Transaction details are missing." }, 400);
@@ -272,14 +331,18 @@ async function queryByTranId(body: Record<string, unknown>): Promise<Response> {
 
   const { data: order, error: orderError } = await admin
     .from("orders")
-    .select("id")
+    .select("id, payment_status")
     .eq("tran_id", tranId)
+    .eq("retailer_id", userId)
     .maybeSingle();
   if (orderError) {
     throw orderError;
   }
   if (!order) {
     return json({ error: "The order could not be found." }, 404);
+  }
+  if (order.payment_status === "paid") {
+    return json({ orderId: order.id, paymentStatus: "paid" });
   }
 
   const params = new URLSearchParams({
@@ -293,12 +356,12 @@ async function queryByTranId(body: Record<string, unknown>): Promise<Response> {
   );
   const data: unknown = await response.json();
   if (!isRecord(data) || data.APIConnect !== "DONE" || !Array.isArray(data.element)) {
-    return json({ paymentStatus: "unpaid" });
+    return json({ orderId: order.id, paymentStatus: order.payment_status });
   }
 
   const expected = await orderTotal(order.id);
   let paidElement: { val_id: string; bank_tran_id: string | null } | undefined;
-  let outcome: "unpaid" | "paid" | "failed" | "cancelled" = "unpaid";
+  let outcome: "unpaid" | "failed" | "cancelled" = "unpaid";
   for (const element of data.element) {
     if (!isRecord(element)) {
       continue;
@@ -323,8 +386,7 @@ async function queryByTranId(body: Record<string, unknown>): Promise<Response> {
   }
 
   if (paidElement) {
-    outcome = "paid";
-    await admin
+    const { data: updated, error: updateError } = await admin
       .from("orders")
       .update({
         payment_status: "paid",
@@ -332,10 +394,40 @@ async function queryByTranId(body: Record<string, unknown>): Promise<Response> {
         bank_tran_id: paidElement.bank_tran_id ?? null,
         paid_at: new Date().toISOString(),
       })
-      .eq("id", order.id);
+      .eq("id", order.id)
+      .neq("payment_status", "paid")
+      .select("payment_status")
+      .maybeSingle();
+    if (updateError) {
+      return json(
+        {
+          error:
+            "Payment was captured, but stock could not be reserved. Contact an administrator for fulfillment or refund support.",
+        },
+        409,
+      );
+    }
+    return json({ orderId: order.id, paymentStatus: updated?.payment_status ?? "paid" });
   }
 
-  return json({ orderId: order.id, paymentStatus: outcome });
+  if (outcome === "failed" || outcome === "cancelled") {
+    const { data: updated, error: updateError } = await admin
+      .from("orders")
+      .update({ payment_status: outcome })
+      .eq("id", order.id)
+      .eq("payment_status", "unpaid")
+      .select("payment_status")
+      .maybeSingle();
+    if (updateError) {
+      throw updateError;
+    }
+    return json({
+      orderId: order.id,
+      paymentStatus: updated?.payment_status ?? order.payment_status,
+    });
+  }
+
+  return json({ orderId: order.id, paymentStatus: order.payment_status });
 }
 
 async function validateTransaction(valId: string): Promise<ValidationResult> {

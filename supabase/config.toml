@@ -2,7 +2,7 @@
 verify_jwt = true
 
 [functions.sslcommerz-checkout]
-verify_jwt = false
+verify_jwt = true
 
 [functions.sslcommerz-ipn]
 verify_jwt = false

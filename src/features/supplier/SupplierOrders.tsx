@@ -17,9 +17,9 @@ import { formatDate, formatPrice, initials } from "../workspace/format.ts";
 import { RouterLink, WorkspaceShell } from "../workspace/WorkspaceShell.tsx";
 import { supplierNavItems } from "./supplier-shared.tsx";
 import {
+  acceptSupplierOrder,
   filterSupplierOrders,
   loadSupplierOrders,
-  setSupplierOrderStatus,
   type SupplierOrder,
 } from "./supplier-orders-api.ts";
 
@@ -32,18 +32,21 @@ type Notice = { message: string; state: NoticeState } | null;
 function OrderActions({
   order,
   disabled,
-  onStatus,
+  onAccept,
 }: {
   order: SupplierOrder;
   disabled: boolean;
-  onStatus: (order: SupplierOrder, next: "confirmed" | "shipped") => void;
+  onAccept: (order: SupplierOrder) => void;
 }) {
-  if (order.cancel_requested && order.status === "confirmed") {
+  if (order.cancel_requested) {
     return (
       <span className="admin-muted">
         The retailer asked to cancel. The admin team will resolve it.
       </span>
     );
+  }
+  if (order.accepted_at) {
+    return <span className="admin-muted">Accepted {formatDate(order.accepted_at)}</span>;
   }
   if (order.status === "pending") {
     return (
@@ -51,30 +54,14 @@ function OrderActions({
         className="text-button"
         type="button"
         disabled={disabled}
-        onClick={() => onStatus(order, "confirmed")}
+        onClick={() => onAccept(order)}
       >
         <Icon name="check" />
-        <span>Confirm order</span>
+        <span>Accept order</span>
       </button>
     );
   }
-  if (order.status === "confirmed") {
-    return (
-      <button
-        className="text-button"
-        type="button"
-        disabled={disabled}
-        onClick={() => onStatus(order, "shipped")}
-      >
-        <Icon name="truck" />
-        <span>Mark shipped</span>
-      </button>
-    );
-  }
-  if (order.status === "shipped") {
-    return <span className="admin-muted">Shipped · waiting for delivery to be confirmed.</span>;
-  }
-  return null;
+  return <span className="admin-muted">Order status is managed by the admin team.</span>;
 }
 
 export function SupplierOrders({ loadOrders = loadSupplierOrders }: SupplierOrdersProps) {
@@ -124,7 +111,7 @@ export function SupplierOrders({ loadOrders = loadSupplierOrders }: SupplierOrde
     return (
       <WorkspaceError
         eyebrow="Supplier workspace"
-        title="We could not load your catalog."
+        title="We could not load your orders."
         message={error}
         onRetry={retry}
         onLogout={onLogout}
@@ -132,34 +119,31 @@ export function SupplierOrders({ loadOrders = loadSupplierOrders }: SupplierOrde
     );
   }
 
-  const onStatus = (order: SupplierOrder, next: "confirmed" | "shipped") => {
-    const message =
-      next === "confirmed"
-        ? `Confirm order #${shortId(order.id)} for ${order.retailer_name}? They will see it as confirmed.`
-        : `Mark order #${shortId(order.id)} as shipped for ${order.retailer_name}?`;
-    if (!window.confirm(message)) return;
+  const onAccept = (order: SupplierOrder) => {
+    if (!window.confirm(`Accept order #${shortId(order.id)} from ${order.retailer_name}?`)) return;
 
     setBusyId(order.id);
-    void setSupplierOrderStatus(order.id, next)
-      .then((status) => {
-        setOrders((prev) => prev?.map((o) => (o.id === order.id ? { ...o, status } : o)) ?? prev);
+    void acceptSupplierOrder(order.id)
+      .then((acceptedAt) => {
+        setOrders(
+          (prev) =>
+            prev?.map((current) =>
+              current.id === order.id ? { ...current, accepted_at: acceptedAt } : current,
+            ) ?? prev,
+        );
         setNotice({
-          message:
-            next === "confirmed"
-              ? `Order #${shortId(order.id)} is confirmed.`
-              : `Order #${shortId(order.id)} is marked shipped.`,
+          message: `Order #${shortId(order.id)} was accepted. The admin team will manage its status.`,
           state: "success",
         });
-        setBusyId(null);
       })
-      .catch((statusError: unknown) => {
+      .catch((acceptError: unknown) => {
         setNotice({
           message:
-            statusError instanceof Error ? statusError.message : "The order could not be updated.",
+            acceptError instanceof Error ? acceptError.message : "The order could not be accepted.",
           state: "error",
         });
-        setBusyId(null);
-      });
+      })
+      .finally(() => setBusyId(null));
   };
 
   const filtered = orders ? filterSupplierOrders(orders, searchTerm, shortId) : [];
@@ -175,7 +159,7 @@ export function SupplierOrders({ loadOrders = loadSupplierOrders }: SupplierOrde
       <PageHeader
         eyebrow="Order fulfillment"
         title="Orders."
-        copy="Confirm incoming orders and mark them shipped once dispatched."
+        copy="Accept incoming order requests. The admin team manages confirmation, shipping, delivery, and cancellation statuses."
         actions={
           <RouterLink className="button button-subtle" to="/supplier/stock">
             <Icon name="layers" />
@@ -246,6 +230,9 @@ export function SupplierOrders({ loadOrders = loadSupplierOrders }: SupplierOrde
                             </td>
                             <td>
                               <StatusBadge status={order.status} />
+                              {order.accepted_at ? (
+                                <span className="rt-cancel-flag">Accepted</span>
+                              ) : null}
                               {order.cancel_requested ? (
                                 <span className="rt-cancel-flag">Cancel requested</span>
                               ) : null}
@@ -274,7 +261,7 @@ export function SupplierOrders({ loadOrders = loadSupplierOrders }: SupplierOrde
                               <OrderActions
                                 order={order}
                                 disabled={busyId === order.id}
-                                onStatus={onStatus}
+                                onAccept={onAccept}
                               />
                             </div>
                           </>

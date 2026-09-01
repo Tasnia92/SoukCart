@@ -75,6 +75,8 @@ Deno.serve(async (request) => {
         return await listUsers();
       case "create":
         return await createUser(body);
+      case "update":
+        return await updateUser(body, caller);
       case "delete":
         return await deleteUser(body, caller);
       default:
@@ -133,17 +135,10 @@ async function createUser(body: RequestBody): Promise<Response> {
   const password = readText(body.password);
   const role = readText(body.role);
 
-  if (!name || name.length > 100) {
-    return json({ error: "Enter a name between 1 and 100 characters." }, 400);
-  }
-  if (!email || !email.includes("@") || email.length > 255) {
-    return json({ error: "Enter a valid email address." }, 400);
-  }
+  const validationError = validateAccountFields(name, email, role);
+  if (validationError) return validationError;
   if (password.length < 8 || password.length > 72) {
     return json({ error: "The password must be between 8 and 72 characters." }, 400);
-  }
-  if (!allowedRoles.has(role)) {
-    return json({ error: "Choose a valid account type." }, 400);
   }
 
   const { data, error } = await admin.auth.admin.createUser({
@@ -158,7 +153,7 @@ async function createUser(body: RequestBody): Promise<Response> {
 
   const { data: profile, error: profileError } = await admin
     .from("users")
-    .update({ name, role })
+    .update({ name, email, role })
     .eq("id", data.user.id)
     .select("id, email, name, role, created_at")
     .single();
@@ -168,6 +163,76 @@ async function createUser(body: RequestBody): Promise<Response> {
   }
 
   return json({ user: toDirectoryUser(data.user, profile) }, 201);
+}
+
+async function updateUser(body: RequestBody, caller: Caller): Promise<Response> {
+  const userId = readText(body.userId).trim();
+  const name = readText(body.name).trim();
+  const email = readText(body.email).trim().toLowerCase();
+  const role = readText(body.role);
+
+  if (!isUuid(userId)) {
+    return json({ error: "Enter a valid user ID." }, 400);
+  }
+  const validationError = validateAccountFields(name, email, role);
+  if (validationError) return validationError;
+  if (userId === caller.id && role !== "admin") {
+    return json({ error: "You cannot remove administrator access from your active account." }, 400);
+  }
+
+  const { data: existingData, error: existingError } = await admin.auth.admin.getUserById(userId);
+  if (existingError || !existingData.user) {
+    return json({ error: existingError?.message ?? "The user could not be found." }, 404);
+  }
+
+  const existingUser = existingData.user as AuthUser;
+  const previousMetadata = isRecord(existingUser.user_metadata) ? existingUser.user_metadata : {};
+  const { data: updatedData, error: authError } = await admin.auth.admin.updateUserById(userId, {
+    email,
+    user_metadata: { ...previousMetadata, name },
+  });
+  if (authError || !updatedData.user) {
+    return json({ error: authError?.message ?? "The account could not be updated." }, 400);
+  }
+
+  const { data: profile, error: profileError } = await admin
+    .from("users")
+    .upsert({ id: userId, email, name, role }, { onConflict: "id" })
+    .select("id, email, name, role, created_at")
+    .single();
+  if (profileError || !profile) {
+    const rollback: { email?: string; user_metadata: Record<string, unknown> } = {
+      user_metadata: previousMetadata,
+    };
+    if (existingUser.email) rollback.email = existingUser.email;
+    const { error: rollbackError } = await admin.auth.admin.updateUserById(userId, rollback);
+    if (rollbackError) {
+      console.error("Admin user update rollback failed", rollbackError);
+      return json(
+        {
+          error:
+            "The profile update failed and the authentication change could not be rolled back. Reconcile this account in Supabase Auth before editing it again.",
+        },
+        500,
+      );
+    }
+    return json({ error: "The profile could not be updated. No changes were saved." }, 500);
+  }
+
+  return json({ user: toDirectoryUser(updatedData.user as AuthUser, profile) });
+}
+
+function validateAccountFields(name: string, email: string, role: string): Response | null {
+  if (!name || name.length > 100) {
+    return json({ error: "Enter a name between 1 and 100 characters." }, 400);
+  }
+  if (!email || !email.includes("@") || email.length > 255) {
+    return json({ error: "Enter a valid email address." }, 400);
+  }
+  if (!allowedRoles.has(role)) {
+    return json({ error: "Choose a valid account type." }, 400);
+  }
+  return null;
 }
 
 async function deleteUser(body: RequestBody, caller: Caller): Promise<Response> {
@@ -197,7 +262,7 @@ async function listAuthUsers(): Promise<AuthUser[]> {
     if (error) {
       throw error;
     }
-    users.push(...data.users);
+    users.push(...(data.users as AuthUser[]));
     if (data.users.length < perPage) {
       return users;
     }

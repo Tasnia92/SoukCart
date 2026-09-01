@@ -68,18 +68,30 @@ Deno.serve(async (request) => {
     });
 
     if (result.paid) {
-      await admin
+      const { error: paymentError } = await admin
         .from("orders")
         .update({ payment_status: "paid", paid_at: new Date().toISOString() })
         .eq("id", order.id)
         .neq("payment_status", "paid");
+      if (paymentError) {
+        console.error("Paid order could not reserve stock", paymentError);
+        return respond(
+          appBase,
+          "failed",
+          order.id,
+          "Payment was captured, but inventory requires administrator review.",
+        );
+      }
       await clearCart(retailerSafe(result.retailerId, order.retailer_id));
-    } else if (result.outcome !== "unpaid") {
-      await admin
+    } else if (result.outcome !== "unpaid" && result.hardFail) {
+      const { error: paymentError } = await admin
         .from("orders")
         .update({ payment_status: result.outcome })
         .eq("id", order.id)
-        .neq("payment_status", "paid");
+        .eq("payment_status", "unpaid");
+      if (paymentError) {
+        throw paymentError;
+      }
     }
 
     const redirect =

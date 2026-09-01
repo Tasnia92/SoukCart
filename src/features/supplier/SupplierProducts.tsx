@@ -9,6 +9,7 @@ import {
   SearchToolbar,
   WorkspaceError,
 } from "../../components/ui/Workspace.tsx";
+import { useProductChanges } from "../../product-realtime.ts";
 import { useSessionSnapshot, useSessionStore } from "../../session.tsx";
 import { formatDate, formatPrice } from "../workspace/format.ts";
 import { RouterLink, WorkspaceShell } from "../workspace/WorkspaceShell.tsx";
@@ -103,6 +104,12 @@ export function SupplierProducts({ loadProducts = loadSupplierProducts }: Suppli
   const [busyId, setBusyId] = useState<string | null>(null);
 
   const sellerId = state.status === "seller" ? state.session.user.id : "";
+
+  useProductChanges({
+    enabled: Boolean(sellerId),
+    sellerId,
+    onChange: () => setLoadVersion((version) => version + 1),
+  });
 
   useEffect(() => {
     if (!sellerId) return;

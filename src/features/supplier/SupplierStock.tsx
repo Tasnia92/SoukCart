@@ -11,6 +11,7 @@ import {
   TableShell,
   WorkspaceError,
 } from "../../components/ui/Workspace.tsx";
+import { useProductChanges } from "../../product-realtime.ts";
 import { useSessionSnapshot, useSessionStore } from "../../session.tsx";
 import { RouterLink, WorkspaceShell } from "../workspace/WorkspaceShell.tsx";
 import {
@@ -70,7 +71,7 @@ function StockRow({
           <span className="sr-only">New stock for {product.name}</span>
           <input
             type="number"
-            min="0"
+            min="1"
             step="1"
             inputMode="numeric"
             value={value}
@@ -99,6 +100,12 @@ export function SupplierStock({ loadProducts = loadSupplierProducts }: SupplierS
   const [notice, setNotice] = useState<SupplierNotice | null>(consumeSupplierNotice);
 
   const sellerId = state.status === "seller" ? state.session.user.id : "";
+
+  useProductChanges({
+    enabled: Boolean(sellerId),
+    sellerId,
+    onChange: () => setLoadVersion((version) => version + 1),
+  });
 
   useEffect(() => {
     if (!sellerId) return;
@@ -145,8 +152,8 @@ export function SupplierStock({ loadProducts = loadSupplierProducts }: SupplierS
   const onSave = async (product: SupplierProduct, raw: string): Promise<boolean> => {
     const trimmed = raw.trim();
     const next = Number(trimmed);
-    if (!trimmed || !Number.isInteger(next) || next < 0) {
-      setNotice({ message: "Stock must be a whole number of 0 or more.", state: "error" });
+    if (!trimmed || !Number.isInteger(next) || next < 1) {
+      setNotice({ message: "Stock must be a whole number of at least 1.", state: "error" });
       return false;
     }
     try {

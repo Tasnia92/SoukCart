@@ -56,6 +56,10 @@ Deno.serve(async (request) => {
       return new Response("Order not found.", { status: 404 });
     }
 
+    if (order.payment_status === "paid") {
+      return new Response("OK");
+    }
+
     let paid = false;
     if (status === "VALID") {
       const validation = await validateTransaction(valId);
@@ -64,14 +68,21 @@ Deno.serve(async (request) => {
         validation.amount === (await orderTotal(order.id));
     }
 
-    await admin
-      .from("orders")
-      .update({
-        payment_status: paid ? "paid" : status === "CANCELLED" ? "cancelled" : "failed",
-        val_id: valId,
-        paid_at: paid ? new Date().toISOString() : null,
-      })
-      .eq("id", order.id);
+    if (paid) {
+      const { error: paymentError } = await admin
+        .from("orders")
+        .update({
+          payment_status: "paid",
+          val_id: valId,
+          paid_at: new Date().toISOString(),
+        })
+        .eq("id", order.id)
+        .neq("payment_status", "paid");
+      if (paymentError) {
+        console.error("Paid order could not reserve stock", paymentError);
+        return new Response("Payment requires administrator review.", { status: 409 });
+      }
+    }
 
     return new Response("OK");
   } catch (error) {

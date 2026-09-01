@@ -21,13 +21,18 @@ export type SupplierOrder = {
   created_at: string;
   retailer_name: string;
   retailer_email: string;
+  accepted_at: string | null;
   items: SupplierOrderItem[];
   supplier_total: number;
 };
 
-type SupplierOrderRow = Omit<SupplierOrder, "supplier_total" | "items" | "cancel_requested"> & {
+type SupplierOrderRow = Omit<
+  SupplierOrder,
+  "supplier_total" | "items" | "cancel_requested" | "accepted_at"
+> & {
   supplier_total: number | string;
   cancel_requested: boolean | null;
+  accepted_at: string | null;
   items: (Omit<SupplierOrderItem, "unit_price" | "line_total"> & {
     unit_price: number | string;
     line_total: number | string;
@@ -39,6 +44,7 @@ function normalizeOrder(row: SupplierOrderRow): SupplierOrder {
     ...row,
     status: row.status as SupplierOrderStatus,
     cancel_requested: row.cancel_requested === true,
+    accepted_at: row.accepted_at ?? null,
     supplier_total: Number(row.supplier_total),
     items: (row.items ?? []).map((item) => ({
       ...item,
@@ -54,16 +60,13 @@ export async function loadSupplierOrders(): Promise<SupplierOrder[]> {
   return ((Array.isArray(data) ? data : []) as SupplierOrderRow[]).map(normalizeOrder);
 }
 
-export async function setSupplierOrderStatus(
-  orderId: string,
-  status: "confirmed" | "shipped",
-): Promise<SupplierOrderStatus> {
-  const { data, error } = await supabase.rpc("seller_set_order_status", {
+export async function acceptSupplierOrder(orderId: string): Promise<string> {
+  const { data, error } = await supabase.rpc("seller_accept_order", {
     p_order_id: orderId,
-    p_status: status,
   });
-  if (error) throw new Error("The order could not be updated.");
-  return (typeof data === "string" ? data : status) as SupplierOrderStatus;
+  if (error) throw new Error("The order could not be accepted.");
+  if (typeof data !== "string") throw new Error("The order acceptance was not confirmed.");
+  return data;
 }
 
 export function filterSupplierOrders(
