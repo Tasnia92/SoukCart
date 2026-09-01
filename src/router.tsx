@@ -1,16 +1,24 @@
 import {
-  createRootRoute,
+  createRootRouteWithContext,
   createRoute,
   createRouter,
   Outlet,
+  redirect,
   useRouterState,
 } from "@tanstack/react-router";
 import { useEffect, useRef } from "react";
+import { resolveAuthAccess, type AuthArea } from "./auth-access.ts";
 import { renderAdminApp } from "./components/AdminApp.ts";
-import { renderAuthApp } from "./components/AuthApp.ts";
+import { AdminAuthRoute, RootAuthRoute } from "./components/auth/AuthRoutes.tsx";
 import { renderPaymentResult } from "./components/PaymentResult.ts";
 import { renderRetailerApp } from "./components/RetailerApp.ts";
 import { renderSupplierApp } from "./components/SupplierApp.ts";
+import {
+  sessionStore,
+  type SessionState,
+  type SessionStore,
+  useSessionSnapshot,
+} from "./session.tsx";
 
 export const FLASH_STORAGE_KEYS = {
   notice: "soukcart:notice",
@@ -50,8 +58,18 @@ export const fallbackRouteContract = [
   { path: "$", to: "/" },
 ] as const;
 
+export const publicPaymentResultPaths = [
+  "/retailer/checkout/success",
+  "/retailer/checkout/failed",
+  "/retailer/checkout/cancelled",
+] as const;
+
 type LegacyRenderer = (root: HTMLDivElement) => void;
-type LegacyTarget = (typeof legacyRouteContract)[number]["target"];
+type LegacyRouteEntry = (typeof legacyRouteContract)[number];
+type LegacyTarget = LegacyRouteEntry["target"];
+type RouterContext = { session: SessionStore };
+
+const publicPaymentPathSet = new Set<string>(publicPaymentResultPaths);
 
 const rendererByTarget = {
   admin: renderAdminApp,
@@ -74,14 +92,54 @@ export function shouldRenderPaymentResult({
   );
 }
 
+function getPaymentReturn(): string | null {
+  return sessionStorage.getItem(FLASH_STORAGE_KEYS.paymentReturn);
+}
+
+function isRootPaymentLocation(location: { pathname: string; searchStr: string }): boolean {
+  return shouldRenderPaymentResult({
+    pathname: location.pathname,
+    search: location.searchStr,
+    paymentReturn: getPaymentReturn(),
+  });
+}
+
+export async function guardAuthArea(store: SessionStore, area: AuthArea): Promise<void> {
+  const state = await store.ensureReady();
+  const decision = resolveAuthAccess(area, state);
+
+  switch (decision.kind) {
+    case "render":
+      return;
+    case "redirect":
+      throw redirect({ href: decision.to, replace: true });
+    case "deny-admin":
+      await store.denyAdminAccess();
+      return;
+    case "sign-out-redirect":
+      await store.signOutForGuard();
+      throw redirect({ href: decision.to, replace: true });
+  }
+}
+
+function routeArea({ path, target }: LegacyRouteEntry): AuthArea {
+  if (publicPaymentPathSet.has(path)) return "public-payment";
+  if (target === "root") return "root";
+  return target === "supplier" ? "supplier" : target;
+}
+
+function canMountProtectedTarget(state: SessionState, target: Exclude<LegacyTarget, "root">) {
+  if (target === "admin") return state.status === "admin";
+  if (target === "retailer") return state.status === "retailer";
+  return state.status === "seller";
+}
+
 function LegacyMount({ renderer, routeKey }: { renderer: LegacyRenderer; routeKey: string }) {
   const host = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
     const node = host.current;
-    if (!node) {
-      return;
-    }
+    if (!node) return;
 
     renderer(node);
     return () => node.replaceChildren();
@@ -90,20 +148,38 @@ function LegacyMount({ renderer, routeKey }: { renderer: LegacyRenderer; routeKe
   return <div ref={host} className="min-h-0" data-legacy-route={routeKey} />;
 }
 
-function LegacyRoute({ target }: { target: LegacyTarget }) {
+function LegacyRoute({ target }: { target: Exclude<LegacyTarget, "root"> }) {
   const location = useRouterState({ select: (state) => state.location });
-  const renderer =
-    target === "root"
-      ? shouldRenderPaymentResult({
-          pathname: location.pathname,
-          search: location.searchStr,
-          paymentReturn: sessionStorage.getItem(FLASH_STORAGE_KEYS.paymentReturn),
-        })
-        ? renderPaymentResult
-        : renderAuthApp
-      : rendererByTarget[target];
+  return (
+    <LegacyMount key={location.href} renderer={rendererByTarget[target]} routeKey={location.href} />
+  );
+}
 
-  return <LegacyMount key={location.href} renderer={renderer} routeKey={location.href} />;
+function ProtectedLegacyRoute({ target }: { target: Exclude<LegacyTarget, "root"> }) {
+  const { state } = useSessionSnapshot();
+  return canMountProtectedTarget(state, target) ? <LegacyRoute target={target} /> : null;
+}
+
+function RootRoute() {
+  const location = useRouterState({ select: (state) => state.location });
+  if (isRootPaymentLocation(location)) {
+    return (
+      <LegacyMount key={location.href} renderer={renderPaymentResult} routeKey={location.href} />
+    );
+  }
+  return <RootAuthRoute />;
+}
+
+function AdminRoute() {
+  const { state } = useSessionSnapshot();
+  return state.status === "admin" ? <LegacyRoute target="admin" /> : <AdminAuthRoute />;
+}
+
+function routeComponent({ path, target }: LegacyRouteEntry) {
+  if (target === "root") return RootRoute;
+  if (target === "admin") return AdminRoute;
+  if (publicPaymentPathSet.has(path)) return () => <LegacyRoute target={target} />;
+  return () => <ProtectedLegacyRoute target={target} />;
 }
 
 export function getFallbackDestination(
@@ -123,19 +199,29 @@ function NotFoundRedirect() {
   return null;
 }
 
-const rootRoute = createRootRoute({ component: Outlet, notFoundComponent: NotFoundRedirect });
+const rootRoute = createRootRouteWithContext<RouterContext>()({
+  component: Outlet,
+  notFoundComponent: NotFoundRedirect,
+});
 
-const legacyRoutes = legacyRouteContract.map(({ path, target }) =>
-  createRoute({
+const legacyRoutes = legacyRouteContract.map((entry) => {
+  const area = routeArea(entry);
+  return createRoute({
     getParentRoute: () => rootRoute,
-    path,
-    component: () => <LegacyRoute target={target} />,
-  }),
-);
+    path: entry.path,
+    beforeLoad: async ({ context, location }) => {
+      if (area === "public-payment" || (area === "root" && isRootPaymentLocation(location))) {
+        return;
+      }
+      await guardAuthArea(context.session, area);
+    },
+    component: routeComponent(entry),
+  });
+});
 
 const routeTree = rootRoute.addChildren(legacyRoutes);
 
-export const router = createRouter({ routeTree });
+export const router = createRouter({ routeTree, context: { session: sessionStore } });
 
 declare module "@tanstack/react-router" {
   interface Register {
