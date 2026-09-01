@@ -131,7 +131,7 @@ async function listActivity(): Promise<Response> {
   const { data, error } = await admin
     .from("orders")
     .select(
-      "id, status, cancel_requested, payment_status, payment_method, created_at, users(name, email), order_items(id, product_id, quantity, unit_price, products(id, name, seller_id, users(name, email)))",
+      "id, status, cancel_requested, payment_status, payment_method, created_at, retailer_id, users(name, email), order_items(id, product_id, quantity, unit_price, products(id, name, seller_id, users(name, email)))",
     )
     .order("created_at", { ascending: false })
     .limit(1000);

@@ -101,7 +101,9 @@ async function authorize(request: Request): Promise<Caller | Response> {
 async function listComplaints(): Promise<Response> {
   const { data, error } = await admin
     .from("complaints")
-    .select("id, subject, description, attachment_url, status, created_at, users(name, email)")
+    .select(
+      "id, subject, description, attachment_url, status, created_at, retailer_id, users(name, email)",
+    )
     .order("created_at", { ascending: false })
     .limit(1000);
   if (error) {
