@@ -4,6 +4,7 @@ import {
   fallbackRouteContract,
   FLASH_STORAGE_KEYS,
   getFallbackDestination,
+  isReactOverviewRoute,
   legacyRouteContract,
   PAYMENT_SEARCH_KEYS,
   publicPaymentResultPaths,
@@ -42,7 +43,7 @@ type BeforeLoad = (options: {
 
 function beforeLoad(path: keyof typeof router.routesByPath): BeforeLoad {
   const handler = router.routesByPath[path].options.beforeLoad;
-  if (!handler) throw new Error(`Expected ${path} to have a beforeLoad guard`);
+  if (!handler) throw new Error(`Expected ${String(path)} to have a beforeLoad guard`);
   return handler as unknown as BeforeLoad;
 }
 
@@ -96,6 +97,18 @@ describe("route contract", () => {
     for (const { path } of legacyRouteContract) {
       expect(router.routesByPath[path].options.beforeLoad).toBeTypeOf("function");
     }
+  });
+
+  it("uses React only for the exact Phase 4 overview URLs", () => {
+    expect(isReactOverviewRoute("/admin", "admin")).toBe(true);
+    expect(isReactOverviewRoute("/supplier", "supplier")).toBe(true);
+    expect(isReactOverviewRoute("/admin/users", "admin")).toBe(false);
+    expect(isReactOverviewRoute("/admin/activity", "admin")).toBe(false);
+    expect(isReactOverviewRoute("/admin/complaints", "admin")).toBe(false);
+    expect(isReactOverviewRoute("/supplier/orders", "supplier")).toBe(false);
+    expect(isReactOverviewRoute("/supplier/products", "supplier")).toBe(false);
+    expect(isReactOverviewRoute("/supplier/products/new", "supplier")).toBe(false);
+    expect(isReactOverviewRoute("/supplier/stock", "supplier")).toBe(false);
   });
 
   it("keeps checkout result routes public and mapped to the retailer legacy renderer", () => {

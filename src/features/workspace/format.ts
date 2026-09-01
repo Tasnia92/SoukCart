@@ -1,0 +1,18 @@
+export function formatPrice(value: number): string {
+  return `৳${value.toLocaleString(undefined, {
+    minimumFractionDigits: 2,
+    maximumFractionDigits: 2,
+  })}`;
+}
+
+export function formatDate(value: string): string {
+  return new Date(value).toLocaleDateString(undefined, {
+    day: "2-digit",
+    month: "short",
+    year: "numeric",
+  });
+}
+
+export function firstName(value: string): string {
+  return value.trim().split(/\s+/)[0] ?? "there";
+}

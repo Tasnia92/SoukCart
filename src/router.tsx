@@ -6,10 +6,12 @@ import {
   redirect,
   useRouterState,
 } from "@tanstack/react-router";
-import { useEffect, useRef } from "react";
+import { useEffect, useRef, type ReactElement } from "react";
 import { resolveAuthAccess, type AuthArea } from "./auth-access.ts";
 import { renderAdminApp } from "./components/AdminApp.ts";
 import { AdminAuthRoute, RootAuthRoute } from "./components/auth/AuthRoutes.tsx";
+import { AdminOverview } from "./features/admin/AdminOverview.tsx";
+import { SupplierOverview } from "./features/supplier/SupplierOverview.tsx";
 import { renderPaymentResult } from "./components/PaymentResult.ts";
 import { renderRetailerApp } from "./components/RetailerApp.ts";
 import { renderSupplierApp } from "./components/SupplierApp.ts";
@@ -63,6 +65,13 @@ export const publicPaymentResultPaths = [
   "/retailer/checkout/failed",
   "/retailer/checkout/cancelled",
 ] as const;
+
+export function isReactOverviewRoute(pathname: string, target: "admin" | "supplier"): boolean {
+  return (
+    (target === "admin" && pathname === "/admin") ||
+    (target === "supplier" && pathname === "/supplier")
+  );
+}
 
 type LegacyRenderer = (root: HTMLDivElement) => void;
 type LegacyRouteEntry = (typeof legacyRouteContract)[number];
@@ -148,19 +157,23 @@ function LegacyMount({ renderer, routeKey }: { renderer: LegacyRenderer; routeKe
   return <div ref={host} className="min-h-0" data-legacy-route={routeKey} />;
 }
 
-function LegacyRoute({ target }: { target: Exclude<LegacyTarget, "root"> }) {
+function LegacyRoute({ target }: { target: Exclude<LegacyTarget, "root"> }): ReactElement {
   const location = useRouterState({ select: (state) => state.location });
   return (
     <LegacyMount key={location.href} renderer={rendererByTarget[target]} routeKey={location.href} />
   );
 }
 
-function ProtectedLegacyRoute({ target }: { target: Exclude<LegacyTarget, "root"> }) {
+function ProtectedLegacyRoute({
+  target,
+}: {
+  target: Exclude<LegacyTarget, "root">;
+}): ReactElement | null {
   const { state } = useSessionSnapshot();
   return canMountProtectedTarget(state, target) ? <LegacyRoute target={target} /> : null;
 }
 
-function RootRoute() {
+function RootRoute(): ReactElement {
   const location = useRouterState({ select: (state) => state.location });
   if (isRootPaymentLocation(location)) {
     return (
@@ -170,14 +183,30 @@ function RootRoute() {
   return <RootAuthRoute />;
 }
 
-function AdminRoute() {
+function AdminRoute(): ReactElement {
   const { state } = useSessionSnapshot();
-  return state.status === "admin" ? <LegacyRoute target="admin" /> : <AdminAuthRoute />;
+  const pathname = useRouterState({ select: (routerState) => routerState.location.pathname });
+  if (state.status !== "admin") return <AdminAuthRoute />;
+  return isReactOverviewRoute(pathname, "admin") ? (
+    <AdminOverview />
+  ) : (
+    <LegacyRoute target="admin" />
+  );
 }
 
-function routeComponent({ path, target }: LegacyRouteEntry) {
+function SupplierRoute(): ReactElement | null {
+  const { state } = useSessionSnapshot();
+  const pathname = useRouterState({ select: (routerState) => routerState.location.pathname });
+  if (isReactOverviewRoute(pathname, "supplier") && state.status === "seller") {
+    return <SupplierOverview />;
+  }
+  return <ProtectedLegacyRoute target="supplier" />;
+}
+
+function routeComponent({ path, target }: LegacyRouteEntry): () => ReactElement | null {
   if (target === "root") return RootRoute;
   if (target === "admin") return AdminRoute;
+  if (target === "supplier") return SupplierRoute;
   if (publicPaymentPathSet.has(path)) return () => <LegacyRoute target={target} />;
   return () => <ProtectedLegacyRoute target={target} />;
 }
