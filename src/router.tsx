@@ -12,6 +12,9 @@ import { renderAdminApp } from "./components/AdminApp.ts";
 import { AdminAuthRoute, RootAuthRoute } from "./components/auth/AuthRoutes.tsx";
 import { AdminOverview } from "./features/admin/AdminOverview.tsx";
 import { SupplierOverview } from "./features/supplier/SupplierOverview.tsx";
+import { SupplierProductForm } from "./features/supplier/SupplierProductForm.tsx";
+import { SupplierProducts } from "./features/supplier/SupplierProducts.tsx";
+import { SupplierStock } from "./features/supplier/SupplierStock.tsx";
 import { renderPaymentResult } from "./components/PaymentResult.ts";
 import { renderRetailerApp } from "./components/RetailerApp.ts";
 import { renderSupplierApp } from "./components/SupplierApp.ts";
@@ -194,11 +197,24 @@ function AdminRoute(): ReactElement {
   );
 }
 
+const SUPPLIER_EDIT_PATTERN = /^\/supplier\/products\/([^/]+)\/edit$/;
+
+function reactSupplierPanel(pathname: string): ReactElement | null {
+  if (isReactOverviewRoute(pathname, "supplier")) return <SupplierOverview />;
+  if (pathname === "/supplier/products") return <SupplierProducts />;
+  if (pathname === "/supplier/products/new") return <SupplierProductForm />;
+  if (pathname === "/supplier/stock") return <SupplierStock />;
+  const editMatch = SUPPLIER_EDIT_PATTERN.exec(pathname);
+  if (editMatch) return <SupplierProductForm productId={editMatch[1]} />;
+  return null;
+}
+
 function SupplierRoute(): ReactElement | null {
   const { state } = useSessionSnapshot();
   const pathname = useRouterState({ select: (routerState) => routerState.location.pathname });
-  if (isReactOverviewRoute(pathname, "supplier") && state.status === "seller") {
-    return <SupplierOverview />;
+  if (state.status === "seller") {
+    const panel = reactSupplierPanel(pathname);
+    if (panel) return panel;
   }
   return <ProtectedLegacyRoute target="supplier" />;
 }

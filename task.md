@@ -19,28 +19,28 @@ Move the current vanilla TypeScript application to **React + TanStack Router + T
 
 ### Route inventory
 
-| Route | Current behavior that must survive |
-| --- | --- |
-| `/` | Login/register, role selection, signed-in role redirect, or global payment result when `status` is present or `soukcart:payment-return` exists |
-| `/admin` | Admin login when signed out; account statistics when authorized |
-| `/admin/users` | Search, create, inspect, and delete users |
-| `/admin/activity` | Search and expand orders, summaries, status changes, cancellation approval/rejection |
-| `/admin/complaints` | Search complaints, inspect attachments, resolve complaints |
-| `/retailer` | Order/cart statistics and recent orders |
-| `/retailer/catalog` | Search/category filtering, quantity selection, stock checks, add-to-cart feedback |
-| `/retailer/cart` | Persistent quantities, removal, contact/address fields, notes, online/COD selection, checkout initiation |
-| `/retailer/orders` | Order history, details, payment verification, invoices, cancellation/request rules |
-| `/retailer/orders/$orderId/invoice` | Paid-order invoice states and browser print/PDF flow |
-| `/retailer/complaints` | Complaint history and image/PDF upload up to 5 MB |
-| `/retailer/checkout/success` | Legacy payment completion route |
-| `/retailer/checkout/failed` | Legacy failed-payment result |
-| `/retailer/checkout/cancelled` | Legacy cancelled-payment result |
-| `/supplier` | Product statistics and recent listings |
-| `/supplier/orders` | Search/expand supplier orders and confirm/ship actions |
-| `/supplier/products` | Search, show/hide, edit, and delete products |
-| `/supplier/products/new` | Product creation and optional image upload |
-| `/supplier/products/$productId/edit` | Product editing, image replacement, and missing-product redirect |
-| `/supplier/stock` | Search active products and save nonnegative integer stock, including Enter-to-save |
+| Route                                | Current behavior that must survive                                                                                                             |
+| ------------------------------------ | ---------------------------------------------------------------------------------------------------------------------------------------------- |
+| `/`                                  | Login/register, role selection, signed-in role redirect, or global payment result when `status` is present or `soukcart:payment-return` exists |
+| `/admin`                             | Admin login when signed out; account statistics when authorized                                                                                |
+| `/admin/users`                       | Search, create, inspect, and delete users                                                                                                      |
+| `/admin/activity`                    | Search and expand orders, summaries, status changes, cancellation approval/rejection                                                           |
+| `/admin/complaints`                  | Search complaints, inspect attachments, resolve complaints                                                                                     |
+| `/retailer`                          | Order/cart statistics and recent orders                                                                                                        |
+| `/retailer/catalog`                  | Search/category filtering, quantity selection, stock checks, add-to-cart feedback                                                              |
+| `/retailer/cart`                     | Persistent quantities, removal, contact/address fields, notes, online/COD selection, checkout initiation                                       |
+| `/retailer/orders`                   | Order history, details, payment verification, invoices, cancellation/request rules                                                             |
+| `/retailer/orders/$orderId/invoice`  | Paid-order invoice states and browser print/PDF flow                                                                                           |
+| `/retailer/complaints`               | Complaint history and image/PDF upload up to 5 MB                                                                                              |
+| `/retailer/checkout/success`         | Legacy payment completion route                                                                                                                |
+| `/retailer/checkout/failed`          | Legacy failed-payment result                                                                                                                   |
+| `/retailer/checkout/cancelled`       | Legacy cancelled-payment result                                                                                                                |
+| `/supplier`                          | Product statistics and recent listings                                                                                                         |
+| `/supplier/orders`                   | Search/expand supplier orders and confirm/ship actions                                                                                         |
+| `/supplier/products`                 | Search, show/hide, edit, and delete products                                                                                                   |
+| `/supplier/products/new`             | Product creation and optional image upload                                                                                                     |
+| `/supplier/products/$productId/edit` | Product editing, image replacement, and missing-product redirect                                                                               |
+| `/supplier/stock`                    | Search active products and save nonnegative integer stock, including Enter-to-save                                                             |
 
 TanStack Router should use exact routes plus role-family not-found handling. Unknown paths under `/admin/*`, `/retailer/*`, and `/supplier/*` should redirect to that role's overview during the transition. A malformed prefix such as `/adminfoo` does not need to preserve the current accidental `startsWith` match.
 
