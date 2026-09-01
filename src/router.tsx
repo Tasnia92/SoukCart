@@ -11,8 +11,10 @@ import { resolveAuthAccess, type AuthArea } from "./auth-access.ts";
 import { renderAdminApp } from "./components/AdminApp.ts";
 import { AdminAuthRoute, RootAuthRoute } from "./components/auth/AuthRoutes.tsx";
 import { AdminActivity } from "./features/admin/AdminActivity.tsx";
+import { AdminComplaints } from "./features/admin/AdminComplaints.tsx";
 import { AdminOverview } from "./features/admin/AdminOverview.tsx";
 import { AdminUsers } from "./features/admin/AdminUsers.tsx";
+import { RetailerComplaints } from "./features/retailer/RetailerComplaints.tsx";
 import { RetailerOrders } from "./features/retailer/RetailerOrders.tsx";
 import { SupplierOrders } from "./features/supplier/SupplierOrders.tsx";
 import { SupplierOverview } from "./features/supplier/SupplierOverview.tsx";
@@ -197,6 +199,7 @@ function AdminRoute(): ReactElement {
   if (isReactOverviewRoute(pathname, "admin")) return <AdminOverview />;
   if (pathname === "/admin/users") return <AdminUsers />;
   if (pathname === "/admin/activity") return <AdminActivity />;
+  if (pathname === "/admin/complaints") return <AdminComplaints />;
   return <LegacyRoute target="admin" />;
 }
 
@@ -227,6 +230,8 @@ function RetailerRoute(): ReactElement | null {
   const { state } = useSessionSnapshot();
   const pathname = useRouterState({ select: (routerState) => routerState.location.pathname });
   if (state.status === "retailer" && pathname === "/retailer/orders") return <RetailerOrders />;
+  if (state.status === "retailer" && pathname === "/retailer/complaints")
+    return <RetailerComplaints />;
   return <ProtectedLegacyRoute target="retailer" />;
 }
 
