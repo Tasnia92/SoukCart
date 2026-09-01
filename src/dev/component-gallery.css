@@ -1,0 +1,123 @@
+.design-gallery {
+  display: grid;
+  gap: 2rem;
+  padding: clamp(1rem, 4vw, 3rem);
+}
+
+.design-gallery-intro {
+  display: grid;
+  gap: 0.75rem;
+  max-width: 48rem;
+}
+
+.design-gallery-intro .eyebrow {
+  margin: 0;
+}
+
+.design-gallery-themes {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 1rem;
+}
+
+.design-gallery-theme,
+.design-gallery-section {
+  padding: 1.5rem;
+  border: 1px solid var(--border);
+  background: var(--background);
+  color: var(--foreground);
+}
+
+.design-gallery-heading {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 1rem;
+}
+
+.design-gallery-heading .eyebrow {
+  margin-bottom: 0.25rem;
+}
+
+.design-gallery-swatches,
+.design-gallery-actions,
+.design-gallery-icons {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.75rem;
+}
+
+.design-gallery-swatches,
+.design-gallery-actions {
+  margin: 1.5rem 0;
+}
+
+.design-gallery-swatch {
+  min-width: 7rem;
+  padding: 0.75rem;
+  font-size: 0.75rem;
+  font-weight: 500;
+  line-height: 1rem;
+  text-align: center;
+}
+
+.design-gallery-section {
+  display: grid;
+  gap: 1.5rem;
+}
+
+.design-gallery-icons {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(7rem, 1fr));
+}
+
+.design-gallery-icon {
+  display: grid;
+  min-height: 6rem;
+  place-items: center;
+  align-content: center;
+  gap: 0.5rem;
+  padding: 0.75rem;
+  color: var(--color-ink);
+  background: var(--color-card);
+  border: 1px solid var(--color-hairline);
+}
+
+.design-gallery-icon small {
+  color: var(--color-mute);
+  font-family: var(--font-mono);
+  font-size: 0.6875rem;
+}
+
+.design-gallery-circle {
+  display: block;
+  width: 2.75rem;
+  height: 2.75rem;
+}
+
+.design-gallery-workspace {
+  overflow: hidden;
+  border: 1px solid var(--color-hairline);
+}
+
+.design-gallery-table {
+  min-width: 40rem;
+}
+
+@media (max-width: 62rem) {
+  .design-gallery-themes {
+    grid-template-columns: 1fr;
+  }
+}
+
+@media (max-width: 35rem) {
+  .design-gallery,
+  .design-gallery-theme,
+  .design-gallery-section {
+    padding-inline: 1rem;
+  }
+
+  .design-gallery-heading {
+    flex-direction: column;
+  }
+}

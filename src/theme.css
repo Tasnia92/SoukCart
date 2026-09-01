@@ -68,18 +68,41 @@
   /* Focus ring */
   --color-ring: #c96442;
 
+  /* shadcn/Tailwind semantic roles — aliases only; SoukCart tokens stay authoritative. */
+  --background: var(--color-canvas);
+  --foreground: var(--color-ink);
+  --card: var(--color-card);
+  --card-foreground: var(--color-ink);
+  --muted: var(--color-canvas-soft);
+  --muted-foreground: var(--color-mute);
+  --border: var(--color-hairline);
+  --input: var(--color-input);
+  --primary: var(--color-primary);
+  --primary-foreground: var(--color-on-dark);
+  --secondary: var(--color-canvas-soft);
+  --secondary-foreground: var(--color-ink);
+  --accent: var(--color-accent);
+  --accent-foreground: var(--color-accent-foreground);
+  --destructive: var(--color-destructive);
+  --destructive-foreground: var(--color-destructive-foreground);
+  --ring: var(--color-ring);
+
   /* Type */
   --font-sans:
     "Space Grotesk", ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI",
     sans-serif;
   --font-mono: "JetBrains Mono", ui-monospace, SFMono-Regular, Consolas, monospace;
 
-  /* Radius scale — sharp editorial geometry; true circles use 50% in CSS. */
+  /* Radius scale — sharp editorial geometry; true circles use rounded-full/50%. */
   --radius: 0rem; /* base card radius */
+  --radius-xs: 0rem;
   --radius-sm: 0rem;
   --radius-md: 0rem;
   --radius-lg: 0rem;
   --radius-xl: 0rem;
+  --radius-2xl: 0rem;
+  --radius-3xl: 0rem;
+  --radius-4xl: 0rem;
   --radius-pill: 0rem;
   --radius-pill-tab: 0rem;
 
@@ -99,6 +122,20 @@
   --shadow-level-1: var(--shadow-s);
   --shadow-level-2: var(--shadow-m);
   --shadow-level-3: var(--shadow-l);
+
+  /* Tailwind shadow utilities resolve to the restrained SoukCart elevation scale. */
+  --shadow-2xs: var(--shadow-s);
+  --shadow-xs: var(--shadow-s);
+  --shadow-sm: var(--shadow-s);
+  --shadow-md: var(--shadow-m);
+  --shadow-lg: var(--shadow-l);
+  --shadow-xl: var(--shadow-l);
+  --shadow-2xl: var(--shadow-l);
+  --shadow: var(--shadow-s);
+  --shadow-inner: var(--shadow-inset);
+  --inset-shadow-2xs: var(--shadow-inset);
+  --inset-shadow-xs: var(--shadow-inset);
+  --inset-shadow-sm: var(--shadow-inset);
 }
 
 .dark {
@@ -139,4 +176,23 @@
 
   /* Focus ring */
   --color-ring: #d97757;
+
+  /* Keep semantic consumers scoped to the active dark SoukCart tokens. */
+  --background: var(--color-canvas);
+  --foreground: var(--color-ink);
+  --card: var(--color-card);
+  --card-foreground: var(--color-ink);
+  --muted: var(--color-canvas-soft);
+  --muted-foreground: var(--color-mute);
+  --border: var(--color-hairline);
+  --input: var(--color-input);
+  --primary: var(--color-primary);
+  --primary-foreground: var(--color-on-dark);
+  --secondary: var(--color-canvas-soft);
+  --secondary-foreground: var(--color-ink);
+  --accent: var(--color-accent);
+  --accent-foreground: var(--color-accent-foreground);
+  --destructive: var(--color-destructive);
+  --destructive-foreground: var(--color-destructive-foreground);
+  --ring: var(--color-ring);
 }

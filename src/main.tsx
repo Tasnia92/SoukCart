@@ -12,4 +12,14 @@ if (!app) {
 }
 
 // StrictMode stays off while legacy renderers own untracked listeners and async work.
-createRoot(app).render(<RouterProvider router={router} />);
+const root = createRoot(app);
+const showGallery =
+  import.meta.env.DEV && new URLSearchParams(window.location.search).has("__gallery");
+
+if (showGallery) {
+  void import("./dev/ComponentGallery.tsx").then(({ ComponentGallery }) => {
+    root.render(<ComponentGallery />);
+  });
+} else {
+  root.render(<RouterProvider router={router} />);
+}

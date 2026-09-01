@@ -1,2 +1,52 @@
 @import "tailwindcss/theme.css" layer(theme);
 @import "tailwindcss/utilities.css" layer(utilities);
+
+@custom-variant dark (&:where(.dark, .dark *));
+
+@theme inline {
+  --color-background: var(--background);
+  --color-foreground: var(--foreground);
+  --color-card: var(--card);
+  --color-card-foreground: var(--card-foreground);
+  --color-muted: var(--muted);
+  --color-muted-foreground: var(--muted-foreground);
+  --color-border: var(--border);
+  --color-input: var(--input);
+  --color-primary: var(--primary);
+  --color-primary-foreground: var(--primary-foreground);
+  --color-secondary: var(--secondary);
+  --color-secondary-foreground: var(--secondary-foreground);
+  --color-accent: var(--accent);
+  --color-accent-foreground: var(--accent-foreground);
+  --color-destructive: var(--destructive);
+  --color-destructive-foreground: var(--destructive-foreground);
+  --color-ring: var(--ring);
+
+  --radius-xs: var(--radius);
+  --radius-sm: var(--radius);
+  --radius-md: var(--radius);
+  --radius-lg: var(--radius);
+  --radius-xl: var(--radius);
+  --radius-2xl: var(--radius);
+  --radius-3xl: var(--radius);
+  --radius-4xl: var(--radius);
+
+  --shadow-2xs: var(--shadow-s);
+  --shadow-xs: var(--shadow-s);
+  --shadow-sm: var(--shadow-s);
+  --shadow-md: var(--shadow-m);
+  --shadow-lg: var(--shadow-l);
+  --shadow-xl: var(--shadow-l);
+  --shadow-2xl: var(--shadow-l);
+  --shadow: var(--shadow-s);
+  --shadow-inner: var(--shadow-inset);
+
+  --inset-shadow-2xs: var(--shadow-inset);
+  --inset-shadow-xs: var(--shadow-inset);
+  --inset-shadow-sm: var(--shadow-inset);
+
+  /* SoukCart has no drop/text shadow roles; do not expose Tailwind defaults. */
+  --drop-shadow-*: initial;
+  --drop-shadow: initial;
+  --text-shadow-*: initial;
+}

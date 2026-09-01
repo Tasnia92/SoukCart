@@ -92,7 +92,7 @@ select:focus-visible {
 
 /* -----------------------------------------------------------------------------
  * Typography helpers
- * Display face: weight 700, sentence-case, tight line-height, no tracking.
+ * Display face: weight 600, sentence-case, tight line-height, tight tracking.
  * -------------------------------------------------------------------------- */
 
 .display-xxl,
@@ -227,6 +227,13 @@ select:focus-visible {
 
 .button-block {
   width: 100%;
+}
+
+.button-compact {
+  min-height: 2.25rem;
+  padding: 0.5rem 1rem;
+  font-size: 0.875rem;
+  line-height: 1rem;
 }
 
 .button:disabled {

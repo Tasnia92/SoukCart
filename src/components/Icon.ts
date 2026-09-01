@@ -25,7 +25,7 @@ export type IconName =
   | "trash"
   | "truck";
 
-const iconPaths: Record<IconName, string> = {
+export const iconPaths: Record<IconName, string> = {
   activity:
     '<path d="M3.5 12h4l2.5-6.5 4.5 13 2.5-6.5h4" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"/>',
   "arrow-up-right":
