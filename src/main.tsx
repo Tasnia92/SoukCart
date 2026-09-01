@@ -2,7 +2,7 @@ import "./tailwind.css";
 import "./theme.css";
 import "./style.css";
 import { RouterProvider } from "@tanstack/react-router";
-import { useEffect } from "react";
+import { StrictMode, useEffect } from "react";
 import { createRoot } from "react-dom/client";
 import { router } from "./router.tsx";
 import {
@@ -30,19 +30,24 @@ function RoutedApp({ store }: { store: SessionStore }) {
   return <RouterProvider router={router} context={{ session: store }} />;
 }
 
-// StrictMode stays off while legacy renderers own untracked listeners and async work.
 const root = createRoot(app);
 const showGallery =
   import.meta.env.DEV && new URLSearchParams(window.location.search).has("__gallery");
 
 if (showGallery) {
   void import("./dev/ComponentGallery.tsx").then(({ ComponentGallery }) => {
-    root.render(<ComponentGallery />);
+    root.render(
+      <StrictMode>
+        <ComponentGallery />
+      </StrictMode>,
+    );
   });
 } else {
   root.render(
-    <SessionProvider store={sessionStore}>
-      <RoutedApp store={sessionStore} />
-    </SessionProvider>,
+    <StrictMode>
+      <SessionProvider store={sessionStore}>
+        <RoutedApp store={sessionStore} />
+      </SessionProvider>
+    </StrictMode>,
   );
 }

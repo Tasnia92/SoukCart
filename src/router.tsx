@@ -6,9 +6,8 @@ import {
   redirect,
   useRouterState,
 } from "@tanstack/react-router";
-import { useEffect, useRef, type ReactElement } from "react";
+import { useEffect, type ReactElement } from "react";
 import { resolveAuthAccess, type AuthArea } from "./auth-access.ts";
-import { renderAdminApp } from "./components/AdminApp.ts";
 import { AdminAuthRoute, RootAuthRoute } from "./components/auth/AuthRoutes.tsx";
 import { AdminActivity } from "./features/admin/AdminActivity.tsx";
 import { AdminComplaints } from "./features/admin/AdminComplaints.tsx";
@@ -27,14 +26,7 @@ import { SupplierOverview } from "./features/supplier/SupplierOverview.tsx";
 import { SupplierProductForm } from "./features/supplier/SupplierProductForm.tsx";
 import { SupplierProducts } from "./features/supplier/SupplierProducts.tsx";
 import { SupplierStock } from "./features/supplier/SupplierStock.tsx";
-import { renderRetailerApp } from "./components/RetailerApp.ts";
-import { renderSupplierApp } from "./components/SupplierApp.ts";
-import {
-  sessionStore,
-  type SessionState,
-  type SessionStore,
-  useSessionSnapshot,
-} from "./session.tsx";
+import { sessionStore, type SessionStore, useSessionSnapshot } from "./session.tsx";
 
 export const FLASH_STORAGE_KEYS = {
   notice: "soukcart:notice",
@@ -44,7 +36,7 @@ export const FLASH_STORAGE_KEYS = {
 
 export const PAYMENT_SEARCH_KEYS = ["status", "tran_id", "val_id"] as const;
 
-export const legacyRouteContract = [
+export const routeContract = [
   { path: "/", target: "root" },
   { path: "/admin", target: "admin" },
   { path: "/admin/users", target: "admin" },
@@ -87,18 +79,10 @@ export function isReactOverviewRoute(pathname: string, target: "admin" | "suppli
   );
 }
 
-type LegacyRenderer = (root: HTMLDivElement) => void;
-type LegacyRouteEntry = (typeof legacyRouteContract)[number];
-type LegacyTarget = LegacyRouteEntry["target"];
+type RouteEntry = (typeof routeContract)[number];
 type RouterContext = { session: SessionStore };
 
 const publicPaymentPathSet = new Set<string>(publicPaymentResultPaths);
-
-const rendererByTarget = {
-  admin: renderAdminApp,
-  retailer: renderRetailerApp,
-  supplier: renderSupplierApp,
-} satisfies Record<Exclude<LegacyTarget, "root">, LegacyRenderer>;
 
 export function shouldRenderPaymentResult({
   pathname,
@@ -145,46 +129,10 @@ export async function guardAuthArea(store: SessionStore, area: AuthArea): Promis
   }
 }
 
-function routeArea({ path, target }: LegacyRouteEntry): AuthArea {
+function routeArea({ path, target }: RouteEntry): AuthArea {
   if (publicPaymentPathSet.has(path)) return "public-payment";
   if (target === "root") return "root";
   return target === "supplier" ? "supplier" : target;
-}
-
-function canMountProtectedTarget(state: SessionState, target: Exclude<LegacyTarget, "root">) {
-  if (target === "admin") return state.status === "admin";
-  if (target === "retailer") return state.status === "retailer";
-  return state.status === "seller";
-}
-
-function LegacyMount({ renderer, routeKey }: { renderer: LegacyRenderer; routeKey: string }) {
-  const host = useRef<HTMLDivElement>(null);
-
-  useEffect(() => {
-    const node = host.current;
-    if (!node) return;
-
-    renderer(node);
-    return () => node.replaceChildren();
-  }, [renderer, routeKey]);
-
-  return <div ref={host} className="min-h-0" data-legacy-route={routeKey} />;
-}
-
-function LegacyRoute({ target }: { target: Exclude<LegacyTarget, "root"> }): ReactElement {
-  const location = useRouterState({ select: (state) => state.location });
-  return (
-    <LegacyMount key={location.href} renderer={rendererByTarget[target]} routeKey={location.href} />
-  );
-}
-
-function ProtectedLegacyRoute({
-  target,
-}: {
-  target: Exclude<LegacyTarget, "root">;
-}): ReactElement | null {
-  const { state } = useSessionSnapshot();
-  return canMountProtectedTarget(state, target) ? <LegacyRoute target={target} /> : null;
 }
 
 function RootRoute(): ReactElement {
@@ -202,13 +150,13 @@ function AdminRoute(): ReactElement {
   if (isReactOverviewRoute(pathname, "admin")) return <AdminOverview />;
   if (pathname === "/admin/users") return <AdminUsers />;
   if (pathname === "/admin/activity") return <AdminActivity />;
-  if (pathname === "/admin/complaints") return <AdminComplaints />;
-  return <LegacyRoute target="admin" />;
+  return <AdminComplaints />;
 }
 
 const SUPPLIER_EDIT_PATTERN = /^\/supplier\/products\/([^/]+)\/edit$/;
 
-function reactSupplierPanel(pathname: string): ReactElement | null {
+function SupplierRoute(): ReactElement | null {
+  const pathname = useRouterState({ select: (routerState) => routerState.location.pathname });
   if (isReactOverviewRoute(pathname, "supplier")) return <SupplierOverview />;
   if (pathname === "/supplier/products") return <SupplierProducts />;
   if (pathname === "/supplier/products/new") return <SupplierProductForm />;
@@ -219,40 +167,26 @@ function reactSupplierPanel(pathname: string): ReactElement | null {
   return null;
 }
 
-function SupplierRoute(): ReactElement | null {
-  const { state } = useSessionSnapshot();
-  const pathname = useRouterState({ select: (routerState) => routerState.location.pathname });
-  if (state.status === "seller") {
-    const panel = reactSupplierPanel(pathname);
-    if (panel) return panel;
-  }
-  return <ProtectedLegacyRoute target="supplier" />;
-}
-
 const RETAILER_INVOICE_PATTERN = /^\/retailer\/orders\/([0-9a-fA-F-]+)\/invoice$/;
 
 function RetailerRoute(): ReactElement | null {
-  const { state } = useSessionSnapshot();
   const pathname = useRouterState({ select: (routerState) => routerState.location.pathname });
-  if (state.status === "retailer") {
-    if (pathname === "/retailer") return <RetailerOverview />;
-    if (pathname === "/retailer/catalog") return <RetailerCatalog />;
-    if (pathname === "/retailer/cart") return <RetailerCart />;
-    if (pathname === "/retailer/orders") return <RetailerOrders />;
-    if (pathname === "/retailer/complaints") return <RetailerComplaints />;
-    const invoiceMatch = RETAILER_INVOICE_PATTERN.exec(pathname);
-    if (invoiceMatch) return <RetailerInvoice orderId={invoiceMatch[1]} />;
-  }
-  return <ProtectedLegacyRoute target="retailer" />;
+  if (pathname === "/retailer") return <RetailerOverview />;
+  if (pathname === "/retailer/catalog") return <RetailerCatalog />;
+  if (pathname === "/retailer/cart") return <RetailerCart />;
+  if (pathname === "/retailer/orders") return <RetailerOrders />;
+  if (pathname === "/retailer/complaints") return <RetailerComplaints />;
+  const invoiceMatch = RETAILER_INVOICE_PATTERN.exec(pathname);
+  if (invoiceMatch) return <RetailerInvoice orderId={invoiceMatch[1]} />;
+  return null;
 }
 
-function routeComponent({ path, target }: LegacyRouteEntry): () => ReactElement | null {
+function routeComponent({ path, target }: RouteEntry): () => ReactElement | null {
   if (target === "root") return RootRoute;
   if (target === "admin") return AdminRoute;
   if (target === "supplier") return SupplierRoute;
   if (publicPaymentPathSet.has(path)) return CheckoutResult;
-  if (target === "retailer") return RetailerRoute;
-  return () => <ProtectedLegacyRoute target={target} />;
+  return RetailerRoute;
 }
 
 export function getFallbackDestination(
@@ -277,7 +211,7 @@ const rootRoute = createRootRouteWithContext<RouterContext>()({
   notFoundComponent: NotFoundRedirect,
 });
 
-const legacyRoutes = legacyRouteContract.map((entry) => {
+const routes = routeContract.map((entry) => {
   const area = routeArea(entry);
   return createRoute({
     getParentRoute: () => rootRoute,
@@ -292,7 +226,7 @@ const legacyRoutes = legacyRouteContract.map((entry) => {
   });
 });
 
-const routeTree = rootRoute.addChildren(legacyRoutes);
+const routeTree = rootRoute.addChildren(routes);
 
 export const router = createRouter({ routeTree, context: { session: sessionStore } });
 
