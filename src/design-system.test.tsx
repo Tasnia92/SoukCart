@@ -1,9 +1,8 @@
 import { renderToStaticMarkup } from "react-dom/server";
 import { describe, expect, it } from "vite-plus/test";
-import { iconPaths, renderIcon } from "./components/Icon.ts";
 import { Brand } from "./components/ui/Brand.tsx";
 import { buttonClassName } from "./components/ui/Button.tsx";
-import { Icon, ICON_NAMES } from "./components/ui/Icon.tsx";
+import { Icon, ICON_NAMES, iconPaths } from "./components/ui/Icon.tsx";
 import { SidebarNav } from "./components/ui/Workspace.tsx";
 
 function svgBody(markup: string): string {
@@ -11,7 +10,7 @@ function svgBody(markup: string): string {
 }
 
 describe("Phase 2 design contract", () => {
-  it("keeps every React icon identical to the legacy SVG registry", () => {
+  it("renders every registered icon with the hand-authored SVG registry", () => {
     expect(ICON_NAMES).toHaveLength(25);
     expect(new Set(ICON_NAMES)).toEqual(new Set(Object.keys(iconPaths)));
 
@@ -20,7 +19,7 @@ describe("Phase 2 design contract", () => {
       expect(reactIcon).toContain('viewBox="0 0 24 24"');
       expect(reactIcon).toContain('aria-hidden="true"');
       expect(reactIcon).toContain('focusable="false"');
-      expect(svgBody(reactIcon)).toBe(svgBody(renderIcon(name)));
+      expect(svgBody(reactIcon)).toBe(iconPaths[name]);
     }
   });
 

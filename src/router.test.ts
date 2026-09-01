@@ -5,9 +5,9 @@ import {
   FLASH_STORAGE_KEYS,
   getFallbackDestination,
   isReactOverviewRoute,
-  legacyRouteContract,
   PAYMENT_SEARCH_KEYS,
   publicPaymentResultPaths,
+  routeContract,
   router,
   shouldRenderPaymentResult,
 } from "./router.tsx";
@@ -79,9 +79,9 @@ async function captureRejection(work: Promise<void>): Promise<unknown> {
 
 describe("route contract", () => {
   it("maps every inventory route to its preserved route target", () => {
-    expect(
-      Object.fromEntries(legacyRouteContract.map(({ path, target }) => [path, target])),
-    ).toEqual(expectedRoutes);
+    expect(Object.fromEntries(routeContract.map(({ path, target }) => [path, target]))).toEqual(
+      expectedRoutes,
+    );
   });
 
   it("gives root and admin auth states to React and guards every inventory route", () => {
@@ -94,7 +94,7 @@ describe("route contract", () => {
     ] as const) {
       expect(router.routesByPath[path].options.component?.name).toBe("AdminRoute");
     }
-    for (const { path } of legacyRouteContract) {
+    for (const { path } of routeContract) {
       expect(router.routesByPath[path].options.beforeLoad).toBeTypeOf("function");
     }
   });
@@ -111,14 +111,14 @@ describe("route contract", () => {
     expect(isReactOverviewRoute("/supplier/stock", "supplier")).toBe(false);
   });
 
-  it("keeps checkout result routes public and mapped to the retailer legacy renderer", () => {
+  it("keeps checkout result routes public under the retailer route family", () => {
     expect(publicPaymentResultPaths).toEqual([
       "/retailer/checkout/success",
       "/retailer/checkout/failed",
       "/retailer/checkout/cancelled",
     ]);
     expect(
-      legacyRouteContract
+      routeContract
         .filter(({ path }) => publicPaymentResultPaths.includes(path as never))
         .map(({ target }) => target),
     ).toEqual(["retailer", "retailer", "retailer"]);

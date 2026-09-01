@@ -95,7 +95,6 @@ select:focus-visible {
  * Display face: weight 600, sentence-case, tight line-height, tight tracking.
  * -------------------------------------------------------------------------- */
 
-.display-xxl,
 .display-xl,
 .display-lg,
 .display-md,
@@ -104,11 +103,6 @@ select:focus-visible {
   color: var(--color-ink);
   font-weight: 600;
   letter-spacing: -0.02em;
-}
-
-.display-xxl {
-  font-size: 3.25rem;
-  line-height: 4rem;
 }
 
 .display-xl {
@@ -139,14 +133,6 @@ select:focus-visible {
   letter-spacing: 0.08em;
   line-height: 1.25rem;
   text-transform: uppercase;
-}
-
-.lead {
-  margin: 0;
-  color: var(--color-body);
-  font-size: 1.125rem;
-  font-weight: 500;
-  line-height: 1.5rem;
 }
 
 .body-copy {
@@ -2065,13 +2051,6 @@ select:focus-visible {
   margin: 0;
 }
 
-.cp-file-hint {
-  margin: -0.5rem 0 0;
-  color: var(--color-mute);
-  font-size: 0.75rem;
-  line-height: 1.25rem;
-}
-
 .cp-form-actions {
   display: flex;
   justify-content: flex-end;
@@ -2296,10 +2275,6 @@ select:focus-visible {
 /* -----------------------------------------------------------------------------
  * Supplier — catalog management chips and card actions.
  * -------------------------------------------------------------------------- */
-
-.sp-field-wide {
-  grid-column: span 2;
-}
 
 /* Status chips — the primary fill marks live listings, grayscale handles the rest. */
 
@@ -2725,11 +2700,6 @@ select:focus-visible {
 }
 
 @media (max-width: 35rem) {
-  .display-xxl {
-    font-size: 2.25rem;
-    line-height: 2.75rem;
-  }
-
   .display-xl {
     font-size: 2rem;
     line-height: 2.5rem;
@@ -2752,10 +2722,6 @@ select:focus-visible {
   .admin-stats,
   .admin-create-form {
     grid-template-columns: 1fr;
-  }
-
-  .sp-field-wide {
-    grid-column: auto;
   }
 
   .admin-create-actions,
