@@ -76,7 +76,7 @@ TanStack Router should use exact routes plus role-family not-found handling. Unk
 ### Design-system contract
 
 - Keep `src/theme.css` variable names and both `:root`/`.dark` values.
-- Keep Space Grotesk, JetBrains Mono, current type sizes/line heights/tracking, warm cream/ink/terracotta colors, hairlines, and restrained shadows.
+- Keep Geist Sans, Geist Mono, current type sizes/line heights/tracking, warm cream/ink/terracotta colors, hairlines, and restrained shadows.
 - shadcn radius tokens must resolve to `0`; only intentionally circular controls/avatars remain circular.
 - Keep `public/soukcart-logo.png`, the current wordmark treatment, hand-authored SVG icons, and auth illustration. Do not substitute Lucide paths during parity work.
 - Keep current breakpoints and behavior at 62rem, 45rem, and 35rem.

@@ -11,15 +11,15 @@
  * Warm Terracotta Editorial: warm cream canvas (#faf9f5), olive-brown body ink
  * (#3d3929), near-black headings (#141413), terracotta brand (#c96442) reserved
  * for actions and active states, sand tinted surfaces, monochrome destructive.
- * Sharp geometry (radius 0), Space Grotesk + JetBrains Mono, hairline borders
- * and near-invisible neutral shadows. Dark values mirror the .dark sheet and
- * apply when the `dark` class is set on <html>.
+ * Sharp geometry (radius 0), Geist Sans + Geist Mono, hairline borders and
+ * near-invisible neutral shadows. Dark values mirror the .dark sheet and apply
+ * when the `dark` class is set on <html>.
  * ========================================================================== */
 
 :root {
   color-scheme: light;
   font-family:
-    "Space Grotesk",
+    "Geist Sans",
     ui-sans-serif,
     system-ui,
     -apple-system,
@@ -89,9 +89,9 @@
 
   /* Type */
   --font-sans:
-    "Space Grotesk", ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI",
+    "Geist Sans", ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI",
     sans-serif;
-  --font-mono: "JetBrains Mono", ui-monospace, SFMono-Regular, Consolas, monospace;
+  --font-mono: "Geist Mono", ui-monospace, SFMono-Regular, Consolas, monospace;
 
   /* Radius scale — sharp editorial geometry; true circles use rounded-full/50%. */
   --radius: 0rem; /* base card radius */
