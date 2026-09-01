@@ -16,3 +16,14 @@ export function formatDate(value: string): string {
 export function firstName(value: string): string {
   return value.trim().split(/\s+/)[0] ?? "there";
 }
+
+export function initials(value: string): string {
+  const result = value
+    .trim()
+    .split(/\s+/)
+    .map((part) => part[0] ?? "")
+    .join("")
+    .slice(0, 2)
+    .toUpperCase();
+  return result || "U";
+}

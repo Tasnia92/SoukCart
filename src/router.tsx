@@ -11,6 +11,7 @@ import { resolveAuthAccess, type AuthArea } from "./auth-access.ts";
 import { renderAdminApp } from "./components/AdminApp.ts";
 import { AdminAuthRoute, RootAuthRoute } from "./components/auth/AuthRoutes.tsx";
 import { AdminOverview } from "./features/admin/AdminOverview.tsx";
+import { AdminUsers } from "./features/admin/AdminUsers.tsx";
 import { SupplierOverview } from "./features/supplier/SupplierOverview.tsx";
 import { SupplierProductForm } from "./features/supplier/SupplierProductForm.tsx";
 import { SupplierProducts } from "./features/supplier/SupplierProducts.tsx";
@@ -190,11 +191,9 @@ function AdminRoute(): ReactElement {
   const { state } = useSessionSnapshot();
   const pathname = useRouterState({ select: (routerState) => routerState.location.pathname });
   if (state.status !== "admin") return <AdminAuthRoute />;
-  return isReactOverviewRoute(pathname, "admin") ? (
-    <AdminOverview />
-  ) : (
-    <LegacyRoute target="admin" />
-  );
+  if (isReactOverviewRoute(pathname, "admin")) return <AdminOverview />;
+  if (pathname === "/admin/users") return <AdminUsers />;
+  return <LegacyRoute target="admin" />;
 }
 
 const SUPPLIER_EDIT_PATTERN = /^\/supplier\/products\/([^/]+)\/edit$/;
