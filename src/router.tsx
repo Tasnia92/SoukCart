@@ -14,8 +14,12 @@ import { AdminActivity } from "./features/admin/AdminActivity.tsx";
 import { AdminComplaints } from "./features/admin/AdminComplaints.tsx";
 import { AdminOverview } from "./features/admin/AdminOverview.tsx";
 import { AdminUsers } from "./features/admin/AdminUsers.tsx";
+import { CheckoutResult } from "./features/retailer/CheckoutResult.tsx";
+import { PaymentReturn } from "./features/retailer/PaymentReturn.tsx";
+import { RetailerCart } from "./features/retailer/RetailerCart.tsx";
 import { RetailerCatalog } from "./features/retailer/RetailerCatalog.tsx";
 import { RetailerComplaints } from "./features/retailer/RetailerComplaints.tsx";
+import { RetailerInvoice } from "./features/retailer/RetailerInvoice.tsx";
 import { RetailerOrders } from "./features/retailer/RetailerOrders.tsx";
 import { RetailerOverview } from "./features/retailer/RetailerOverview.tsx";
 import { SupplierOrders } from "./features/supplier/SupplierOrders.tsx";
@@ -23,7 +27,6 @@ import { SupplierOverview } from "./features/supplier/SupplierOverview.tsx";
 import { SupplierProductForm } from "./features/supplier/SupplierProductForm.tsx";
 import { SupplierProducts } from "./features/supplier/SupplierProducts.tsx";
 import { SupplierStock } from "./features/supplier/SupplierStock.tsx";
-import { renderPaymentResult } from "./components/PaymentResult.ts";
 import { renderRetailerApp } from "./components/RetailerApp.ts";
 import { renderSupplierApp } from "./components/SupplierApp.ts";
 import {
@@ -187,9 +190,7 @@ function ProtectedLegacyRoute({
 function RootRoute(): ReactElement {
   const location = useRouterState({ select: (state) => state.location });
   if (isRootPaymentLocation(location)) {
-    return (
-      <LegacyMount key={location.href} renderer={renderPaymentResult} routeKey={location.href} />
-    );
+    return <PaymentReturn key={location.href} />;
   }
   return <RootAuthRoute />;
 }
@@ -228,14 +229,19 @@ function SupplierRoute(): ReactElement | null {
   return <ProtectedLegacyRoute target="supplier" />;
 }
 
+const RETAILER_INVOICE_PATTERN = /^\/retailer\/orders\/([0-9a-fA-F-]+)\/invoice$/;
+
 function RetailerRoute(): ReactElement | null {
   const { state } = useSessionSnapshot();
   const pathname = useRouterState({ select: (routerState) => routerState.location.pathname });
   if (state.status === "retailer") {
     if (pathname === "/retailer") return <RetailerOverview />;
     if (pathname === "/retailer/catalog") return <RetailerCatalog />;
+    if (pathname === "/retailer/cart") return <RetailerCart />;
     if (pathname === "/retailer/orders") return <RetailerOrders />;
     if (pathname === "/retailer/complaints") return <RetailerComplaints />;
+    const invoiceMatch = RETAILER_INVOICE_PATTERN.exec(pathname);
+    if (invoiceMatch) return <RetailerInvoice orderId={invoiceMatch[1]} />;
   }
   return <ProtectedLegacyRoute target="retailer" />;
 }
@@ -244,7 +250,7 @@ function routeComponent({ path, target }: LegacyRouteEntry): () => ReactElement 
   if (target === "root") return RootRoute;
   if (target === "admin") return AdminRoute;
   if (target === "supplier") return SupplierRoute;
-  if (publicPaymentPathSet.has(path)) return () => <LegacyRoute target={target} />;
+  if (publicPaymentPathSet.has(path)) return CheckoutResult;
   if (target === "retailer") return RetailerRoute;
   return () => <ProtectedLegacyRoute target={target} />;
 }
