@@ -11,6 +11,10 @@ export type WorkspacePath =
   | "/admin/activity"
   | "/admin/complaints"
   | "/retailer"
+  | "/retailer/catalog"
+  | "/retailer/cart"
+  | "/retailer/orders"
+  | "/retailer/complaints"
   | "/supplier"
   | "/supplier/orders"
   | "/supplier/products"
@@ -21,6 +25,7 @@ export type WorkspaceNavItem = {
   icon: IconName;
   label: string;
   active?: boolean;
+  trailing?: ReactNode;
 };
 
 type RouterLinkProps = Omit<AnchorHTMLAttributes<HTMLAnchorElement>, "href"> & {
@@ -68,7 +73,7 @@ export function WorkspaceShell({
             </RouterLink>
           </div>
           <nav className="admin-nav" aria-label={navigationLabel}>
-            {items.map(({ to, icon, label, active }) => (
+            {items.map(({ to, icon, label, active, trailing }) => (
               <RouterLink
                 className={`admin-tab${active ? " is-active" : ""}`}
                 to={to}
@@ -77,6 +82,7 @@ export function WorkspaceShell({
               >
                 <Icon name={icon} />
                 <span>{label}</span>
+                {trailing}
               </RouterLink>
             ))}
           </nav>

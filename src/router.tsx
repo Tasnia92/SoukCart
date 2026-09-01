@@ -10,8 +10,11 @@ import { useEffect, useRef, type ReactElement } from "react";
 import { resolveAuthAccess, type AuthArea } from "./auth-access.ts";
 import { renderAdminApp } from "./components/AdminApp.ts";
 import { AdminAuthRoute, RootAuthRoute } from "./components/auth/AuthRoutes.tsx";
+import { AdminActivity } from "./features/admin/AdminActivity.tsx";
 import { AdminOverview } from "./features/admin/AdminOverview.tsx";
 import { AdminUsers } from "./features/admin/AdminUsers.tsx";
+import { RetailerOrders } from "./features/retailer/RetailerOrders.tsx";
+import { SupplierOrders } from "./features/supplier/SupplierOrders.tsx";
 import { SupplierOverview } from "./features/supplier/SupplierOverview.tsx";
 import { SupplierProductForm } from "./features/supplier/SupplierProductForm.tsx";
 import { SupplierProducts } from "./features/supplier/SupplierProducts.tsx";
@@ -193,6 +196,7 @@ function AdminRoute(): ReactElement {
   if (state.status !== "admin") return <AdminAuthRoute />;
   if (isReactOverviewRoute(pathname, "admin")) return <AdminOverview />;
   if (pathname === "/admin/users") return <AdminUsers />;
+  if (pathname === "/admin/activity") return <AdminActivity />;
   return <LegacyRoute target="admin" />;
 }
 
@@ -203,6 +207,7 @@ function reactSupplierPanel(pathname: string): ReactElement | null {
   if (pathname === "/supplier/products") return <SupplierProducts />;
   if (pathname === "/supplier/products/new") return <SupplierProductForm />;
   if (pathname === "/supplier/stock") return <SupplierStock />;
+  if (pathname === "/supplier/orders") return <SupplierOrders />;
   const editMatch = SUPPLIER_EDIT_PATTERN.exec(pathname);
   if (editMatch) return <SupplierProductForm productId={editMatch[1]} />;
   return null;
@@ -218,11 +223,19 @@ function SupplierRoute(): ReactElement | null {
   return <ProtectedLegacyRoute target="supplier" />;
 }
 
+function RetailerRoute(): ReactElement | null {
+  const { state } = useSessionSnapshot();
+  const pathname = useRouterState({ select: (routerState) => routerState.location.pathname });
+  if (state.status === "retailer" && pathname === "/retailer/orders") return <RetailerOrders />;
+  return <ProtectedLegacyRoute target="retailer" />;
+}
+
 function routeComponent({ path, target }: LegacyRouteEntry): () => ReactElement | null {
   if (target === "root") return RootRoute;
   if (target === "admin") return AdminRoute;
   if (target === "supplier") return SupplierRoute;
   if (publicPaymentPathSet.has(path)) return () => <LegacyRoute target={target} />;
+  if (target === "retailer") return RetailerRoute;
   return () => <ProtectedLegacyRoute target={target} />;
 }
 
