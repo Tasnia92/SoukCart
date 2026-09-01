@@ -1,3 +1,4 @@
+import { useNavigate } from "@tanstack/react-router";
 import { useEffect, useState } from "react";
 import { Icon } from "../../components/ui/Icon.tsx";
 import {
@@ -74,6 +75,7 @@ function RecentListing({ product }: { product: SupplierProduct }) {
 export function SupplierOverview({ loadProducts = loadSupplierProducts }: SupplierOverviewProps) {
   const { state } = useSessionSnapshot();
   const store = useSessionStore();
+  const navigate = useNavigate({ from: "/supplier" });
   const [products, setProducts] = useState<SupplierProduct[] | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [loadVersion, setLoadVersion] = useState(0);
@@ -104,7 +106,9 @@ export function SupplierOverview({ loadProducts = loadSupplierProducts }: Suppli
   if (state.status !== "seller") return null;
 
   const onLogout = () => {
-    void store.signOut();
+    void store.signOut().then(() => {
+      void navigate({ to: "/" });
+    });
   };
   const retry = () => setLoadVersion((version) => version + 1);
   const userName = state.profile.name || state.profile.email;

@@ -55,6 +55,11 @@ function createSessionStore(profile: Profile) {
 
 function createOverviewRouter(path: "/admin" | "/supplier", content: ReactNode) {
   const rootRoute = createRootRoute({ component: Outlet });
+  const signedOutRoute = createRoute({
+    getParentRoute: () => rootRoute,
+    path: "/",
+    component: () => <p>Signed out home</p>,
+  });
   const overviewRoute = createRoute({
     getParentRoute: () => rootRoute,
     path,
@@ -62,7 +67,7 @@ function createOverviewRouter(path: "/admin" | "/supplier", content: ReactNode) 
   });
 
   return createRouter({
-    routeTree: rootRoute.addChildren([overviewRoute]),
+    routeTree: rootRoute.addChildren([signedOutRoute, overviewRoute]),
     history: createMemoryHistory({ initialEntries: [path] }),
   });
 }
@@ -318,7 +323,8 @@ describe("React workspace overview behavior", () => {
         await act(async () => userEvent.click(button(mounted.host, "Log out")));
         await flush();
         expect(seller.signOutCalls()).toBe(1);
-        expect(mounted.host.textContent).toBe("");
+        expect(router.state.location.pathname).toBe("/");
+        expect(mounted.host.textContent).toBe("Signed out home");
       } finally {
         sessionStorage.removeItem("soukcart:supplier-notice");
         await unmount(mounted.root);
