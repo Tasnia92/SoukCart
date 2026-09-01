@@ -9,6 +9,7 @@ import {
   type NoticeState,
 } from "../../components/ui/Workspace.tsx";
 import { useSessionSnapshot, useSessionStore } from "../../session.tsx";
+import { shortId } from "../orders/order-presentation.tsx";
 import { formatDateTime } from "../workspace/format.ts";
 import { RouterLink, WorkspaceShell } from "../workspace/WorkspaceShell.tsx";
 import { loadCartCount } from "./retailer-orders-api.ts";
@@ -34,6 +35,11 @@ function readText(formData: FormData, name: string): string {
   return typeof value === "string" ? value : "";
 }
 
+function linkedOrderFromLocation(): string | null {
+  const orderId = new URLSearchParams(window.location.search).get("order");
+  return orderId && /^[0-9a-fA-F-]{36}$/.test(orderId) ? orderId : null;
+}
+
 function ComplaintCard({ complaint }: { complaint: RetailerComplaint }) {
   return (
     <article className="cp-card">
@@ -43,6 +49,9 @@ function ComplaintCard({ complaint }: { complaint: RetailerComplaint }) {
           {complaint.status === "open" ? "Open" : "Resolved"}
         </span>
       </div>
+      {complaint.order_id ? (
+        <small>Order #{shortId(complaint.order_id)} · cancellation/refund support</small>
+      ) : null}
       <p>{complaint.description}</p>
       {complaint.attachment_url ? (
         <a
@@ -68,6 +77,7 @@ export function RetailerComplaints({
   const { state } = useSessionSnapshot();
   const store = useSessionStore();
   const navigate = useNavigate({ from: "/retailer/complaints" });
+  const linkedOrderId = linkedOrderFromLocation();
   const [complaints, setComplaints] = useState<RetailerComplaint[] | null>(null);
   const [cartCount, setCartCount] = useState(0);
   const [error, setError] = useState<string | null>(null);
@@ -149,9 +159,20 @@ export function RetailerComplaints({
     setSubmitting(true);
     if (file) setFeedback({ message: "Uploading attachment…", state: "info" });
     try {
-      const created = await submitComplaint({ retailerId, subject, description, file });
+      const created = await submitComplaint({
+        retailerId,
+        orderId: linkedOrderId,
+        subject,
+        description,
+        file,
+      });
       setComplaints((prev) => [created, ...(prev ?? [])]);
-      setNotice({ message: "Complaint filed. The admin team will review it.", state: "success" });
+      setNotice({
+        message: linkedOrderId
+          ? "Support request filed. The admin team will review the cancellation and manual refund."
+          : "Complaint filed. The admin team will review it.",
+        state: "success",
+      });
       setFeedback(null);
       form.reset();
     } catch (submitError) {
@@ -184,7 +205,15 @@ export function RetailerComplaints({
       userEmail={state.profile.email}
       onLogout={onLogout}
     >
-      <PageHeader eyebrow="Support" title="Help Center." copy="Tell us what went wrong." />
+      <PageHeader
+        eyebrow="Support"
+        title={linkedOrderId ? `Order #${shortId(linkedOrderId)} support.` : "Help Center."}
+        copy={
+          linkedOrderId
+            ? "Request admin help with cancellation and a manual refund after verified delivery."
+            : "Tell us what went wrong."
+        }
+      />
       <InlineNotice message={notice?.message} state={notice?.state} />
 
       <div className="cp-layout">
@@ -219,14 +248,23 @@ export function RetailerComplaints({
         <form className="cp-form-card" ref={formRef} onSubmit={onSubmit} noValidate>
           <div className="cp-form-heading">
             <p className="eyebrow">New report</p>
-            <h2 className="display-sm">File a complaint</h2>
+            <h2 className="display-sm">
+              {linkedOrderId ? "Contact support about this order" : "File a complaint"}
+            </h2>
           </div>
+          {linkedOrderId ? (
+            <p className="admin-muted">
+              This request is linked to order #{shortId(linkedOrderId)}. Only the admin can cancel a
+              verified delivery and record its manual refund.
+            </p>
+          ) : null}
           <label className="admin-field">
             <span>Subject</span>
             <input
               name="subject"
               type="text"
               maxLength={120}
+              defaultValue={linkedOrderId ? "Cancellation and refund request" : ""}
               placeholder="What is this about?"
               required
             />
@@ -251,7 +289,7 @@ export function RetailerComplaints({
           </label>
           <div className="cp-form-actions">
             <button className="button button-primary" type="submit" disabled={submitting}>
-              <span>Submit complaint</span>
+              <span>{linkedOrderId ? "Submit support request" : "Submit complaint"}</span>
             </button>
           </div>
           <p

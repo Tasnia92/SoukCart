@@ -15,8 +15,13 @@ export type SupplierOrder = {
   id: string;
   status: SupplierOrderStatus;
   cancel_requested: boolean;
+  cancellation_initiator: "retailer" | "supplier" | "admin" | "support" | null;
+  cancellation_reason: string | null;
   payment_status: string;
   payment_method: string;
+  delivery_verified_at: string | null;
+  manual_refund_status: "not_required" | "review_required" | "pending" | "completed";
+  supplier_can_cancel: boolean;
   notes: string | null;
   created_at: string;
   retailer_name: string;
@@ -67,6 +72,31 @@ export async function acceptSupplierOrder(orderId: string): Promise<string> {
   if (error) throw new Error("The order could not be accepted.");
   if (typeof data !== "string") throw new Error("The order acceptance was not confirmed.");
   return data;
+}
+
+export async function requestSupplierCancellation(orderId: string, reason: string): Promise<void> {
+  const { data, error } = await supabase.rpc("seller_request_order_cancellation", {
+    p_order_id: orderId,
+    p_reason: reason,
+  });
+  if (error) throw new Error(error.message || "The cancellation request could not be submitted.");
+  if (
+    typeof data !== "object" ||
+    data === null ||
+    !("status" in data) ||
+    data.status !== "requested"
+  ) {
+    throw new Error("The cancellation request was not confirmed.");
+  }
+}
+
+export function canSupplierCancel(order: SupplierOrder): boolean {
+  return (
+    order.supplier_can_cancel &&
+    order.status !== "cancelled" &&
+    !(order.status === "delivered" && order.delivery_verified_at) &&
+    !order.cancel_requested
+  );
 }
 
 export function filterSupplierOrders(

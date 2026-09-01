@@ -4,6 +4,8 @@ export const ADMIN_COMPLAINTS_FUNCTION = "admin-complaints";
 
 export type AdminComplaint = {
   id: string;
+  order_id: string | null;
+  category: "general" | "cancellation_refund";
   subject: string;
   description: string;
   attachment_url: string | null;
@@ -47,7 +49,13 @@ export function filterComplaints(
   const query = searchTerm.trim().toLowerCase();
   if (!query) return [...complaints];
   return complaints.filter((complaint) =>
-    [complaint.subject, complaint.description, complaint.retailer_name, complaint.retailer_email]
+    [
+      complaint.order_id ?? "",
+      complaint.subject,
+      complaint.description,
+      complaint.retailer_name,
+      complaint.retailer_email,
+    ]
       .join(" ")
       .toLowerCase()
       .includes(query),

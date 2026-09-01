@@ -11,7 +11,7 @@ function svgBody(markup: string): string {
 
 describe("Phase 2 design contract", () => {
   it("renders every registered icon with the hand-authored SVG registry", () => {
-    expect(ICON_NAMES).toHaveLength(25);
+    expect(ICON_NAMES).toHaveLength(31);
     expect(new Set(ICON_NAMES)).toEqual(new Set(Object.keys(iconPaths)));
 
     for (const name of ICON_NAMES) {

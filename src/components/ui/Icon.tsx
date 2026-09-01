@@ -2,6 +2,7 @@ import type { SVGProps } from "react";
 
 export type IconName =
   | "activity"
+  | "arrow-right"
   | "arrow-up-right"
   | "apple"
   | "bag"
@@ -11,9 +12,12 @@ export type IconName =
   | "download"
   | "eye"
   | "eye-off"
+  | "facebook"
   | "home"
   | "image"
+  | "instagram"
   | "layers"
+  | "linkedin"
   | "lock"
   | "mail"
   | "message"
@@ -23,9 +27,11 @@ export type IconName =
   | "plus"
   | "refresh"
   | "search"
+  | "shield-check"
   | "store"
   | "trash"
-  | "truck";
+  | "truck"
+  | "users";
 
 export const iconPaths: Record<IconName, string> = {
   activity:
@@ -71,6 +77,20 @@ export const iconPaths: Record<IconName, string> = {
     '<path d="M5.5 7.5h13M9.5 7.5V5.5a1 1 0 0 1 1-1h3a1 1 0 0 1 1 1v2M7 7.5l.8 11a1.5 1.5 0 0 0 1.5 1.4h5.4a1.5 1.5 0 0 0 1.5-1.4l.8-11M10.2 11v5M13.8 11v5" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"/>',
   truck:
     '<path d="M3 6.5h11v10H3zM14 10h4l3 3v3.5h-7M6.5 18.5a1.8 1.8 0 1 0 0-3.6 1.8 1.8 0 0 0 0 3.6ZM17.5 18.5a1.8 1.8 0 1 0 0-3.6 1.8 1.8 0 0 0 0 3.6Z" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"/>',
+
+  /* Landing surface: audience, assurance, forward motion and social marks. */
+  "arrow-right":
+    '<path d="M4.5 12h14M13 6.5 18.5 12 13 17.5" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/>',
+  users:
+    '<circle cx="9.4" cy="8.4" r="3.2" fill="none" stroke="currentColor" stroke-width="1.7"/><path d="M3.2 19.6c.6-3 2.9-4.9 6.2-4.9s5.6 1.9 6.2 4.9" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round"/><path d="M16 5.6a3.2 3.2 0 0 1 0 5.6M18.1 14.8c1.6.8 2.6 2.1 3 3.9" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round"/>',
+  "shield-check":
+    '<path d="M12 3.3 19 5.7v5.2c0 4-2.8 7.5-7 9.6-4.2-2.1-7-5.6-7-9.6V5.7l7-2.4Z" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linejoin="round"/><path d="m8.9 11.9 2.4 2.4 4-4.7" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"/>',
+  facebook:
+    '<path d="M13.6 20.6v-7.2h2.5l.4-2.9h-2.9V8.6c0-.8.3-1.4 1.5-1.4h1.5V4.6c-.3 0-1.2-.1-2.3-.1-2.3 0-3.8 1.4-3.8 3.9v2.1H8v2.9h2.5v7.2h3.1Z" fill="currentColor"/>',
+  instagram:
+    '<rect x="4.2" y="4.2" width="15.6" height="15.6" rx="4.6" fill="none" stroke="currentColor" stroke-width="1.7"/><circle cx="12" cy="12" r="3.6" fill="none" stroke="currentColor" stroke-width="1.7"/><circle cx="16.5" cy="7.5" r="1.1" fill="currentColor"/>',
+  linkedin:
+    '<path d="M4.7 9.6h2.8v10.3H4.7zM6.1 4.4a1.75 1.75 0 1 0 0 3.5 1.75 1.75 0 0 0 0-3.5Z" fill="currentColor"/><path d="M10 9.6h2.7V11a3.1 3.1 0 0 1 2.8-1.6c2.4 0 3.8 1.5 3.8 4.3v6.2h-2.8v-5.7c0-1.4-.5-2.3-1.8-2.3s-1.9.8-1.9 2.3v5.7H10V9.6Z" fill="currentColor"/>',
 };
 
 export const ICON_NAMES = Object.keys(iconPaths) as IconName[];

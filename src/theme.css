@@ -47,7 +47,7 @@
   /* Surfaces — tinted cards and white input wells on the cream canvas. */
   --color-card: #f5f4ef; /* card — slightly deeper than canvas, so cards read as panels */
   --color-input: #ffffff; /* popover white — input wells */
-  --color-sidebar: #f5f4ee; /* sidebar — auth story band & admin sidebar */
+  --color-sidebar: #f5f4ef; /* soft surface — auth story band & admin sidebar */
 
   /* Text roles */
   --color-ink: #141413; /* headings, labels, strong values — near-black ink */

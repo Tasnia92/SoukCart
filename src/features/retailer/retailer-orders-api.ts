@@ -3,6 +3,8 @@ import { supabase } from "../../supabase.ts";
 export type RetailerOrderStatus = "pending" | "confirmed" | "shipped" | "delivered" | "cancelled";
 export type PaymentStatus = "unpaid" | "paid" | "failed" | "cancelled";
 export type PaymentMethod = "online" | "cod";
+export type CancellationInitiator = "retailer" | "supplier" | "admin" | "support" | null;
+export type ManualRefundStatus = "not_required" | "review_required" | "pending" | "completed";
 
 export type RetailerOrderItem = {
   id: string;
@@ -16,16 +18,22 @@ export type RetailerOrder = {
   id: string;
   status: RetailerOrderStatus;
   cancel_requested: boolean;
+  cancellation_initiator: CancellationInitiator;
   payment_status: PaymentStatus;
   payment_method: PaymentMethod;
   tran_id: string | null;
   notes: string | null;
   created_at: string;
+  delivery_verified_at: string | null;
+  manual_refund_status: ManualRefundStatus;
+  refund_amount: number;
+  platform_charge: number;
+  delivery_charge: number;
   items: RetailerOrderItem[];
 };
 
 const ORDERS_SELECT =
-  "id, status, cancel_requested, payment_status, payment_method, tran_id, notes, created_at, order_items(id, product_id, quantity, unit_price, products(name))";
+  "id, status, cancel_requested, cancellation_initiator, payment_status, payment_method, tran_id, notes, created_at, delivery_verified_at, manual_refund_status, refund_amount, platform_charge, delivery_charge, order_items(id, product_id, quantity, unit_price, products(name))";
 
 type OrderItemRow = {
   id: string;
@@ -39,11 +47,17 @@ type OrderRow = {
   id: string;
   status: string;
   cancel_requested: boolean | null;
+  cancellation_initiator: string | null;
   payment_status: string | null;
   payment_method: string | null;
   tran_id: string | null;
   notes: string | null;
   created_at: string;
+  delivery_verified_at: string | null;
+  manual_refund_status: string | null;
+  refund_amount: number | string | null;
+  platform_charge: number | string | null;
+  delivery_charge: number | string | null;
   order_items: OrderItemRow[] | null;
 };
 
@@ -57,11 +71,17 @@ function normalizeOrder(row: OrderRow): RetailerOrder {
     id: row.id,
     status: row.status as RetailerOrderStatus,
     cancel_requested: row.cancel_requested === true,
+    cancellation_initiator: (row.cancellation_initiator ?? null) as CancellationInitiator,
     payment_status: (row.payment_status ?? "unpaid") as PaymentStatus,
     payment_method: (row.payment_method ?? "online") as PaymentMethod,
     tran_id: row.tran_id ?? null,
     notes: row.notes,
     created_at: row.created_at,
+    delivery_verified_at: row.delivery_verified_at ?? null,
+    manual_refund_status: (row.manual_refund_status ?? "not_required") as ManualRefundStatus,
+    refund_amount: Number(row.refund_amount ?? 0),
+    platform_charge: Number(row.platform_charge ?? 0),
+    delivery_charge: Number(row.delivery_charge ?? 0),
     items: (row.order_items ?? []).map((item) => ({
       id: item.id,
       product_id: item.product_id,
@@ -114,11 +134,28 @@ export async function clearCart(userId: string): Promise<void> {
   await supabase.from("cart_items").delete().eq("user_id", userId);
 }
 
-export async function requestOrderCancellation(orderId: string): Promise<"requested"> {
+export type CancellationRequestResult = {
+  status: "requested";
+  initiator: "retailer";
+  refundPolicy: "manual_less_charges" | "not_required";
+};
+
+export async function requestOrderCancellation(
+  orderId: string,
+): Promise<CancellationRequestResult> {
   const { data, error } = await supabase.rpc("request_order_cancellation", { p_order_id: orderId });
-  if (error) throw new Error("The cancellation request could not be submitted.");
-  if (data !== "requested") throw new Error("The cancellation request was not confirmed.");
-  return "requested";
+  if (error) throw new Error(error.message || "The cancellation request could not be submitted.");
+  if (!isRecord(data) || data.status !== "requested" || data.initiator !== "retailer") {
+    throw new Error("The cancellation request was not confirmed.");
+  }
+  return data as CancellationRequestResult;
+}
+
+export async function confirmOrderDelivery(orderId: string): Promise<string> {
+  const { data, error } = await supabase.rpc("confirm_order_delivery", { p_order_id: orderId });
+  if (error) throw new Error(error.message || "Delivery could not be verified.");
+  if (typeof data !== "string") throw new Error("Delivery verification was not confirmed.");
+  return data;
 }
 
 export function orderTotal(order: RetailerOrder): number {
@@ -126,5 +163,9 @@ export function orderTotal(order: RetailerOrder): number {
 }
 
 export function canCancelOrder(order: RetailerOrder): boolean {
-  return (order.status === "pending" || order.status === "confirmed") && !order.cancel_requested;
+  return (
+    order.status !== "cancelled" &&
+    !(order.status === "delivered" && order.delivery_verified_at) &&
+    !order.cancel_requested
+  );
 }

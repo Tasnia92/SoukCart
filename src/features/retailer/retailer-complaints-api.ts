@@ -3,10 +3,13 @@ import { supabase } from "../../supabase.ts";
 export const COMPLAINT_FILES_BUCKET = "complaint-files";
 export const MAX_COMPLAINT_FILE_BYTES = 5 * 1024 * 1024;
 
-const COMPLAINT_SELECT = "id, subject, description, attachment_url, status, created_at";
+const COMPLAINT_SELECT =
+  "id, order_id, category, subject, description, attachment_url, status, created_at";
 
 export type RetailerComplaint = {
   id: string;
+  order_id: string | null;
+  category: "general" | "cancellation_refund";
   subject: string;
   description: string;
   attachment_url: string | null;
@@ -16,6 +19,8 @@ export type RetailerComplaint = {
 
 type ComplaintRow = {
   id: string;
+  order_id?: string | null;
+  category?: string | null;
   subject: string;
   description: string;
   attachment_url: string | null;
@@ -55,6 +60,8 @@ const complaintGateway = supabase as unknown as ComplaintGateway;
 function normalize(row: ComplaintRow): RetailerComplaint {
   return {
     id: row.id,
+    order_id: row.order_id ?? null,
+    category: row.category === "cancellation_refund" ? "cancellation_refund" : "general",
     subject: row.subject,
     description: row.description,
     attachment_url: row.attachment_url,
@@ -94,13 +101,14 @@ function fileExtension(file: File): string {
 
 export type FileComplaintInput = {
   retailerId: string;
+  orderId?: string | null;
   subject: string;
   description: string;
   file: File | null;
 };
 
 export async function fileComplaint(
-  { retailerId, subject, description, file }: FileComplaintInput,
+  { retailerId, orderId = null, subject, description, file }: FileComplaintInput,
   gateway: ComplaintGateway = complaintGateway,
 ): Promise<RetailerComplaint> {
   let attachmentUrl: string | null = null;
@@ -116,9 +124,20 @@ export async function fileComplaint(
       .data.publicUrl;
   }
 
+  const values: Record<string, unknown> = {
+    retailer_id: retailerId,
+    subject,
+    description,
+    attachment_url: attachmentUrl,
+  };
+  if (orderId) {
+    values.order_id = orderId;
+    values.category = "cancellation_refund";
+  }
+
   const { data, error } = await gateway
     .from("complaints")
-    .insert({ retailer_id: retailerId, subject, description, attachment_url: attachmentUrl })
+    .insert(values)
     .select(COMPLAINT_SELECT)
     .single();
   if (error || !data) {

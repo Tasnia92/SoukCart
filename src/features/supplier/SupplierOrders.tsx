@@ -12,14 +12,17 @@ import {
   type NoticeState,
 } from "../../components/ui/Workspace.tsx";
 import { useSessionSnapshot, useSessionStore } from "../../session.tsx";
+import { NotificationsPanel } from "../notifications/NotificationsPanel.tsx";
 import { OrderRow, PaymentBadge, shortId, StatusBadge } from "../orders/order-presentation.tsx";
 import { formatDate, formatPrice, initials } from "../workspace/format.ts";
 import { RouterLink, WorkspaceShell } from "../workspace/WorkspaceShell.tsx";
 import { supplierNavItems } from "./supplier-shared.tsx";
 import {
   acceptSupplierOrder,
+  canSupplierCancel,
   filterSupplierOrders,
   loadSupplierOrders,
+  requestSupplierCancellation,
   type SupplierOrder,
 } from "./supplier-orders-api.ts";
 
@@ -33,35 +36,65 @@ function OrderActions({
   order,
   disabled,
   onAccept,
+  onCancel,
 }: {
   order: SupplierOrder;
   disabled: boolean;
   onAccept: (order: SupplierOrder) => void;
+  onCancel: (order: SupplierOrder) => void;
 }) {
-  if (order.cancel_requested) {
+  if (order.status === "cancelled") {
     return (
       <span className="admin-muted">
-        The retailer asked to cancel. The admin team will resolve it.
+        Cancelled
+        {order.manual_refund_status === "pending" ? " · full manual refund pending" : ""}
       </span>
     );
   }
-  if (order.accepted_at) {
-    return <span className="admin-muted">Accepted {formatDate(order.accepted_at)}</span>;
-  }
-  if (order.status === "pending") {
+  if (order.cancel_requested) {
     return (
-      <button
-        className="text-button"
-        type="button"
-        disabled={disabled}
-        onClick={() => onAccept(order)}
-      >
-        <Icon name="check" />
-        <span>Accept order</span>
-      </button>
+      <span className="admin-muted">
+        Cancellation requested by {order.cancellation_initiator ?? "a participant"} · waiting for
+        admin
+      </span>
     );
   }
-  return <span className="admin-muted">Order status is managed by the admin team.</span>;
+  if (order.status === "delivered" && order.delivery_verified_at) {
+    return <span className="admin-muted">Delivery verified · supplier cancellation is closed</span>;
+  }
+
+  return (
+    <>
+      {!order.accepted_at && order.status === "pending" ? (
+        <button
+          className="text-button"
+          type="button"
+          disabled={disabled}
+          onClick={() => onAccept(order)}
+        >
+          <Icon name="check" />
+          <span>Accept order</span>
+        </button>
+      ) : order.accepted_at ? (
+        <span className="admin-muted">Accepted {formatDate(order.accepted_at)}</span>
+      ) : null}
+      {canSupplierCancel(order) ? (
+        <button
+          className="text-button rt-cancel-button"
+          type="button"
+          disabled={disabled}
+          onClick={() => onCancel(order)}
+        >
+          <Icon name="trash" />
+          <span>Request cancellation</span>
+        </button>
+      ) : !order.supplier_can_cancel ? (
+        <span className="admin-muted">
+          Multi-supplier order · contact admin to resolve your fulfillment
+        </span>
+      ) : null}
+    </>
+  );
 }
 
 export function SupplierOrders({ loadOrders = loadSupplierOrders }: SupplierOrdersProps) {
@@ -146,6 +179,49 @@ export function SupplierOrders({ loadOrders = loadSupplierOrders }: SupplierOrde
       .finally(() => setBusyId(null));
   };
 
+  const onCancel = (order: SupplierOrder) => {
+    const reason = window.prompt(
+      `Why should order #${shortId(order.id)} be cancelled? A paid online order will require a full manual refund.`,
+    );
+    if (reason === null) return;
+    if (!reason.trim()) {
+      setNotice({ message: "Add a cancellation reason.", state: "error" });
+      return;
+    }
+
+    setBusyId(order.id);
+    void requestSupplierCancellation(order.id, reason)
+      .then(() => {
+        setOrders(
+          (prev) =>
+            prev?.map((current) =>
+              current.id === order.id
+                ? {
+                    ...current,
+                    cancel_requested: true,
+                    cancellation_initiator: "supplier",
+                    cancellation_reason: reason.trim(),
+                  }
+                : current,
+            ) ?? prev,
+        );
+        setNotice({
+          message: `Cancellation of order #${shortId(order.id)} was requested. The retailer, admin, and other suppliers were notified.`,
+          state: "info",
+        });
+      })
+      .catch((cancelError: unknown) => {
+        setNotice({
+          message:
+            cancelError instanceof Error
+              ? cancelError.message
+              : "The cancellation request could not be submitted.",
+          state: "error",
+        });
+      })
+      .finally(() => setBusyId(null));
+  };
+
   const filtered = orders ? filterSupplierOrders(orders, searchTerm, shortId) : [];
 
   return (
@@ -159,7 +235,7 @@ export function SupplierOrders({ loadOrders = loadSupplierOrders }: SupplierOrde
       <PageHeader
         eyebrow="Order fulfillment"
         title="Orders."
-        copy="Accept incoming order requests. The admin team manages confirmation, shipping, delivery, and cancellation statuses."
+        copy="Accept incoming orders or request cancellation before delivery is verified. The admin completes all refunds manually."
         actions={
           <RouterLink className="button button-subtle" to="/supplier/stock">
             <Icon name="layers" />
@@ -168,6 +244,7 @@ export function SupplierOrders({ loadOrders = loadSupplierOrders }: SupplierOrde
         }
       />
       <InlineNotice message={notice?.message} state={notice?.state} />
+      <NotificationsPanel />
       {orders ? (
         <>
           <SearchToolbar
@@ -234,7 +311,9 @@ export function SupplierOrders({ loadOrders = loadSupplierOrders }: SupplierOrde
                                 <span className="rt-cancel-flag">Accepted</span>
                               ) : null}
                               {order.cancel_requested ? (
-                                <span className="rt-cancel-flag">Cancel requested</span>
+                                <span className="rt-cancel-flag">
+                                  Cancel requested by {order.cancellation_initiator}
+                                </span>
                               ) : null}
                             </td>
                           </>
@@ -257,11 +336,17 @@ export function SupplierOrders({ loadOrders = loadSupplierOrders }: SupplierOrde
                                 <strong>Notes:</strong> {order.notes}
                               </p>
                             ) : null}
+                            {order.cancellation_reason ? (
+                              <p className="rt-order-notes">
+                                <strong>Cancellation reason:</strong> {order.cancellation_reason}
+                              </p>
+                            ) : null}
                             <div className="rt-order-detail-actions">
                               <OrderActions
                                 order={order}
                                 disabled={busyId === order.id}
                                 onAccept={onAccept}
+                                onCancel={onCancel}
                               />
                             </div>
                           </>

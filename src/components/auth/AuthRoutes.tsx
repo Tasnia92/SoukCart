@@ -1,10 +1,11 @@
 import { useState } from "react";
+import { LandingPage } from "../../features/landing/LandingPage.tsx";
 import { useSessionSnapshot, useSessionStore } from "../../session.tsx";
 import { AuthScreen } from "./AuthScreen.tsx";
 import { RoleChooser, type AccountRole } from "./RoleChooser.tsx";
 import { SessionLoading } from "./SessionLoading.tsx";
 import { SignedInFallback } from "./SignedInFallback.tsx";
-import type { AuthFeedback, LoginCredentials, RegistrationDetails } from "./types.ts";
+import type { AuthFeedback, AuthMode, LoginCredentials, RegistrationDetails } from "./types.ts";
 
 function useAuthCallbacks() {
   const store = useSessionStore();
@@ -65,6 +66,32 @@ function UnknownRoleScreen() {
   return <SignedInFallback feedback={feedback} onLogout={logout} pending={pending} />;
 }
 
+/**
+ * Signed-out visitors land on the marketing page. Opening sign-in or sign-up
+ * swaps in the existing auth screen; the auth screen's brand link points back
+ * at "/" for the return trip.
+ */
+function PublicEntry({
+  login,
+  register,
+}: {
+  login: ReturnType<typeof useAuthCallbacks>["login"];
+  register: ReturnType<typeof useAuthCallbacks>["register"];
+}) {
+  const [authMode, setAuthMode] = useState<AuthMode | null>(null);
+
+  if (!authMode) {
+    return (
+      <LandingPage
+        onSignIn={() => setAuthMode("login")}
+        onRegister={() => setAuthMode("register")}
+      />
+    );
+  }
+
+  return <AuthScreen initialMode={authMode} onLogin={login} onRegister={register} />;
+}
+
 export function RootAuthRoute() {
   const { state } = useSessionSnapshot();
   const callbacks = useAuthCallbacks();
@@ -73,7 +100,7 @@ export function RootAuthRoute() {
     case "loading":
       return <SessionLoading />;
     case "signed-out":
-      return <AuthScreen onLogin={callbacks.login} onRegister={callbacks.register} />;
+      return <PublicEntry login={callbacks.login} register={callbacks.register} />;
     case "missing-profile":
     case "roleless":
       return <RoleSetup />;

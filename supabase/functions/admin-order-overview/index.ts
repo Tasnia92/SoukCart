@@ -16,6 +16,8 @@ type RequestBody = {
   action?: unknown;
   orderId?: unknown;
   status?: unknown;
+  platformCharge?: unknown;
+  deliveryCharge?: unknown;
 };
 
 const ORDER_STATUSES = ["pending", "confirmed", "shipped", "delivered", "cancelled"] as const;
@@ -40,9 +42,18 @@ type ActivityOrder = {
   id: string;
   status: string;
   cancel_requested: boolean;
+  cancellation_initiator: string | null;
+  cancellation_reason: string | null;
   payment_status: string;
   payment_method: string;
   created_at: string;
+  delivered_at: string | null;
+  delivery_verified_at: string | null;
+  platform_charge: number;
+  delivery_charge: number;
+  refund_amount: number;
+  manual_refund_status: string;
+  refund_completed_at: string | null;
   retailer_id: string;
   retailer_name: string;
   retailer_email: string;
@@ -87,7 +98,10 @@ Deno.serve(async (request) => {
       return await listActivity();
     }
     if (body.action === "update-status") {
-      return await updateStatus(body);
+      return await updateStatus(caller, body);
+    }
+    if (body.action === "complete-refund") {
+      return await completeRefund(caller, body);
     }
     return json({ error: "Choose a valid admin action." }, 400);
   } catch (error) {
@@ -131,7 +145,7 @@ async function listActivity(): Promise<Response> {
   const { data, error } = await admin
     .from("orders")
     .select(
-      "id, status, cancel_requested, payment_status, payment_method, created_at, retailer_id, users(name, email), order_items(id, product_id, quantity, unit_price, products(id, name, seller_id, users(name, email)))",
+      "id, status, cancel_requested, cancellation_initiator, cancellation_reason, payment_status, payment_method, created_at, delivered_at, delivery_verified_at, platform_charge, delivery_charge, refund_amount, manual_refund_status, refund_completed_at, retailer_id, users(name, email), order_items(id, product_id, quantity, unit_price, products(id, name, seller_id, users(name, email)))",
     )
     .order("created_at", { ascending: false })
     .limit(1000);
@@ -162,9 +176,18 @@ async function listActivity(): Promise<Response> {
       id: row.id,
       status: row.status,
       cancel_requested: row.cancel_requested === true,
+      cancellation_initiator: row.cancellation_initiator,
+      cancellation_reason: row.cancellation_reason,
       payment_status: row.payment_status,
       payment_method: row.payment_method,
       created_at: row.created_at,
+      delivered_at: row.delivered_at,
+      delivery_verified_at: row.delivery_verified_at,
+      platform_charge: Number(row.platform_charge ?? 0),
+      delivery_charge: Number(row.delivery_charge ?? 0),
+      refund_amount: Number(row.refund_amount ?? 0),
+      manual_refund_status: row.manual_refund_status ?? "not_required",
+      refund_completed_at: row.refund_completed_at,
       retailer_id: row.retailer_id,
       retailer_name: typeof retailer?.name === "string" ? retailer.name : "Unknown retailer",
       retailer_email: typeof retailer?.email === "string" ? retailer.email : "",
@@ -193,7 +216,7 @@ async function listActivity(): Promise<Response> {
   return json({ summary, orders });
 }
 
-async function updateStatus(body: RequestBody): Promise<Response> {
+async function updateStatus(caller: Caller, body: RequestBody): Promise<Response> {
   const orderId = readUuid(body.orderId);
   const status = typeof body.status === "string" ? body.status : "";
   if (!orderId) {
@@ -203,32 +226,36 @@ async function updateStatus(body: RequestBody): Promise<Response> {
     return json({ error: "Choose a valid order status." }, 400);
   }
 
-  const { data: existing, error: fetchError } = await admin
-    .from("orders")
-    .select("id, status")
-    .eq("id", orderId)
-    .maybeSingle();
-  if (fetchError) {
-    throw fetchError;
-  }
-  if (!existing) {
-    return json({ error: "Order not found." }, 404);
+  const platformCharge = readMoney(body.platformCharge);
+  const deliveryCharge = readMoney(body.deliveryCharge);
+  if (platformCharge === null || deliveryCharge === null) {
+    return json({ error: "Cancellation charges must be valid non-negative amounts." }, 400);
   }
 
-  const { data, error } = await admin
-    .from("orders")
-    .update({
-      status,
-      // Setting a status resolves any pending cancellation request: the same
-      // status clears (rejects) it, "cancelled" approves it.
-      cancel_requested: false,
-      cancel_requested_at: null,
-    })
-    .eq("id", orderId)
-    .select("id, status, cancel_requested")
-    .single();
+  const { data, error } = await admin.rpc("admin_update_order_status", {
+    p_order_id: orderId,
+    p_status: status,
+    p_admin_id: caller.id,
+    p_platform_charge: platformCharge,
+    p_delivery_charge: deliveryCharge,
+  });
   if (error) {
-    // Surface database guardrails (e.g. the stock trigger) to the admin.
+    return json({ error: error.message }, 400);
+  }
+  return json({ order: data });
+}
+
+async function completeRefund(caller: Caller, body: RequestBody): Promise<Response> {
+  const orderId = readUuid(body.orderId);
+  if (!orderId) {
+    return json({ error: "A valid order is required." }, 400);
+  }
+
+  const { data, error } = await admin.rpc("admin_complete_manual_refund", {
+    p_order_id: orderId,
+    p_admin_id: caller.id,
+  });
+  if (error) {
     return json({ error: error.message }, 400);
   }
   return json({ order: data });
@@ -238,9 +265,18 @@ type OrderRow = {
   id: string;
   status: string;
   cancel_requested: boolean;
+  cancellation_initiator: string | null;
+  cancellation_reason: string | null;
   payment_status: string;
   payment_method: string;
   created_at: string;
+  delivered_at: string | null;
+  delivery_verified_at: string | null;
+  platform_charge: number | string | null;
+  delivery_charge: number | string | null;
+  refund_amount: number | string | null;
+  manual_refund_status: string | null;
+  refund_completed_at: string | null;
   retailer_id: string;
   users: unknown;
   order_items: OrderItemRow[] | null;
@@ -261,6 +297,12 @@ function pickRelation(value: unknown): { name?: unknown; email?: unknown } | nul
 
 function roundMoney(value: number): number {
   return Math.round(value * 100) / 100;
+}
+
+function readMoney(value: unknown): number | null {
+  if (value === undefined || value === null || value === "") return 0;
+  const amount = typeof value === "number" || typeof value === "string" ? Number(value) : NaN;
+  return Number.isFinite(amount) && amount >= 0 ? roundMoney(amount) : null;
 }
 
 async function readBody(request: Request): Promise<RequestBody> {

@@ -22,6 +22,8 @@ type Caller = { id: string };
 
 type Complaint = {
   id: string;
+  order_id: string | null;
+  category: string;
   subject: string;
   description: string;
   attachment_url: string | null;
@@ -102,7 +104,7 @@ async function listComplaints(): Promise<Response> {
   const { data, error } = await admin
     .from("complaints")
     .select(
-      "id, subject, description, attachment_url, status, created_at, retailer_id, users(name, email)",
+      "id, order_id, category, subject, description, attachment_url, status, created_at, retailer_id, users(name, email)",
     )
     .order("created_at", { ascending: false })
     .limit(1000);
@@ -114,6 +116,8 @@ async function listComplaints(): Promise<Response> {
     const retailer = pickRelation(row.users);
     return {
       id: row.id,
+      order_id: row.order_id,
+      category: row.category,
       subject: row.subject,
       description: row.description,
       attachment_url: row.attachment_url,
@@ -153,6 +157,8 @@ async function updateComplaint(body: RequestBody): Promise<Response> {
 
 type ComplaintRow = {
   id: string;
+  order_id: string | null;
+  category: string;
   subject: string;
   description: string;
   attachment_url: string | null;

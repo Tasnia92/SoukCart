@@ -26,9 +26,18 @@ export type ActivityOrder = {
   id: string;
   status: string;
   cancel_requested: boolean;
+  cancellation_initiator: "retailer" | "supplier" | "admin" | "support" | null;
+  cancellation_reason: string | null;
   payment_status: string;
   payment_method: string;
   created_at: string;
+  delivered_at: string | null;
+  delivery_verified_at: string | null;
+  platform_charge: number;
+  delivery_charge: number;
+  refund_amount: number;
+  manual_refund_status: "not_required" | "review_required" | "pending" | "completed";
+  refund_completed_at: string | null;
   retailer_id: string;
   retailer_name: string;
   retailer_email: string;
@@ -49,12 +58,28 @@ export type ActivityResponse = {
   orders: ActivityOrder[];
 };
 
+export type CancellationCharges = {
+  platformCharge: number;
+  deliveryCharge: number;
+};
+
 export async function loadAdminActivity(): Promise<ActivityResponse> {
   return invokeAdmin<ActivityResponse>({ action: "list" }, ADMIN_ACTIVITY_FUNCTION);
 }
 
-export async function updateOrderStatus(orderId: string, status: string): Promise<void> {
-  await invokeAdmin<unknown>({ action: "update-status", orderId, status }, ADMIN_ACTIVITY_FUNCTION);
+export async function updateOrderStatus(
+  orderId: string,
+  status: string,
+  charges: CancellationCharges = { platformCharge: 0, deliveryCharge: 0 },
+): Promise<void> {
+  await invokeAdmin<unknown>(
+    { action: "update-status", orderId, status, ...charges },
+    ADMIN_ACTIVITY_FUNCTION,
+  );
+}
+
+export async function completeManualRefund(orderId: string): Promise<void> {
+  await invokeAdmin<unknown>({ action: "complete-refund", orderId }, ADMIN_ACTIVITY_FUNCTION);
 }
 
 export function filterActivityOrders(
@@ -67,7 +92,9 @@ export function filterActivityOrders(
   return orders.filter((order) => {
     if (
       shortId(order.id).toLowerCase().includes(query) ||
-      `${order.retailer_name} ${order.retailer_email}`.toLowerCase().includes(query)
+      `${order.retailer_name} ${order.retailer_email} ${order.cancellation_reason ?? ""}`
+        .toLowerCase()
+        .includes(query)
     ) {
       return true;
     }

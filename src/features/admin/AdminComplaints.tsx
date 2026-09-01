@@ -44,6 +44,11 @@ function ComplaintRow({
       <td>
         <div className="cp-cell">
           <strong>{complaint.subject}</strong>
+          {complaint.order_id ? (
+            <small>
+              Order #{complaint.order_id.slice(0, 8).toUpperCase()} · cancellation/refund support
+            </small>
+          ) : null}
           <small>{complaint.description}</small>
         </div>
       </td>

@@ -12,6 +12,8 @@ import {
 function complaint(overrides: Partial<AdminComplaint>): AdminComplaint {
   return {
     id: "complaint-1",
+    order_id: null,
+    category: "general",
     subject: "Damaged crate",
     description: "The dates arrived crushed.",
     attachment_url: null,

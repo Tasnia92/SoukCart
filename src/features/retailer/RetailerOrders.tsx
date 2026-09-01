@@ -11,12 +11,14 @@ import {
   type NoticeState,
 } from "../../components/ui/Workspace.tsx";
 import { useSessionSnapshot, useSessionStore } from "../../session.tsx";
+import { NotificationsPanel } from "../notifications/NotificationsPanel.tsx";
 import { OrderRow, PaymentBadge, shortId, StatusBadge } from "../orders/order-presentation.tsx";
 import { formatDate, formatPrice } from "../workspace/format.ts";
 import { RouterLink, WorkspaceShell } from "../workspace/WorkspaceShell.tsx";
 import {
   canCancelOrder,
   clearCart,
+  confirmOrderDelivery,
   loadCartCount,
   loadRetailerOrders,
   orderTotal,
@@ -36,54 +38,74 @@ function CancelAction({
   order,
   disabled,
   onCancel,
+  onVerifyDelivery,
 }: {
   order: RetailerOrder;
   disabled: boolean;
   onCancel: (order: RetailerOrder) => void;
+  onVerifyDelivery: (order: RetailerOrder) => void;
 }) {
-  if (order.status === "pending") {
-    if (order.cancel_requested) {
+  if (order.status === "cancelled") {
+    if (order.manual_refund_status === "review_required") {
+      return <span className="admin-muted">Historical refund requires admin review</span>;
+    }
+    if (order.manual_refund_status === "pending") {
       return (
-        <span className="admin-muted">Cancellation requested · waiting for admin approval</span>
+        <span className="admin-muted">
+          Manual refund pending · {formatPrice(order.refund_amount)}
+        </span>
       );
     }
-    return (
-      <button
-        className="text-button rt-cancel-button"
-        type="button"
-        disabled={disabled}
-        onClick={() => onCancel(order)}
-      >
-        <Icon name="trash" />
-        <span>Request cancellation</span>
-      </button>
-    );
-  }
-  if (order.status === "confirmed") {
-    if (order.cancel_requested) {
+    if (order.manual_refund_status === "completed") {
       return (
-        <span className="admin-muted">Cancellation requested · waiting for admin approval</span>
+        <span className="admin-muted">Refund completed · {formatPrice(order.refund_amount)}</span>
       );
     }
+    return <span className="admin-muted">Order cancelled · no advance refund required</span>;
+  }
+
+  if (order.cancel_requested) {
+    return <span className="admin-muted">Cancellation requested · waiting for admin approval</span>;
+  }
+
+  if (order.status === "delivered" && order.delivery_verified_at) {
     return (
-      <button
-        className="text-button rt-cancel-button"
-        type="button"
-        disabled={disabled}
-        onClick={() => onCancel(order)}
+      <a
+        className="text-button"
+        href={`/retailer/complaints?order=${encodeURIComponent(order.id)}`}
       >
-        <Icon name="trash" />
-        <span>Request cancellation</span>
-      </button>
+        <Icon name="message" />
+        <span>Contact support for cancellation or refund</span>
+      </a>
     );
   }
-  if (order.status === "shipped") {
-    return <span className="admin-muted">Shipped · cancellation is no longer available</span>;
-  }
-  if (order.status === "delivered") {
-    return <span className="admin-muted">Delivered · file a complaint for returns</span>;
-  }
-  return null;
+
+  return (
+    <>
+      {order.status === "delivered" ? (
+        <button
+          className="text-button"
+          type="button"
+          disabled={disabled}
+          onClick={() => onVerifyDelivery(order)}
+        >
+          <Icon name="check" />
+          <span>Verify delivery</span>
+        </button>
+      ) : null}
+      {canCancelOrder(order) ? (
+        <button
+          className="text-button rt-cancel-button"
+          type="button"
+          disabled={disabled}
+          onClick={() => onCancel(order)}
+        >
+          <Icon name="trash" />
+          <span>Request cancellation</span>
+        </button>
+      ) : null}
+    </>
+  );
 }
 
 export function RetailerOrders({
@@ -150,7 +172,7 @@ export function RetailerOrders({
     setOrders((prev) => prev?.map((o) => (o.id === orderId ? { ...o, ...patch } : o)) ?? prev);
   };
 
-  const onVerify = (order: RetailerOrder) => {
+  const onVerifyPayment = (order: RetailerOrder) => {
     if (!order.tran_id) return;
     setBusyId(order.id);
     void queryPaymentStatus(order.tran_id).then(async (result) => {
@@ -171,22 +193,45 @@ export function RetailerOrders({
     });
   };
 
+  const onVerifyDelivery = (order: RetailerOrder) => {
+    if (!window.confirm(`Confirm that order #${shortId(order.id)} was delivered?`)) return;
+
+    setBusyId(order.id);
+    void confirmOrderDelivery(order.id)
+      .then((verifiedAt) => {
+        updateOrder(order.id, { delivery_verified_at: verifiedAt });
+        setNotice({
+          message: `Delivery of order #${shortId(order.id)} was verified. Future cancellation requests must go through support.`,
+          state: "success",
+        });
+      })
+      .catch((verifyError: unknown) => {
+        setNotice({
+          message:
+            verifyError instanceof Error ? verifyError.message : "Delivery could not be verified.",
+          state: "error",
+        });
+      })
+      .finally(() => setBusyId(null));
+  };
+
   const onCancel = (order: RetailerOrder) => {
     if (!canCancelOrder(order)) return;
-    const total = orderTotal(order);
-    const paid = order.payment_status === "paid";
-    const message = `Request cancellation of order #${shortId(order.id)}? The admin team will review it${paid ? ` and arrange the refund of ${formatPrice(total)}` : ""}.`;
+    const paidInAdvance = order.payment_method === "online" && order.payment_status === "paid";
+    const message = `Request cancellation of order #${shortId(order.id)}? The admin team will review it${paidInAdvance ? " and manually refund the eligible amount after platform and delivery charges" : ""}.`;
     if (!window.confirm(message)) return;
 
     setBusyId(order.id);
     void requestOrderCancellation(order.id)
       .then(() => {
-        updateOrder(order.id, { cancel_requested: true });
+        updateOrder(order.id, {
+          cancel_requested: true,
+          cancellation_initiator: "retailer",
+        });
         setNotice({
-          message: `Cancellation of order #${shortId(order.id)} was requested. The admin team will review it.`,
+          message: `Cancellation of order #${shortId(order.id)} was requested. The admin and suppliers were notified.`,
           state: "info",
         });
-        setBusyId(null);
       })
       .catch((cancelError: unknown) => {
         setNotice({
@@ -196,8 +241,8 @@ export function RetailerOrders({
               : "The cancellation request could not be submitted.",
           state: "error",
         });
-        setBusyId(null);
-      });
+      })
+      .finally(() => setBusyId(null));
   };
 
   return (
@@ -231,6 +276,7 @@ export function RetailerOrders({
         }
       />
       <InlineNotice message={notice?.message} state={notice?.state} />
+      <NotificationsPanel />
       {orders ? (
         orders.length ? (
           <TableShell>
@@ -269,6 +315,9 @@ export function RetailerOrders({
                             paymentMethod={order.payment_method}
                           />
                           <StatusBadge status={order.status} />
+                          {order.delivery_verified_at ? (
+                            <span className="rt-cancel-flag">Delivery verified</span>
+                          ) : null}
                         </td>
                       </>
                     }
@@ -288,6 +337,14 @@ export function RetailerOrders({
                             <strong>Notes:</strong> {order.notes}
                           </p>
                         ) : null}
+                        {order.status === "cancelled" &&
+                        order.manual_refund_status !== "not_required" ? (
+                          <p className="rt-order-notes">
+                            <strong>Refund:</strong> {formatPrice(order.refund_amount)} · platform
+                            charge {formatPrice(order.platform_charge)} · delivery charge{" "}
+                            {formatPrice(order.delivery_charge)}
+                          </p>
+                        ) : null}
                         <div className="rt-order-detail-actions">
                           {order.payment_status === "paid" ? (
                             <RouterLink
@@ -304,7 +361,7 @@ export function RetailerOrders({
                               className="text-button rt-invoice-link"
                               type="button"
                               disabled={busyId === order.id}
-                              onClick={() => onVerify(order)}
+                              onClick={() => onVerifyPayment(order)}
                             >
                               <Icon name="refresh" />
                               <span>Verify payment</span>
@@ -314,6 +371,7 @@ export function RetailerOrders({
                             order={order}
                             disabled={busyId === order.id}
                             onCancel={onCancel}
+                            onVerifyDelivery={onVerifyDelivery}
                           />
                         </div>
                       </>
