@@ -14,8 +14,10 @@ import { AdminActivity } from "./features/admin/AdminActivity.tsx";
 import { AdminComplaints } from "./features/admin/AdminComplaints.tsx";
 import { AdminOverview } from "./features/admin/AdminOverview.tsx";
 import { AdminUsers } from "./features/admin/AdminUsers.tsx";
+import { RetailerCatalog } from "./features/retailer/RetailerCatalog.tsx";
 import { RetailerComplaints } from "./features/retailer/RetailerComplaints.tsx";
 import { RetailerOrders } from "./features/retailer/RetailerOrders.tsx";
+import { RetailerOverview } from "./features/retailer/RetailerOverview.tsx";
 import { SupplierOrders } from "./features/supplier/SupplierOrders.tsx";
 import { SupplierOverview } from "./features/supplier/SupplierOverview.tsx";
 import { SupplierProductForm } from "./features/supplier/SupplierProductForm.tsx";
@@ -229,9 +231,12 @@ function SupplierRoute(): ReactElement | null {
 function RetailerRoute(): ReactElement | null {
   const { state } = useSessionSnapshot();
   const pathname = useRouterState({ select: (routerState) => routerState.location.pathname });
-  if (state.status === "retailer" && pathname === "/retailer/orders") return <RetailerOrders />;
-  if (state.status === "retailer" && pathname === "/retailer/complaints")
-    return <RetailerComplaints />;
+  if (state.status === "retailer") {
+    if (pathname === "/retailer") return <RetailerOverview />;
+    if (pathname === "/retailer/catalog") return <RetailerCatalog />;
+    if (pathname === "/retailer/orders") return <RetailerOrders />;
+    if (pathname === "/retailer/complaints") return <RetailerComplaints />;
+  }
   return <ProtectedLegacyRoute target="retailer" />;
 }
 
