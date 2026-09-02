@@ -70,28 +70,5 @@ export async function loadAdminOverviewUsers(
   return response.users;
 }
 
-export type AdminOverviewStats = {
-  total: number;
-  recentlyActive: number;
-  newThisWeek: number;
-  needsSetup: number;
-};
-
-export function getAdminOverviewStats(
-  users: readonly AdminOverviewUser[],
-  now = Date.now(),
-): AdminOverviewStats {
-  const thirtyDays = 30 * 24 * 60 * 60 * 1000;
-  const sevenDays = 7 * 24 * 60 * 60 * 1000;
-
-  return {
-    total: users.length,
-    recentlyActive: users.filter(
-      (user) =>
-        user.last_sign_in_at && now - new Date(user.last_sign_in_at).getTime() <= thirtyDays,
-    ).length,
-    newThisWeek: users.filter((user) => now - new Date(user.created_at).getTime() <= sevenDays)
-      .length,
-    needsSetup: users.filter((user) => !user.role).length,
-  };
-}
+// Account totals now come from `buildAdminDashboard`, which combines them with
+// order activity, disputes and notifications instead of standing alone.

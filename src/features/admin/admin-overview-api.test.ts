@@ -1,14 +1,11 @@
 import { describe, expect, it } from "vite-plus/test";
 import {
   ADMIN_USERS_FUNCTION,
-  getAdminOverviewStats,
   invokeAdmin,
   loadAdminOverviewUsers,
   type AdminFunctionGateway,
   type AdminOverviewUser,
 } from "./admin-overview-api.ts";
-
-const now = Date.parse("2026-09-01T12:00:00.000Z");
 
 function user(overrides: Partial<AdminOverviewUser>): AdminOverviewUser {
   return {
@@ -74,26 +71,5 @@ describe("admin overview API", () => {
     await expect(
       invokeAdmin({ action: "list" }, ADMIN_USERS_FUNCTION, emptyGateway),
     ).rejects.toThrow("The admin service returned no data.");
-  });
-
-  it("derives overview windows and roleless totals with the legacy boundaries", () => {
-    const stats = getAdminOverviewStats(
-      [
-        user({
-          id: "active-at-boundary",
-          last_sign_in_at: new Date(now - 30 * 86400000).toISOString(),
-        }),
-        user({
-          id: "inactive",
-          last_sign_in_at: new Date(now - 30 * 86400000 - 1).toISOString(),
-        }),
-        user({ id: "new-at-boundary", created_at: new Date(now - 7 * 86400000).toISOString() }),
-        user({ id: "old", created_at: new Date(now - 7 * 86400000 - 1).toISOString(), role: null }),
-        user({ id: "empty-role", role: "" }),
-      ],
-      now,
-    );
-
-    expect(stats).toEqual({ total: 5, recentlyActive: 1, newThisWeek: 1, needsSetup: 2 });
   });
 });

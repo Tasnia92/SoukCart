@@ -1,6 +1,5 @@
 import { describe, expect, it } from "vite-plus/test";
 import {
-  getSupplierOverviewStats,
   loadSupplierProducts,
   SUPPLIER_PRODUCT_COLUMNS,
   type SupplierProductsGateway,
@@ -83,36 +82,5 @@ describe("supplier overview API", () => {
     await expect(loadSupplierProducts("seller-1", gateway)).rejects.toThrow(
       "Products are unavailable.",
     );
-  });
-
-  it("counts all products, active listings, all zero-stock listings, and all units", () => {
-    expect(
-      getSupplierOverviewStats([
-        {
-          id: "active",
-          name: "Active",
-          description: "",
-          price: 10,
-          unit: "kg",
-          stock: 4,
-          category: "Rice & Grains",
-          image_url: null,
-          is_active: true,
-          created_at: "2026-08-30T00:00:00.000Z",
-        },
-        {
-          id: "hidden-zero",
-          name: "Hidden zero",
-          description: "",
-          price: 11,
-          unit: "piece",
-          stock: 0,
-          category: null,
-          image_url: null,
-          is_active: false,
-          created_at: "2026-08-29T00:00:00.000Z",
-        },
-      ]),
-    ).toEqual({ total: 2, active: 1, outOfStock: 1, unitsInStock: 4 });
   });
 });

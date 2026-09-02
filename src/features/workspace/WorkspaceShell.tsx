@@ -1,8 +1,12 @@
-import { Link } from "@tanstack/react-router";
-import type { AnchorHTMLAttributes, ReactNode } from "react";
+import type { ReactNode } from "react";
 import { Button } from "../../components/ui/Button.tsx";
 import { Icon, type IconName } from "../../components/ui/Icon.tsx";
+import { RouterLink } from "../../components/ui/RouterLink.tsx";
 import { AppShell } from "../../components/ui/Workspace.tsx";
+
+// Re-exported so the many existing `from "../workspace/WorkspaceShell.tsx"` imports keep working
+// while shared UI primitives import the link from the component layer instead.
+export { RouterLink };
 
 export type WorkspacePath =
   | "/"
@@ -27,17 +31,6 @@ export type WorkspaceNavItem = {
   active?: boolean;
   trailing?: ReactNode;
 };
-
-type RouterLinkProps = Omit<AnchorHTMLAttributes<HTMLAnchorElement>, "href"> & {
-  to: string;
-  params?: Record<string, string>;
-};
-
-// The code-generated route array currently merges sibling dynamic params in Link's type map.
-// Keep the workaround here while retaining TanStack client navigation at every React workspace link.
-export function RouterLink({ to, params = {}, ...props }: RouterLinkProps) {
-  return <Link {...props} from={"/" as never} to={to as never} params={params as never} />;
-}
 
 type WorkspaceShellProps = {
   navigationLabel: string;

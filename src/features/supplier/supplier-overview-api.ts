@@ -59,20 +59,5 @@ export async function loadSupplierProducts(
   return (data ?? []).map(normalizeSupplierProduct);
 }
 
-export type SupplierOverviewStats = {
-  total: number;
-  active: number;
-  outOfStock: number;
-  unitsInStock: number;
-};
-
-export function getSupplierOverviewStats(
-  products: readonly SupplierProduct[],
-): SupplierOverviewStats {
-  return {
-    total: products.length,
-    active: products.filter((product) => product.is_active).length,
-    outOfStock: products.filter((product) => product.stock <= 0).length,
-    unitsInStock: products.reduce((sum, product) => sum + product.stock, 0),
-  };
-}
+// Catalog totals now come from `buildSupplierDashboard`, which weighs them against
+// incoming orders and stock risk instead of reporting the catalog in isolation.

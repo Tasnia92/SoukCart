@@ -87,18 +87,19 @@ function Cloud({ x, y, scale = 1 }: { x: number; y: number; scale?: number }) {
   );
 }
 
-function Tree({ x, y, radius }: { x: number; y: number; radius: number }) {
+/* Symmetric lobed canopy over a straight trunk. */
+function Tree({ x, y, radius: r }: { x: number; y: number; radius: number }) {
   return (
     <g className="ld-art-line ld-art-line--soft">
-      <path d={`M ${x} ${y + radius} V ${y + radius + radius * 1.1}`} />
+      <path d={`M ${x} ${y + r} V ${y + r * 2.1}`} />
       <path
-        d={`M ${x - radius} ${y + radius * 0.5}
-            c ${-radius * 0.4} ${-radius * 0.5} ${-radius * 0.1} ${-radius * 1.1} ${radius * 0.45} ${-radius * 1.05}
-            c ${radius * 0.15} ${-radius * 0.6} ${radius * 0.95} ${-radius * 0.6} ${radius * 1.1} ${0}
-            c ${radius * 0.55} ${-radius * 0.05} ${radius * 0.85} ${radius * 0.55} ${radius * 0.45} ${radius * 1.05}
-            c ${radius * 0.3} ${radius * 0.55} ${-radius * 0.2} ${radius * 1.1} ${-radius * 0.9} ${radius * 0.95}
-            h ${-radius * 1.1}
-            c ${-radius * 0.7} ${radius * 0.1} ${-radius * 1.2} ${-radius * 0.45} ${-radius} ${-radius * 0.95} z`}
+        d={`M ${x} ${y + r}
+            q ${-r * 1.05} 0 ${-r * 1.05} ${-r * 0.62}
+            q ${-r * 0.18} ${-r * 0.72} ${r * 0.52} ${-r * 0.9}
+            q ${r * 0.12} ${-r * 0.72} ${r * 0.53} ${-r * 0.6}
+            q ${r * 0.41} ${-r * 0.3} ${r * 0.53} ${r * 0.6}
+            q ${r * 0.7} ${r * 0.18} ${r * 0.52} ${r * 0.9}
+            q 0 ${r * 0.62} ${-r * 1.05} ${r * 0.62} z`}
       />
     </g>
   );
@@ -149,10 +150,10 @@ export function JourneyArt() {
 
       {/* Ground contact shadows */}
       <g className="ld-art-shadow">
-        <ellipse cx={404} cy={306} rx={172} ry={12} />
-        <ellipse cx={514} cy={276} rx={78} ry={9} />
-        <ellipse cx={322} cy={330} rx={54} ry={8} />
-        <ellipse cx={428} cy={666} rx={148} ry={12} />
+        <ellipse cx={380} cy={306} rx={158} ry={12} />
+        <ellipse cx={536} cy={324} rx={84} ry={10} />
+        <ellipse cx={330} cy={394} rx={50} ry={8} />
+        <ellipse cx={428} cy={668} rx={148} ry={12} />
       </g>
 
       {/* Supplier warehouse */}
@@ -192,65 +193,65 @@ export function JourneyArt() {
         </text>
       </g>
 
-      {/* Pallets waiting on the apron */}
+      {/* Pallets waiting in the bay and on the dock */}
       <g>
         <Crate x={402} y={244} width={54} height={44} />
         <Crate x={412} y={214} width={36} height={30} />
         <rect className="ld-art-line ld-art-fill--soft" x={398} y={288} width={62} height={10} />
-        <Crate x={286} y={258} width={50} height={42} />
-        <rect className="ld-art-line ld-art-fill--soft" x={282} y={300} width={58} height={10} />
+        <Crate x={280} y={240} width={50} height={44} />
+        <rect className="ld-art-line ld-art-fill--soft" x={276} y={284} width={58} height={10} />
       </g>
 
-      {/* Delivery truck */}
+      {/* Delivery truck, parked on the apron beside the dock */}
       <g>
-        <rect className="ld-art-line ld-art-fill--accent" x={496} y={196} width={82} height={62} />
+        <rect className="ld-art-line ld-art-fill--accent" x={514} y={238} width={90} height={68} />
         <path
           className="ld-art-line ld-art-fill--paper"
-          d="M 496 212 h -32 a 12 12 0 0 0 -11 8 l -6 22 a 8 8 0 0 0 -1 4 v 12 h 50 z"
+          d="M 514 256 h -34 a 12 12 0 0 0 -11 8 l -6 22 a 8 8 0 0 0 -1 4 v 12 h 52 z"
         />
         <polygon
           className="ld-art-line ld-art-fill--soft"
-          points="464,220 490,220 490,240 458,240"
+          points="482,264 508,264 508,284 476,284"
         />
-        <rect className="ld-art-line" x={444} y={248} width={14} height={10} />
+        <rect className="ld-art-line" x={458} y={292} width={14} height={10} />
         <svg
           className="ld-art-glyph ld-art-glyph--light"
-          x={518}
-          y={208}
+          x={540}
+          y={252}
           width={38}
           height={38}
           viewBox="0 0 24 24"
           dangerouslySetInnerHTML={{ __html: iconPaths.cart }}
         />
         <g className="ld-art-wheel">
-          <circle cx={480} cy={262} r={13} />
-          <circle cx={552} cy={262} r={13} />
+          <circle cx={498} cy={308} r={13} />
+          <circle cx={576} cy={308} r={13} />
         </g>
       </g>
 
-      {/* Courier with a hand truck */}
+      {/* Courier crossing the yard with a hand truck */}
       <g>
         <g className="ld-art-line">
-          <ellipse className="ld-art-fill--paper" cx={306} cy={252} rx={17} ry={5} />
-          <path className="ld-art-fill--soft" d="M 296 251 a 10 8 0 0 1 20 0" />
-          <circle className="ld-art-fill--paper" cx={306} cy={262} r={9} />
-          <path d="M 306 271 V 298" />
-          <path d="M 306 278 L 330 288" />
-          <path d="M 306 298 L 293 324 M 306 298 L 320 324" />
-          <path d="M 288 326 h 12 M 316 326 h 12" />
+          <ellipse className="ld-art-fill--paper" cx={316} cy={316} rx={17} ry={5} />
+          <path className="ld-art-fill--soft" d="M 306 315 a 10 8 0 0 1 20 0" />
+          <circle className="ld-art-fill--paper" cx={316} cy={326} r={9} />
+          <path d="M 316 335 V 362" />
+          <path d="M 316 342 L 340 352" />
+          <path d="M 316 362 L 303 388 M 316 362 L 330 388" />
+          <path d="M 298 390 h 12 M 326 390 h 12" />
         </g>
-        <path className="ld-art-line" d="M 334 266 L 341 322" />
-        <Crate x={330} y={286} width={36} height={28} />
-        <Crate x={332} y={260} width={32} height={26} />
-        <path className="ld-art-line" d="M 338 314 L 362 320" />
+        <path className="ld-art-line" d="M 344 330 L 351 386" />
+        <Crate x={340} y={350} width={36} height={28} />
+        <Crate x={342} y={324} width={32} height={26} />
+        <path className="ld-art-line" d="M 348 378 L 372 384" />
         <g className="ld-art-wheel ld-art-wheel--small">
-          <circle cx={344} cy={322} r={9} />
+          <circle cx={354} cy={386} r={9} />
         </g>
       </g>
 
       {/* Trees */}
-      <Tree x={606} y={392} radius={26} />
-      <Tree x={654} y={366} radius={19} />
+      <Tree x={620} y={402} radius={26} />
+      <Tree x={654} y={372} radius={17} />
 
       {/* Terracotta route: stock → pick → transit → doorstep */}
       <g className="ld-art-route">
@@ -259,7 +260,7 @@ export function JourneyArt() {
           d="M 268 300 C 190 322 148 374 196 406 C 238 434 338 426 380 454"
           markerEnd="url(#ld-route-arrow)"
         />
-        <path d="M 398 480 C 428 508 388 530 330 526 C 264 522 230 562 258 592" />
+        <path d="M 386 458 C 424 492 388 528 330 524 C 264 520 230 560 258 590" />
       </g>
 
       {/* Your shop */}
@@ -291,7 +292,7 @@ export function JourneyArt() {
         {SHELF_STOCK.map((item) => (
           <rect
             key={`${item.row}-${item.x}`}
-            className={item.accent ? "ld-art-fill--accent" : "ld-art-fill--ink"}
+            className={item.accent ? "ld-art-fill--accent" : "ld-art-fill--mid"}
             x={item.x}
             y={SHELF_ROWS[item.row] - 11}
             width={item.width}
@@ -309,7 +310,7 @@ export function JourneyArt() {
 
       {/* Route arrival marker on the doorstep */}
       <g className="ld-art-route">
-        <path d="M 254 598 C 266 616 276 626 292 632" markerEnd="url(#ld-route-arrow)" />
+        <path d="M 252 596 C 264 616 276 626 292 632" markerEnd="url(#ld-route-arrow)" />
       </g>
 
       {/* Order badge */}

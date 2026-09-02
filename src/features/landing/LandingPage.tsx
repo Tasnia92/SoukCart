@@ -1,9 +1,10 @@
 /* -----------------------------------------------------------------------------
  * LandingPage — the public marketing surface at "/".
  *
- * Structure: header → hero (copy + illustrated order journey) → market stats
- * → how it works → join band → footer. Every visual is SVG line art or a token
- * coloured surface; the only raster asset is the header logo in public/.
+ * Structure: header → hero (copy + illustrated order journey) → platform
+ * highlights → how it works → join band → footer. Every visual is SVG line art
+ * or a token coloured surface; the only raster asset is the header logo in
+ * public/.
  * -------------------------------------------------------------------------- */
 
 import "./landing.css";
@@ -18,11 +19,10 @@ import {
   FOOTER_COLUMNS,
   HANDOFF_STEPS,
   LEGAL_LINKS,
-  MARKET_STATS,
   NAV_LINKS,
   NEWSLETTER_FEEDBACK,
+  PLATFORM_HIGHLIGHTS,
   SECTION_IDS,
-  SOCIAL_LINKS,
 } from "./landing-content.ts";
 
 export type LandingPageProps = {
@@ -102,20 +102,34 @@ function Hero({ onRegister }: { onRegister: () => void }) {
   );
 }
 
-function MarketStats() {
+function PlatformHighlights() {
   return (
-    <section className="ld-shell" id={SECTION_IDS.platform} aria-label="SoukCart at a glance">
-      <div className="ld-stats">
-        {MARKET_STATS.map((stat) => (
-          <article className="ld-stat" key={stat.label}>
-            <span className="ld-stat-art">
-              <Icon name={stat.icon} />
+    <section
+      className="ld-shell ld-highlights"
+      id={SECTION_IDS.platform}
+      aria-labelledby="ld-highlights-title"
+    >
+      <div className="ld-highlights-heading">
+        <div>
+          <p className="eyebrow ld-eyebrow">Built for wholesale</p>
+          <h2 className="ld-highlights-title" id="ld-highlights-title">
+            Keep your market moving.
+          </h2>
+        </div>
+        <p className="ld-highlights-copy">
+          SoukCart brings the details of every order into one clear, dependable workflow.
+        </p>
+      </div>
+      <div className="ld-highlight-grid">
+        {PLATFORM_HIGHLIGHTS.map((highlight) => (
+          <article className="ld-highlight-card" key={highlight.title}>
+            <span className="ld-highlight-art">
+              <Icon name={highlight.icon} />
             </span>
-            <span className="ld-stat-body">
-              <strong className="ld-stat-value">{stat.value}</strong>
-              <span className="ld-stat-label">{stat.label}</span>
-              <small className="ld-stat-detail">{stat.detail}</small>
-            </span>
+            <div>
+              <h3 className="ld-highlight-title">{highlight.title}</h3>
+              <p className="ld-highlight-copy">{highlight.copy}</p>
+            </div>
           </article>
         ))}
       </div>
@@ -230,21 +244,6 @@ function LandingFooter() {
             The wholesale commerce platform that connects suppliers and retailers. One market. One
             order line.
           </p>
-          <ul className="ld-social">
-            {SOCIAL_LINKS.map((social) => (
-              <li key={social.label}>
-                <a
-                  className="ld-social-link"
-                  href={social.href}
-                  rel="noreferrer noopener"
-                  target="_blank"
-                  aria-label={social.label}
-                >
-                  <Icon name={social.icon} />
-                </a>
-              </li>
-            ))}
-          </ul>
         </div>
 
         {FOOTER_COLUMNS.map((column) => (
@@ -293,7 +292,7 @@ export function LandingPage({ onSignIn, onRegister }: LandingPageProps) {
       <LandingHeader onSignIn={onSignIn} />
       <main className="ld-main">
         <Hero onRegister={onRegister} />
-        <MarketStats />
+        <PlatformHighlights />
         <HowItWorks />
         <JoinBand onRegister={onRegister} />
       </main>

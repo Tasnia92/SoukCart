@@ -2,10 +2,10 @@
  * Landing page copy and link inventory.
  *
  * PLACEHOLDER DESTINATIONS: SoukCart has no marketing routes yet, so every
- * navigation, footer and social destination below points at an in-page section
- * (or a canonical profile URL pattern). Nothing is a dead `#` and nothing
- * 404s — but these hrefs are meant to be replaced once the real marketing
- * pages exist. The section ids are declared in LandingPage.tsx.
+ * navigation and footer destination below points at an in-page section (or a
+ * canonical profile URL pattern). Nothing is a dead `#` and nothing 404s — but
+ * these hrefs are meant to be replaced once the real marketing pages exist.
+ * The section ids are declared in LandingPage.tsx.
  * -------------------------------------------------------------------------- */
 
 import type { IconName } from "../../components/ui/Icon.tsx";
@@ -20,7 +20,6 @@ export const NAV_LINKS = [
   { label: "For Retailers", href: `#${SECTION_IDS.join}` },
   { label: "For Suppliers", href: `#${SECTION_IDS.join}` },
   { label: "How it Works", href: `#${SECTION_IDS.howItWorks}` },
-  { label: "Pricing", href: `#${SECTION_IDS.platform}` },
   { label: "About", href: `#${SECTION_IDS.platform}` },
 ] as const;
 
@@ -32,20 +31,25 @@ export const HANDOFF_STEPS = [
   { step: "04", title: "Delivered", detail: "Stocked & ready" },
 ] as const;
 
-export const MARKET_STATS: {
+export const PLATFORM_HIGHLIGHTS: {
   icon: IconName;
-  value: string;
-  label: string;
-  detail: string;
+  title: string;
+  copy: string;
 }[] = [
-  { icon: "package", value: "10K+", label: "Products", detail: "Across categories" },
-  { icon: "users", value: "2K+", label: "Trusted Suppliers", detail: "Verified & active" },
-  { icon: "store", value: "25K+", label: "Retailers", detail: "Growing every day" },
   {
-    icon: "shield-check",
-    value: "99.5%",
-    label: "Order Accuracy",
-    detail: "On-time. Every time.",
+    icon: "package",
+    title: "Clear product details",
+    copy: "Keep product information, quantities, and order expectations easy to understand.",
+  },
+  {
+    icon: "cart",
+    title: "Straightforward ordering",
+    copy: "Give retailers a simpler way to move from choosing products to placing an order.",
+  },
+  {
+    icon: "truck",
+    title: "One connected workflow",
+    copy: "Keep suppliers and retailers aligned from confirmation through delivery.",
   },
 ];
 
@@ -88,7 +92,7 @@ export const FOOTER_COLUMNS: {
   {
     title: "For Retailers",
     links: [
-      { label: "Browse Products", href: `#${SECTION_IDS.howItWorks}` },
+      { label: "Browse Products", href: `#${SECTION_IDS.platform}` },
       { label: "How it Works", href: `#${SECTION_IDS.howItWorks}` },
       { label: "Pricing", href: `#${SECTION_IDS.platform}` },
       { label: "Help Center", href: `#${SECTION_IDS.join}` },
@@ -111,16 +115,6 @@ export const FOOTER_COLUMNS: {
       { label: "Blog", href: `#${SECTION_IDS.join}` },
       { label: "Contact Us", href: `#${SECTION_IDS.join}` },
     ],
-  },
-];
-
-export const SOCIAL_LINKS: { icon: IconName; label: string; href: string }[] = [
-  { icon: "facebook", label: "SoukCart on Facebook", href: "https://www.facebook.com/soukcart" },
-  { icon: "instagram", label: "SoukCart on Instagram", href: "https://www.instagram.com/soukcart" },
-  {
-    icon: "linkedin",
-    label: "SoukCart on LinkedIn",
-    href: "https://www.linkedin.com/company/soukcart",
   },
 ];
 

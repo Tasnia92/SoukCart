@@ -25,50 +25,65 @@ const defaultDeps: RetailerOverviewDeps = {
   clearRetailerCart: clearCart,
 };
 
-// Preserves the legacy dashboard behavior: load orders and cart, sequentially reconcile
-// every still-unpaid online order against the gateway, and clear the cart once any order
-// becomes paid — all before the overview renders.
+/**
+ * Loads what the overview needs to paint: the retailer's orders and cart size.
+ * Payment reconciliation deliberately stays out of this call — see
+ * `reconcileRetailerPayments`.
+ */
 export async function loadRetailerOverview(
   retailerId: string,
-  deps: RetailerOverviewDeps = defaultDeps,
+  deps: Pick<RetailerOverviewDeps, "loadOrders" | "loadCart"> = defaultDeps,
 ): Promise<RetailerOverviewData> {
   const [orders, cartCount] = await Promise.all([
     deps.loadOrders(retailerId),
     deps.loadCart(retailerId),
   ]);
+  return { orders, cartCount };
+}
 
+export type ReconciliationResult = {
+  /** Orders whose payment status the gateway actually changed. Empty when nothing moved. */
+  updates: { id: string; payment_status: RetailerOrder["payment_status"] }[];
+  /** True when an order settled as paid, which also empties the cart. */
+  cartCleared: boolean;
+};
+
+/**
+ * Reconciles still-unpaid online orders against the payment gateway and clears the
+ * cart once one of them settles as paid — the same behavior the old blocking loader
+ * had, moved after first paint so a slow gateway can no longer delay the dashboard.
+ * Each order is queried sequentially to keep the gateway request pattern unchanged.
+ */
+export async function reconcileRetailerPayments(
+  retailerId: string,
+  orders: readonly RetailerOrder[],
+  deps: Pick<RetailerOverviewDeps, "queryPayment" | "clearRetailerCart"> = defaultDeps,
+): Promise<ReconciliationResult> {
+  const updates: ReconciliationResult["updates"] = [];
   let justPaid = false;
+
   for (const order of orders) {
     if (order.payment_status !== "unpaid" || !order.tran_id) continue;
     const result = await deps.queryPayment(order.tran_id);
     if (result === "paid" || result === "failed" || result === "cancelled") {
-      order.payment_status = result;
+      updates.push({ id: order.id, payment_status: result });
       if (result === "paid") justPaid = true;
     }
   }
 
-  if (justPaid) {
-    await deps.clearRetailerCart(retailerId);
-    return { orders, cartCount: 0 };
-  }
-  return { orders, cartCount };
+  if (justPaid) await deps.clearRetailerCart(retailerId);
+  return { updates, cartCleared: justPaid };
 }
 
-export type RetailerOverviewStats = {
-  orders: number;
-  pending: number;
-  delivered: number;
-  inCart: number;
-};
-
-export function getRetailerOverviewStats(
+/** Applies a reconciliation result without mutating the orders already on screen. */
+export function applyReconciliation(
   orders: readonly RetailerOrder[],
-  cartCount: number,
-): RetailerOverviewStats {
-  return {
-    orders: orders.length,
-    pending: orders.filter((order) => order.status === "pending").length,
-    delivered: orders.filter((order) => order.status === "delivered").length,
-    inCart: cartCount,
-  };
+  updates: ReconciliationResult["updates"],
+): RetailerOrder[] {
+  if (!updates.length) return [...orders];
+  const byId = new Map(updates.map((update) => [update.id, update.payment_status]));
+  return orders.map((order) => {
+    const payment = byId.get(order.id);
+    return payment ? { ...order, payment_status: payment } : order;
+  });
 }
