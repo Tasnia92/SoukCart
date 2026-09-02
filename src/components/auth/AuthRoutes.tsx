@@ -5,21 +5,29 @@ import { AuthScreen } from "./AuthScreen.tsx";
 import { RoleChooser, type AccountRole } from "./RoleChooser.tsx";
 import { SessionLoading } from "./SessionLoading.tsx";
 import { SignedInFallback } from "./SignedInFallback.tsx";
-import type { AuthFeedback, AuthMode, LoginCredentials, RegistrationDetails } from "./types.ts";
+import type {
+  AuthFeedback,
+  AuthMode,
+  AuthRole,
+  LoginCredentials,
+  RegistrationDetails,
+} from "./types.ts";
 
 function useAuthCallbacks() {
   const store = useSessionStore();
   return {
-    login: async ({ email, password }: LoginCredentials): Promise<AuthFeedback | undefined> => {
+    login: async (
+      { email, password }: LoginCredentials,
+      _role: AuthRole,
+    ): Promise<AuthFeedback | undefined> => {
       const result = await store.signIn(email, password);
       return result.error ? { message: result.error, state: "error" } : undefined;
     },
-    register: async ({
-      email,
-      password,
-      name,
-    }: RegistrationDetails): Promise<AuthFeedback | undefined> => {
-      const result = await store.register(email, password, name);
+    register: async (
+      { email, password, name }: RegistrationDetails,
+      role: AuthRole,
+    ): Promise<AuthFeedback | undefined> => {
+      const result = await store.register(email, password, name, role);
       if (result.error) return { message: result.error, state: "error" };
       if (result.needsConfirmation) {
         return {
@@ -67,9 +75,9 @@ function UnknownRoleScreen() {
 }
 
 /**
- * Signed-out visitors land on the marketing page. Opening sign-in or sign-up
- * swaps in the existing auth screen; the auth screen's brand link points back
- * at "/" for the return trip.
+ * Signed-out visitors land on the marketing page. Its two hero buttons open the
+ * shared auth screen pre-set to the retailer or supplier path; the tab on the
+ * auth screen lets them switch, and the brand link points back at "/".
  */
 function PublicEntry({
   login,
@@ -78,18 +86,20 @@ function PublicEntry({
   login: ReturnType<typeof useAuthCallbacks>["login"];
   register: ReturnType<typeof useAuthCallbacks>["register"];
 }) {
-  const [authMode, setAuthMode] = useState<AuthMode | null>(null);
+  const [auth, setAuth] = useState<{ mode: AuthMode; role: AuthRole } | null>(null);
 
-  if (!authMode) {
-    return (
-      <LandingPage
-        onSignIn={() => setAuthMode("login")}
-        onRegister={() => setAuthMode("register")}
-      />
-    );
+  if (!auth) {
+    return <LandingPage onOpenAuth={(options) => setAuth(options)} />;
   }
 
-  return <AuthScreen initialMode={authMode} onLogin={login} onRegister={register} />;
+  return (
+    <AuthScreen
+      initialMode={auth.mode}
+      initialRole={auth.role}
+      onLogin={login}
+      onRegister={register}
+    />
+  );
 }
 
 export function RootAuthRoute() {

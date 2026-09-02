@@ -19,6 +19,8 @@ const expectedRoutes = {
   "/admin/users": "admin",
   "/admin/activity": "admin",
   "/admin/complaints": "admin",
+  "/admin/verifications": "admin",
+  "/admin/verifications/$userId": "admin",
   "/retailer": "retailer",
   "/retailer/catalog": "retailer",
   "/retailer/cart": "retailer",
@@ -91,6 +93,8 @@ describe("route contract", () => {
       "/admin/users",
       "/admin/activity",
       "/admin/complaints",
+      "/admin/verifications",
+      "/admin/verifications/$userId",
     ] as const) {
       expect(router.routesByPath[path].options.component?.name).toBe("AdminRoute");
     }

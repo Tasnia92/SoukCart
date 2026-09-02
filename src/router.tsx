@@ -12,6 +12,8 @@ import { AdminAuthRoute, RootAuthRoute } from "./components/auth/AuthRoutes.tsx"
 import { AdminActivity } from "./features/admin/AdminActivity.tsx";
 import { AdminComplaints } from "./features/admin/AdminComplaints.tsx";
 import { AdminOverview } from "./features/admin/AdminOverview.tsx";
+import { AdminSupplierVerifications } from "./features/admin/AdminSupplierVerifications.tsx";
+import { AdminSupplierVerificationDetail } from "./features/admin/AdminSupplierVerificationDetail.tsx";
 import { AdminUsers } from "./features/admin/AdminUsers.tsx";
 import { CheckoutResult } from "./features/retailer/CheckoutResult.tsx";
 import { PaymentReturn } from "./features/retailer/PaymentReturn.tsx";
@@ -22,6 +24,7 @@ import { RetailerInvoice } from "./features/retailer/RetailerInvoice.tsx";
 import { RetailerOrders } from "./features/retailer/RetailerOrders.tsx";
 import { RetailerOverview } from "./features/retailer/RetailerOverview.tsx";
 import { SupplierOrders } from "./features/supplier/SupplierOrders.tsx";
+import { SupplierGate } from "./features/supplier/SupplierGate.tsx";
 import { SupplierOverview } from "./features/supplier/SupplierOverview.tsx";
 import { SupplierProductForm } from "./features/supplier/SupplierProductForm.tsx";
 import { SupplierProducts } from "./features/supplier/SupplierProducts.tsx";
@@ -42,6 +45,8 @@ export const routeContract = [
   { path: "/admin/users", target: "admin" },
   { path: "/admin/activity", target: "admin" },
   { path: "/admin/complaints", target: "admin" },
+  { path: "/admin/verifications", target: "admin" },
+  { path: "/admin/verifications/$userId", target: "admin" },
   { path: "/retailer", target: "retailer" },
   { path: "/retailer/catalog", target: "retailer" },
   { path: "/retailer/cart", target: "retailer" },
@@ -150,13 +155,17 @@ function AdminRoute(): ReactElement {
   if (isReactOverviewRoute(pathname, "admin")) return <AdminOverview />;
   if (pathname === "/admin/users") return <AdminUsers />;
   if (pathname === "/admin/activity") return <AdminActivity />;
+  if (pathname === "/admin/verifications") return <AdminSupplierVerifications />;
+  const verificationMatch = ADMIN_VERIFICATION_DETAIL_PATTERN.exec(pathname);
+  if (verificationMatch) return <AdminSupplierVerificationDetail userId={verificationMatch[1]} />;
   return <AdminComplaints />;
 }
 
+const ADMIN_VERIFICATION_DETAIL_PATTERN = /^\/admin\/verifications\/([^/]+)$/;
+
 const SUPPLIER_EDIT_PATTERN = /^\/supplier\/products\/([^/]+)\/edit$/;
 
-function SupplierRoute(): ReactElement | null {
-  const pathname = useRouterState({ select: (routerState) => routerState.location.pathname });
+function resolveSupplierPage(pathname: string): ReactElement | null {
   if (isReactOverviewRoute(pathname, "supplier")) return <SupplierOverview />;
   if (pathname === "/supplier/products") return <SupplierProducts />;
   if (pathname === "/supplier/products/new") return <SupplierProductForm />;
@@ -165,6 +174,15 @@ function SupplierRoute(): ReactElement | null {
   const editMatch = SUPPLIER_EDIT_PATTERN.exec(pathname);
   if (editMatch) return <SupplierProductForm productId={editMatch[1]} />;
   return null;
+}
+
+function SupplierRoute(): ReactElement | null {
+  const pathname = useRouterState({ select: (routerState) => routerState.location.pathname });
+  const page = resolveSupplierPage(pathname);
+  if (!page) return null;
+  // Sellers must complete shop verification and be approved before the
+  // workspace unlocks; the gate handles onboarding/pending/rejected screens.
+  return <SupplierGate>{page}</SupplierGate>;
 }
 
 const RETAILER_INVOICE_PATTERN = /^\/retailer\/orders\/([0-9a-fA-F-]+)\/invoice$/;

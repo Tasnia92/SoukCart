@@ -305,6 +305,7 @@ export function AdminUsers({ loadUsers = loadAdminUsers }: AdminUsersProps) {
         { to: "/admin", icon: "layers", label: "Overview" },
         { to: "/admin/activity", icon: "activity", label: "Order activity" },
         { to: "/admin/complaints", icon: "message", label: "Disputes & Claims" },
+        { to: "/admin/verifications", icon: "shield-check", label: "Supplier verifications" },
         { to: "/admin/users", icon: "person", label: "User directory", active: true },
       ]}
       userName={userName}

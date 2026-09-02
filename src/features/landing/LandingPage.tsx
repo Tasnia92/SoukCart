@@ -12,6 +12,7 @@ import { useState, type FormEvent } from "react";
 import { Brand } from "../../components/ui/Brand.tsx";
 import { Button } from "../../components/ui/Button.tsx";
 import { Icon } from "../../components/ui/Icon.tsx";
+import type { AuthMode, AuthRole } from "../../components/auth/types.ts";
 import { GrowthArt } from "./GrowthArt.tsx";
 import { JourneyArt } from "./JourneyArt.tsx";
 import {
@@ -25,14 +26,14 @@ import {
   SECTION_IDS,
 } from "./landing-content.ts";
 
+export type OpenAuth = (options: { mode: AuthMode; role: AuthRole }) => void;
+
 export type LandingPageProps = {
-  /** Opens the existing auth screen in login mode. */
-  onSignIn: () => void;
-  /** Opens the existing auth screen in register mode. */
-  onRegister: () => void;
+  /** Opens the shared auth screen pre-set to a mode (login/register) and role. */
+  onOpenAuth: OpenAuth;
 };
 
-function LandingHeader({ onSignIn }: { onSignIn: () => void }) {
+function LandingHeader({ onOpenAuth }: { onOpenAuth: OpenAuth }) {
   return (
     <header className="ld-header">
       <div className="ld-shell ld-header-inner">
@@ -44,7 +45,12 @@ function LandingHeader({ onSignIn }: { onSignIn: () => void }) {
             </a>
           ))}
         </nav>
-        <Button className="ld-signin" variant="secondary" size="compact" onClick={onSignIn}>
+        <Button
+          className="ld-signin"
+          variant="secondary"
+          size="compact"
+          onClick={() => onOpenAuth({ mode: "login", role: "retailer" })}
+        >
           Sign in
         </Button>
       </div>
@@ -69,7 +75,7 @@ function JourneyScene() {
   );
 }
 
-function Hero({ onRegister }: { onRegister: () => void }) {
+function Hero({ onOpenAuth }: { onOpenAuth: OpenAuth }) {
   return (
     <section className="ld-shell ld-hero" aria-labelledby="ld-hero-title">
       <div className="ld-hero-copy">
@@ -84,12 +90,13 @@ function Hero({ onRegister }: { onRegister: () => void }) {
           one place.
         </p>
         <div className="ld-actions">
-          <Button onClick={onRegister}>
-            <span>Buy for my shop</span>
-            <Icon name="arrow-right" />
+          <Button onClick={() => onOpenAuth({ mode: "login", role: "retailer" })}>
+            <Icon name="store" />
+            <span>Log in as retailer</span>
           </Button>
-          <Button variant="secondary" onClick={onRegister}>
-            Sell on SoukCart
+          <Button variant="secondary" onClick={() => onOpenAuth({ mode: "login", role: "seller" })}>
+            <Icon name="package" />
+            <span>Log in as supplier</span>
           </Button>
         </div>
         <p className="ld-hero-trust">
@@ -169,7 +176,7 @@ function HowItWorks() {
   );
 }
 
-function JoinBand({ onRegister }: { onRegister: () => void }) {
+function JoinBand({ onOpenAuth }: { onOpenAuth: OpenAuth }) {
   return (
     <section className="ld-shell" id={SECTION_IDS.join} aria-labelledby="ld-join-title">
       <div className="ld-join">
@@ -184,11 +191,14 @@ function JoinBand({ onRegister }: { onRegister: () => void }) {
           </p>
         </div>
         <div className="ld-actions ld-join-actions">
-          <Button onClick={onRegister}>
+          <Button onClick={() => onOpenAuth({ mode: "register", role: "retailer" })}>
             <span>Buy for my shop</span>
             <Icon name="arrow-right" />
           </Button>
-          <Button variant="secondary" onClick={onRegister}>
+          <Button
+            variant="secondary"
+            onClick={() => onOpenAuth({ mode: "register", role: "seller" })}
+          >
             Sell on SoukCart
           </Button>
         </div>
@@ -286,15 +296,15 @@ function LandingFooter() {
   );
 }
 
-export function LandingPage({ onSignIn, onRegister }: LandingPageProps) {
+export function LandingPage({ onOpenAuth }: LandingPageProps) {
   return (
     <div className="ld-page">
-      <LandingHeader onSignIn={onSignIn} />
+      <LandingHeader onOpenAuth={onOpenAuth} />
       <main className="ld-main">
-        <Hero onRegister={onRegister} />
+        <Hero onOpenAuth={onOpenAuth} />
         <PlatformHighlights />
         <HowItWorks />
-        <JoinBand onRegister={onRegister} />
+        <JoinBand onOpenAuth={onOpenAuth} />
       </main>
       <LandingFooter />
     </div>

@@ -2,8 +2,10 @@ import { useEffect, useRef, useState } from "react";
 import { AuthShell } from "./AuthShell.tsx";
 import type {
   AuthCallback,
+  AuthCallbackWithRole,
   AuthFeedback,
   AuthMode,
+  AuthRole,
   AuthShellVariant,
   LoginCredentials,
   RegistrationDetails,
@@ -22,19 +24,22 @@ export const TERMS_FEEDBACK: AuthFeedback = {
 export type AuthScreenProps = {
   initialFeedback?: AuthFeedback | null;
   initialMode?: AuthMode;
-  onLogin: AuthCallback<LoginCredentials>;
-  onRegister: AuthCallback<RegistrationDetails>;
+  initialRole?: AuthRole;
+  onLogin: AuthCallbackWithRole<LoginCredentials>;
+  onRegister: AuthCallbackWithRole<RegistrationDetails>;
   variant?: AuthShellVariant;
 };
 
 export function AuthScreen({
   initialFeedback = null,
   initialMode = "login",
+  initialRole = "retailer",
   onLogin,
   onRegister,
   variant = "public",
 }: AuthScreenProps) {
   const [mode, setMode] = useState<AuthMode>(() => (variant === "admin" ? "login" : initialMode));
+  const [role, setRole] = useState<AuthRole>(initialRole);
   const [pending, setPending] = useState(false);
   const [feedback, setFeedback] = useState<AuthFeedback | null>(initialFeedback);
   const headingRef = useRef<HTMLHeadingElement>(null);
@@ -80,17 +85,28 @@ export function AuthScreen({
     setMode(nextMode);
   };
 
+  const switchRole = (nextRole: AuthRole) => {
+    if (nextRole === role || variant === "admin") {
+      return;
+    }
+
+    setFeedback(null);
+    setRole(nextRole);
+  };
+
   return (
     <AuthShell
       feedback={feedback}
       headingRef={headingRef}
       mode={mode}
       onForgotPassword={() => setFeedback(FORGOT_PASSWORD_FEEDBACK)}
-      onLogin={(values) => runAuthCallback(onLogin, values)}
-      onRegister={(values) => runAuthCallback(onRegister, values)}
+      onLogin={(values) => runAuthCallback((entry) => onLogin(entry, role), values)}
+      onRegister={(values) => runAuthCallback((entry) => onRegister(entry, role), values)}
+      onRoleChange={switchRole}
       onSwitchMode={switchMode}
       onTerms={() => setFeedback(TERMS_FEEDBACK)}
       pending={pending}
+      role={role}
       variant={variant}
     />
   );

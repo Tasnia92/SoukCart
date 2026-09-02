@@ -218,13 +218,28 @@ export class SessionStore {
     email: string,
     password: string,
     name: string,
+    role?: AccountRole,
   ): Promise<GatewayResult & { needsConfirmation?: boolean }> {
     const signUp = await this.gateway.signUp(email, password, name);
     if (signUp.error) return signUp;
     const signIn = await this.gateway.signIn(email, password);
     if (signIn.error) return { error: null, needsConfirmation: true };
     await this.refresh();
+    if (role) await this.applyChosenRole(role);
     return { error: null };
+  }
+
+  /**
+   * Assigns the role the visitor picked on the auth screen right after signup,
+   * so retailer/supplier accounts skip the standalone role chooser. Only fires
+   * when a fresh, roleless profile exists; otherwise the chooser stays as the
+   * fallback (e.g. when email confirmation defers the session).
+   */
+  private async applyChosenRole(role: AccountRole): Promise<void> {
+    const state = this.snapshot.state;
+    if (state.status !== "roleless" || !("session" in state)) return;
+    const result = await this.gateway.updateRole(state.session.user.id, role);
+    if (!result.error) await this.refresh();
   }
 
   async chooseRole(role: AccountRole): Promise<GatewayResult> {

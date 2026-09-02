@@ -1,5 +1,12 @@
 export type AuthMode = "login" | "register";
 export type AuthShellVariant = "public" | "admin";
+
+/**
+ * The two self-service account paths a signed-out visitor can choose between.
+ * Mirrors the `AccountRole` union in session.tsx ("seller" is surfaced as
+ * "Supplier" in copy).
+ */
+export type AuthRole = "retailer" | "seller";
 export type AuthFeedbackState = "error" | "info" | "success";
 
 export type AuthFeedback = {
@@ -20,5 +27,10 @@ export type RegistrationDetails = {
 };
 
 export type AuthCallback<T> = (values: T) => AuthFeedback | void | Promise<AuthFeedback | void>;
+
+export type AuthCallbackWithRole<T> = (
+  values: T,
+  role: AuthRole,
+) => AuthFeedback | void | Promise<AuthFeedback | void>;
 
 export type AuthFormSubmitHandler<T> = (values: T) => void | Promise<void>;

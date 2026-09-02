@@ -243,6 +243,7 @@ export function AdminActivity({ loadActivity = loadAdminActivity }: AdminActivit
         { to: "/admin", icon: "layers", label: "Overview" },
         { to: "/admin/activity", icon: "activity", label: "Order activity", active: true },
         { to: "/admin/complaints", icon: "message", label: "Disputes & Claims" },
+        { to: "/admin/verifications", icon: "shield-check", label: "Supplier verifications" },
         { to: "/admin/users", icon: "person", label: "User directory" },
       ]}
       userName={userName}

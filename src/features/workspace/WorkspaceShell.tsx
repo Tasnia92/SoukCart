@@ -14,6 +14,7 @@ export type WorkspacePath =
   | "/admin/users"
   | "/admin/activity"
   | "/admin/complaints"
+  | "/admin/verifications"
   | "/retailer"
   | "/retailer/catalog"
   | "/retailer/cart"

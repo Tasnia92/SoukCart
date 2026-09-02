@@ -185,6 +185,7 @@ export function AdminComplaints({
         { to: "/admin", icon: "layers", label: "Overview" },
         { to: "/admin/activity", icon: "activity", label: "Order activity" },
         { to: "/admin/complaints", icon: "message", label: "Disputes & Claims", active: true },
+        { to: "/admin/verifications", icon: "shield-check", label: "Supplier verifications" },
         { to: "/admin/users", icon: "person", label: "User directory" },
       ]}
       userName={userName}
