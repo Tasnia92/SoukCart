@@ -122,7 +122,7 @@ export function WorkspaceShell({
                         </RouterLink>
                       </SidebarMenuButton>
                       {trailing ? (
-                        <SidebarMenuBadge className="bg-primary text-primary-foreground">
+                        <SidebarMenuBadge className="rt-nav-badge bg-primary text-primary-foreground">
                           {trailing}
                         </SidebarMenuBadge>
                       ) : null}

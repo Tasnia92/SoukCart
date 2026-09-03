@@ -150,7 +150,7 @@ function NextActionWidget({ action }: { action: RetailerNextAction }) {
   const ActionIcon = action.icon;
 
   return (
-    <Card aria-label="Your next step" aria-live="polite">
+    <Card className="db-next" aria-label="Your next step" aria-live="polite">
       <CardHeader>
         <CardTitle className="flex items-center gap-2">
           <ActionIcon className="size-5" aria-hidden="true" />
@@ -352,7 +352,7 @@ export function RetailerOverview({
               meta="Every order you have placed"
               action={<DashboardLink to="/retailer/orders">My orders</DashboardLink>}
             >
-              <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-5">
+              <div className="db-stages grid gap-3 sm:grid-cols-2 xl:grid-cols-5">
                 {dashboard.stages.map((stage) => (
                   <Card size="sm" key={stage.key}>
                     <CardHeader>

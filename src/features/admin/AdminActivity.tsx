@@ -1,3 +1,4 @@
+import { useRouterState } from "@tanstack/react-router";
 import { useEffect, useState, type FormEvent } from "react";
 import { Activity, RefreshCw, Search } from "lucide-react";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
@@ -71,6 +72,7 @@ import {
   statusLabel,
 } from "../orders/order-presentation.tsx";
 import { formatDate, formatPrice, initials } from "../workspace/format.ts";
+import { recordIdFromHash, searchParam } from "../workspace/search.ts";
 import { WorkspaceShell } from "../workspace/WorkspaceShell.tsx";
 import {
   completeManualRefund,
@@ -138,6 +140,9 @@ function OrderFlag({ children }: { children: string }) {
 export function AdminActivity({ loadActivity = loadAdminActivity }: AdminActivityProps) {
   const { state } = useSessionSnapshot();
   const store = useSessionStore();
+  const location = useRouterState({ select: (routerState) => routerState.location });
+  const focusedOrderId =
+    searchParam(location.searchStr, "order") ?? recordIdFromHash(location.hash, "order");
   const [data, setData] = useState<ActivityResponse | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [loadVersion, setLoadVersion] = useState(0);
@@ -172,6 +177,11 @@ export function AdminActivity({ loadActivity = loadAdminActivity }: AdminActivit
       current = false;
     };
   }, [loadActivity, loadVersion]);
+
+  useEffect(() => {
+    if (!focusedOrderId || !data) return;
+    document.getElementById(`order-${focusedOrderId}`)?.scrollIntoView({ block: "center" });
+  }, [data, focusedOrderId]);
 
   if (state.status !== "admin") return null;
 
@@ -407,6 +417,9 @@ export function AdminActivity({ loadActivity = loadAdminActivity }: AdminActivit
                       <OrderRow
                         key={order.id}
                         colSpan={8}
+                        rowId={`order-${order.id}`}
+                        defaultOpen={order.id === focusedOrderId}
+                        highlight={order.id === focusedOrderId}
                         toggleLabel={`Toggle lines for order #${shortId(order.id)}`}
                         summaryCells={
                           <>

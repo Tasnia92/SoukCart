@@ -66,19 +66,25 @@ export function OrderRow({
   detail,
   colSpan,
   toggleLabel,
+  defaultOpen = false,
+  highlight = false,
+  rowId,
 }: {
   summaryCells: ReactNode;
   detail: ReactNode;
   colSpan: number;
   toggleLabel: string;
+  defaultOpen?: boolean;
+  highlight?: boolean;
+  rowId?: string;
 }) {
-  const [open, setOpen] = useState(false);
+  const [open, setOpen] = useState(defaultOpen);
   const detailId = useId();
   const ToggleIcon = open ? Minus : Plus;
 
   return (
     <>
-      <TableRow>
+      <TableRow id={rowId} data-state={highlight ? "selected" : undefined}>
         {summaryCells}
         <TableCell className="w-12 text-right">
           <Button

@@ -37,3 +37,16 @@ export function initials(value: string): string {
     .toUpperCase();
   return result || "U";
 }
+
+/** Relative freshness label for dashboard headers, e.g. "Updated 2 minutes ago". */
+export function formatUpdatedAt(timestamp: number, now = Date.now()): string {
+  const elapsed = Math.max(0, now - timestamp);
+  const minutes = Math.floor(elapsed / 60_000);
+  if (minutes < 1) return "Updated just now";
+  if (minutes === 1) return "Updated 1 minute ago";
+  if (minutes < 60) return `Updated ${minutes} minutes ago`;
+  const hours = Math.floor(minutes / 60);
+  if (hours === 1) return "Updated 1 hour ago";
+  if (hours < 24) return `Updated ${hours} hours ago`;
+  return `Updated ${formatDate(new Date(timestamp).toISOString())}`;
+}

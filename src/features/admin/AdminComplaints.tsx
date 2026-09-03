@@ -1,3 +1,4 @@
+import { useRouterState } from "@tanstack/react-router";
 import { useEffect, useState } from "react";
 import { Download, MessageSquare, Search } from "lucide-react";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
@@ -25,6 +26,7 @@ import {
 } from "../../components/ui/Workspace.tsx";
 import { useSessionSnapshot, useSessionStore } from "../../session.tsx";
 import { formatDate, initials } from "../workspace/format.ts";
+import { recordIdFromHash, searchParam } from "../workspace/search.ts";
 import { WorkspaceShell } from "../workspace/WorkspaceShell.tsx";
 import {
   filterComplaints,
@@ -45,14 +47,16 @@ type Notice = { message: string; state: NoticeState } | null;
 function ComplaintRow({
   complaint,
   busy,
+  highlight,
   onResolve,
 }: {
   complaint: AdminComplaint;
   busy: boolean;
+  highlight: boolean;
   onResolve: (complaint: AdminComplaint) => void;
 }) {
   return (
-    <TableRow>
+    <TableRow id={`complaint-${complaint.id}`} data-state={highlight ? "selected" : undefined}>
       <TableCell>
         <div className="flex min-w-64 flex-col gap-1">
           <strong className="font-medium">{complaint.subject}</strong>
@@ -118,6 +122,9 @@ export function AdminComplaints({
 }: AdminComplaintsProps) {
   const { state } = useSessionSnapshot();
   const store = useSessionStore();
+  const location = useRouterState({ select: (routerState) => routerState.location });
+  const focusedComplaintId =
+    searchParam(location.searchStr, "complaint") ?? recordIdFromHash(location.hash, "complaint");
   const [complaints, setComplaints] = useState<AdminComplaint[] | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [loadVersion, setLoadVersion] = useState(0);
@@ -143,6 +150,11 @@ export function AdminComplaints({
       current = false;
     };
   }, [loadComplaints, loadVersion]);
+
+  useEffect(() => {
+    if (!focusedComplaintId || !complaints) return;
+    document.getElementById(`complaint-${focusedComplaintId}`)?.scrollIntoView({ block: "center" });
+  }, [complaints, focusedComplaintId]);
 
   if (state.status !== "admin") return null;
 
@@ -248,6 +260,7 @@ export function AdminComplaints({
                         key={complaint.id}
                         complaint={complaint}
                         busy={busyId === complaint.id}
+                        highlight={complaint.id === focusedComplaintId}
                         onResolve={onResolve}
                       />
                     ))

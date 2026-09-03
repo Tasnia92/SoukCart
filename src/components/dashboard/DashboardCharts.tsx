@@ -75,7 +75,7 @@ export function TrendChartCard({
   return (
     <DashboardCard eyebrow={eyebrow} title={title} meta={rangeLabel} action={action}>
       {hasData ? (
-        <figure className="flex flex-col gap-4">
+        <figure className="db-chart flex flex-col gap-4">
           <div className="flex flex-wrap gap-2">
             {series.map((entry) => {
               const peak = peakOf(entry, labels);
@@ -123,7 +123,9 @@ export function TrendChartCard({
               )}
             </ComposedChart>
           </ChartContainer>
-          <figcaption className="text-sm text-muted-foreground">{summary}</figcaption>
+          <figcaption className="db-chart-summary text-sm text-muted-foreground">
+            {summary}
+          </figcaption>
           <details className="rounded-xl border p-3">
             <summary className="cursor-pointer text-sm font-medium">
               View the {labels.length}-day figures
@@ -195,7 +197,7 @@ export function RankedBarCard({
   return (
     <DashboardCard eyebrow={eyebrow} title={title} meta={rangeLabel} action={action}>
       {items.length && max > 0 ? (
-        <ol className="flex flex-col gap-4" aria-label={`Ranked by ${valueLabel}`}>
+        <ol className="db-bars flex flex-col gap-4" aria-label={`Ranked by ${valueLabel}`}>
           {items.map((item) => (
             <li className="flex flex-col gap-2" key={item.id}>
               <div className="flex items-baseline justify-between gap-3">

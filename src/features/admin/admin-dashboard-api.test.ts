@@ -1,14 +1,14 @@
 import { describe, expect, it } from "vite-plus/test";
-import type { OrderNotification } from "../notifications/notifications-api.ts";
 import type { ActivityOrder, ActivityResponse } from "./admin-activity-api.ts";
 import type { AdminComplaint } from "./admin-complaints-api.ts";
 import type { AdminOverviewUser } from "./admin-overview-api.ts";
+import type { AdminSupplierVerification } from "./admin-supplier-verifications-api.ts";
 import {
   ADMIN_DISPUTES_SECTION,
-  ADMIN_NOTIFICATIONS_SECTION,
-  ADMIN_QUEUE_LIMIT,
+  ADMIN_VERIFICATIONS_SECTION,
   buildAdminDashboard,
   loadAdminDashboard,
+  slaBucketFor,
 } from "./admin-dashboard-api.ts";
 
 const now = Date.parse("2026-09-02T12:00:00.000Z");
@@ -74,29 +74,53 @@ function complaint(overrides: Partial<AdminComplaint>): AdminComplaint {
   };
 }
 
+function verification(overrides: Partial<AdminSupplierVerification>): AdminSupplierVerification {
+  return {
+    user_id: "seller-1",
+    shop_name: "Samira Spices",
+    shop_details: "Wholesale spices",
+    location: "Dhaka",
+    status: "pending",
+    review_note: null,
+    reviewed_at: null,
+    created_at: iso(1),
+    updated_at: iso(1),
+    supplier_name: "Samira Supplier",
+    supplier_email: "samira@example.com",
+    trade_license_url: null,
+    ...overrides,
+  };
+}
+
 describe("buildAdminDashboard", () => {
-  it("reports revenue for the window and excludes cancelled orders", () => {
+  it("reports GMV order value for the window and excludes cancelled orders", () => {
     const dashboard = buildAdminDashboard(
       {
         orders: [
           order({ id: "in-window", total: 400, created_at: iso(5) }),
+          order({
+            id: "unpaid",
+            total: 80,
+            created_at: iso(5),
+            payment_status: "unpaid",
+          }),
           order({ id: "cancelled", total: 900, created_at: iso(5), status: "cancelled" }),
           order({ id: "previous", total: 200, created_at: iso(40) }),
           order({ id: "ancient", total: 5000, created_at: iso(120) }),
         ],
         users: [],
         complaints: [],
-        notifications: [],
       },
       now,
     );
 
-    expect(dashboard.summary.revenue).toBe(400);
-    expect(dashboard.summary.orders).toBe(1);
-    // 400 against the previous window's 200.
-    expect(dashboard.summary.revenueDelta.percent).toBe(100);
+    expect(dashboard.summary.orderValue).toBe(480);
+    expect(dashboard.summary.paidOrderValue).toBe(400);
+    expect(dashboard.summary.orders).toBe(2);
+    // 480 against the previous window's 200.
+    expect(dashboard.summary.orderValueDelta.percent).toBe(140);
     expect(dashboard.series).toHaveLength(30);
-    expect(dashboard.series.reduce((sum, bucket) => sum + bucket.value, 0)).toBe(400);
+    expect(dashboard.series.reduce((sum, bucket) => sum + bucket.value, 0)).toBe(480);
   });
 
   it("counts each blocked order once across pending, cancellation and refund work", () => {
@@ -115,7 +139,6 @@ describe("buildAdminDashboard", () => {
         ],
         users: [],
         complaints: [complaint({ id: "open" }), complaint({ id: "closed", status: "resolved" })],
-        notifications: [],
       },
       now,
     );
@@ -140,7 +163,6 @@ describe("buildAdminDashboard", () => {
           user({ id: "empty-role", role: "" }),
         ],
         complaints: [],
-        notifications: [],
       },
       now,
     );
@@ -151,7 +173,7 @@ describe("buildAdminDashboard", () => {
     expect(dashboard.summary.accountsNeedingSetup).toBe(2);
   });
 
-  it("orders the queue by cost of delay and caps it", () => {
+  it("orders the queue by cost of delay and includes record ids", () => {
     const refunds = Array.from({ length: 5 }, (_unused, index) =>
       order({
         id: `refund-${index}`,
@@ -165,20 +187,56 @@ describe("buildAdminDashboard", () => {
           ...refunds,
           order({ id: "cancel", cancel_requested: true, created_at: iso(1) }),
           order({ id: "cancel-2", cancel_requested: true, created_at: iso(2) }),
+          order({ id: "pending", status: "pending", created_at: iso(1) }),
         ],
         users: [],
         complaints: [complaint({ id: "dispute" })],
-        notifications: [],
+        verifications: [verification({})],
       },
       now,
     );
 
-    expect(dashboard.queue).toHaveLength(ADMIN_QUEUE_LIMIT);
-    expect(dashboard.queue.slice(0, 5).every((item) => item.kind === "refund")).toBe(true);
-    expect(dashboard.queue[5]?.kind).toBe("cancellation");
-    // Newest first inside a group.
+    expect(dashboard.queue.filter((item) => item.kind === "refund")).toHaveLength(5);
+    expect(dashboard.queue[0]?.kind).toBe("refund");
     expect(dashboard.queue[0]?.id).toBe("refund-refund-0");
+    expect(dashboard.queue[0]?.search).toEqual({ order: "refund-0" });
+    expect(dashboard.queue[0]?.recordId).toBe("refund-0");
+    expect(dashboard.queue.some((item) => item.kind === "confirmation")).toBe(true);
+    expect(dashboard.queue.some((item) => item.kind === "verification")).toBe(true);
+    expect(dashboard.queue.find((item) => item.kind === "dispute")?.search).toEqual({
+      complaint: "dispute",
+    });
     expect(dashboard.queue.every((item) => item.severity !== "neutral")).toBe(true);
+    expect(dashboard.summary.pendingVerifications).toBe(1);
+    expect(dashboard.summary.refundsAtRisk).toBe(0);
+  });
+
+  it("groups queue items by SLA relative to each kind's due time", () => {
+    expect(slaBucketFor(iso(2), "refund", now)).toBe("overdue");
+    expect(slaBucketFor(iso(0), "refund", now)).toBe("due_soon");
+    expect(slaBucketFor(iso(1), "dispute", now)).toBe("due_soon");
+
+    const dashboard = buildAdminDashboard(
+      {
+        orders: [
+          order({
+            id: "old-refund",
+            manual_refund_status: "pending",
+            refund_amount: 150,
+            created_at: iso(3),
+          }),
+        ],
+        users: [],
+        complaints: [],
+      },
+      now,
+    );
+
+    expect(dashboard.sla.overdue).toBe(1);
+    expect(dashboard.sla.refundCount).toBe(1);
+    expect(dashboard.sla.refundAmount).toBe(150);
+    expect(dashboard.summary.refundsAtRisk).toBe(150);
+    expect(dashboard.queue[0]?.sla).toBe("overdue");
   });
 
   it("returns the newest five orders with units summed from their lines", () => {
@@ -202,10 +260,7 @@ describe("buildAdminDashboard", () => {
       }),
     );
 
-    const dashboard = buildAdminDashboard(
-      { orders, users: [], complaints: [], notifications: [] },
-      now,
-    );
+    const dashboard = buildAdminDashboard({ orders, users: [], complaints: [] }, now);
 
     expect(dashboard.recent).toHaveLength(5);
     expect(dashboard.recent[0]?.id).toBe("order-0");
@@ -219,23 +274,13 @@ describe("loadAdminDashboard", () => {
     summary: { orders: 1, revenue: 100, retailers: 1, suppliers: 1, units: 1 },
     orders: [order({ id: "order-1" })],
   };
-  const notification: OrderNotification = {
-    id: "n1",
-    order_id: null,
-    type: "order",
-    title: "Order placed",
-    message: "A retailer placed an order.",
-    created_at: iso(0),
-    read_at: null,
-  };
-
-  it("combines activity, accounts, disputes and notifications", async () => {
+  it("combines activity, accounts, disputes and verifications", async () => {
     const dashboard = await loadAdminDashboard(
       {
         loadActivity: async () => activity,
         loadUsers: async () => [user({ role: null })],
         loadComplaints: async () => [complaint({})],
-        loadFeed: async () => [notification],
+        loadVerifications: async () => [verification({})],
       },
       now,
     );
@@ -243,7 +288,8 @@ describe("loadAdminDashboard", () => {
     expect(dashboard.failures).toEqual([]);
     expect(dashboard.summary.accountsNeedingSetup).toBe(1);
     expect(dashboard.summary.openDisputes).toBe(1);
-    expect(dashboard.notifications).toHaveLength(1);
+    expect(dashboard.summary.pendingVerifications).toBe(1);
+    expect(dashboard.pendingVerifications).toHaveLength(1);
   });
 
   it("degrades the supplemental panels instead of failing the page", async () => {
@@ -252,15 +298,15 @@ describe("loadAdminDashboard", () => {
         loadActivity: async () => activity,
         loadUsers: async () => [],
         loadComplaints: () => Promise.reject(new Error("Disputes are unavailable.")),
-        loadFeed: () => Promise.reject(new Error("Notifications are unavailable.")),
+        loadVerifications: () => Promise.reject(new Error("Verifications are unavailable.")),
       },
       now,
     );
 
-    expect(dashboard.summary.revenue).toBe(100);
+    expect(dashboard.summary.orderValue).toBe(100);
     expect(dashboard.failures.map((failure) => failure.section)).toEqual([
       ADMIN_DISPUTES_SECTION,
-      ADMIN_NOTIFICATIONS_SECTION,
+      ADMIN_VERIFICATIONS_SECTION,
     ]);
   });
 
@@ -271,7 +317,7 @@ describe("loadAdminDashboard", () => {
           loadActivity: () => Promise.reject(new Error("Admin service unavailable.")),
           loadUsers: async () => [],
           loadComplaints: async () => [],
-          loadFeed: async () => [],
+          loadVerifications: async () => [],
         },
         now,
       ),

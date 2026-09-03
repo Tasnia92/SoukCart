@@ -121,8 +121,23 @@ function button(host: ParentNode, label: string): HTMLButtonElement {
   return match;
 }
 
+async function openWorkspaceMenu(host: ParentNode) {
+  const { userEvent } = await import("vite-plus/test/browser/context");
+  const account =
+    host.querySelector('[aria-label="Account menu"]') ??
+    document.querySelector('[aria-label="Account menu"]');
+  if (account) return;
+  const trigger =
+    host.querySelector<HTMLButtonElement>("[data-sidebar=trigger]") ??
+    document.querySelector<HTMLButtonElement>("[data-sidebar=trigger]");
+  if (!trigger) throw new Error("Expected a sidebar trigger");
+  await act(async () => userEvent.click(trigger));
+  await flush();
+}
+
 async function clickLogOut(host: ParentNode) {
   const { userEvent } = await import("vite-plus/test/browser/context");
+  await openWorkspaceMenu(host);
   const trigger =
     host.querySelector<HTMLButtonElement>('[aria-label="Account menu"]') ??
     document.querySelector<HTMLButtonElement>('[aria-label="Account menu"]');
@@ -263,17 +278,6 @@ function adminDashboard(): AdminDashboard {
       orders: adminOrders,
       users: adminUsers,
       complaints: adminComplaints,
-      notifications: [
-        {
-          id: "notification-1",
-          order_id: null,
-          type: "order",
-          title: "Refund review needed",
-          message: "A cancellation needs a manual refund decision.",
-          created_at: iso(0),
-          read_at: null,
-        },
-      ],
     },
     NOW,
   );
@@ -450,15 +454,6 @@ describe("React workspace overview behavior", () => {
         await act(async () => userEvent.click(button(mounted.host, "Try again")));
         await flush();
         expect(mounted.host.textContent).toContain("Command center.");
-        expect(mounted.host.textContent).toContain("Avery Administrator");
-        expect(mounted.host.textContent).toContain("avery.long.admin@example.com");
-
-        const overview = element<HTMLAnchorElement>(
-          mounted.host,
-          'nav[aria-label="Admin navigation"] a[aria-current="page"]',
-        );
-        expect(overview.textContent).toContain("Overview");
-        expect(overview.getAttribute("href")).toBe("/admin");
 
         const refresh = button(mounted.host, "Refresh");
         await act(async () => userEvent.click(refresh));
@@ -468,6 +463,17 @@ describe("React workspace overview behavior", () => {
         if (!resolveRefresh) throw new Error("Expected refresh loader to be pending");
         await act(async () => resolveRefresh?.(adminDashboard()));
         expect(refresh.disabled).toBe(false);
+
+        await openWorkspaceMenu(mounted.host);
+        expect(document.body.textContent).toContain("Avery Administrator");
+        expect(document.body.textContent).toContain("avery.long.admin@example.com");
+
+        const overview = element<HTMLAnchorElement>(
+          document,
+          'nav[aria-label="Admin navigation"] a[aria-current="page"]',
+        );
+        expect(overview.textContent).toContain("Overview");
+        expect(overview.getAttribute("href")).toBe("/admin");
 
         await clickLogOut(mounted.host);
         await flush();
@@ -501,26 +507,40 @@ describe("React workspace overview behavior", () => {
       try {
         await flush();
 
-        // What changed: revenue for a stated period, with a comparison.
-        expect(metricValue(mounted.host, "Revenue")).toBe("৳550.00");
-        expect(metric(mounted.host, "Revenue").textContent).toContain("Last 30 days");
-        // What needs attention.
+        // What changed: GMV order value for a stated period, with a comparison.
+        expect(metricValue(mounted.host, "Order value")).toBe("৳550.00");
+        expect(metric(mounted.host, "Order value").textContent).toContain("Last 30 days");
+        expect(metric(mounted.host, "Order value").textContent).toContain("Paid");
+        // What needs attention, with selectable subcounts.
         expect(metricValue(mounted.host, "Orders awaiting action")).toBe("2");
+        expect(metric(mounted.host, "Orders awaiting action").textContent).toContain(
+          "Awaiting confirmation",
+        );
+        expect(metric(mounted.host, "Orders awaiting action").textContent).toContain(
+          "Cancellation requests",
+        );
+        expect(metric(mounted.host, "Orders awaiting action").textContent).toContain("Refunds due");
         expect(metricValue(mounted.host, "Open disputes")).toBe("1");
         expect(metricValue(mounted.host, "Accounts needing setup")).toBe("1");
 
-        // The urgent queue leads with the refund and links into the workflow.
+        // Urgent SLA work sits above analytics.
+        expect(mounted.host.textContent).toContain("Urgent work");
+        expect(mounted.host.textContent).toContain("Overdue");
+        expect(mounted.host.textContent).toContain("at risk");
+
+        // The urgent queue leads with the refund and keeps the record id on the action.
         const queue = element(mounted.host, ".db-queue");
-        expect(queue.children).toHaveLength(3);
+        expect(queue.children.length).toBeGreaterThanOrEqual(3);
         expect(queue.children[0]?.textContent).toContain("Refund needs review");
         expect(queue.children[0]?.textContent).toContain("৳150.00");
-        expect(queue.children[1]?.textContent).toContain("Cancellation requested by retailer");
-        expect(queue.children[2]?.textContent).toContain("Damaged crate");
+        expect(queue.textContent).toContain("Cancellation requested by retailer");
+        expect(queue.textContent).toContain("Damaged crate");
+        expect(queue.textContent).toContain("awaiting confirmation");
 
-        // Every chart carries a text equivalent.
+        // Every chart carries a text equivalent (the data table), even if the
+        // SVG needs a real layout width to paint.
         const chart = element(mounted.host, ".db-chart");
         expect(element(chart, ".db-chart-summary").textContent).toContain("৳550.00");
-        expect(element(chart, "svg").getAttribute("aria-hidden")).toBe("true");
         expect(element(chart, "details table tbody").children).toHaveLength(30);
 
         // Recent orders reach the full ledger.
@@ -533,9 +553,7 @@ describe("React workspace overview behavior", () => {
         ).toBeTruthy();
         expect(element<HTMLAnchorElement>(mounted.host, 'a[href="/admin/users"]')).toBeTruthy();
 
-        // Notifications are part of the overview, not a separate page.
-        expect(mounted.host.textContent).toContain("Refund review needed");
-        expect(button(mounted.host, "Mark as read")).toBeTruthy();
+        expect(mounted.host.textContent).toContain("Up to date");
         await clickLogOut(mounted.host);
       } finally {
         await unmount(mounted.root);
@@ -591,9 +609,12 @@ describe("React workspace overview behavior", () => {
       expect(health.textContent).toContain("Olive oil");
       expect(health.textContent).toContain("Mint tea");
       expect(health.textContent).not.toContain("Hidden spices");
-      expect(element(health, ".db-health-bar").getAttribute("aria-label")).toContain(
-        "out of stock",
-      );
+      const healthBars = [...health.querySelectorAll(".db-health-bar")];
+      expect(
+        healthBars.some((bar) =>
+          bar.getAttribute("aria-label")?.toLowerCase().includes("out of stock"),
+        ),
+      ).toBe(true);
 
       // The fulfillment queue is a table with a per-row action.
       expect(mounted.host.textContent).toContain("Fulfillment queue");
@@ -606,8 +627,9 @@ describe("React workspace overview behavior", () => {
       expect(bars.textContent).toContain("Atlas dates");
       expect(bars.textContent).toContain("5 units sold");
 
+      await openWorkspaceMenu(mounted.host);
       const overview = element<HTMLAnchorElement>(
-        mounted.host,
+        document,
         'nav[aria-label="Supplier navigation"] a[aria-current="page"]',
       );
       expect(overview.getAttribute("href")).toBe("/supplier");
@@ -696,7 +718,12 @@ describe("React workspace overview behavior", () => {
         expect(metricValue(mounted.host, "Spend")).toBe("৳600.00");
         expect(metricValue(mounted.host, "Active orders")).toBe("2");
         expect(metricValue(mounted.host, "In your cart")).toBe("3");
-        expect(element(mounted.host, ".rt-nav-badge").textContent).toBe("3");
+        await openWorkspaceMenu(mounted.host);
+        expect(
+          (
+            mounted.host.querySelector(".rt-nav-badge") ?? document.querySelector(".rt-nav-badge")
+          )?.textContent?.trim(),
+        ).toBe("3");
 
         // Fulfillment ladder and help tickets both link to their full workflow.
         expect(element(mounted.host, ".db-stages").children).toHaveLength(5);

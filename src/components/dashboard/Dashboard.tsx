@@ -1,5 +1,12 @@
-import { useId, type ReactNode } from "react";
-import { ArrowRight, RotateCcw, TrendingDown, TrendingUp, type LucideIcon } from "lucide-react";
+import { useId, type KeyboardEvent, type ReactNode } from "react";
+import {
+  ArrowRight,
+  CircleHelp,
+  RotateCcw,
+  TrendingDown,
+  TrendingUp,
+  type LucideIcon,
+} from "lucide-react";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -40,6 +47,7 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 import { cn } from "@/lib/utils";
 import { RouterLink } from "../ui/RouterLink.tsx";
 import type { DashboardSeverity, MetricDelta, SizedSegment } from "./dashboard-model.ts";
@@ -117,19 +125,44 @@ export function DashboardCard({
 export function DashboardLink({
   to,
   params,
+  search,
+  hash,
   children,
 }: {
   to: string;
   params?: Record<string, string>;
+  search?: Record<string, string>;
+  hash?: string;
   children: ReactNode;
 }) {
   return (
     <Button variant="link" size="sm" asChild className="h-auto justify-start px-0">
-      <RouterLink to={to} params={params}>
+      <RouterLink to={to} params={params} search={search} hash={hash}>
         <span>{children}</span>
         <ArrowRight data-icon="inline-end" />
       </RouterLink>
     </Button>
+  );
+}
+
+export function MetricHint({ label, children }: { label: string; children: ReactNode }) {
+  return (
+    <TooltipProvider>
+      <Tooltip>
+        <TooltipTrigger asChild>
+          <Button
+            type="button"
+            variant="ghost"
+            size="icon-xs"
+            className="text-muted-foreground"
+            aria-label={`What ${label} means`}
+          >
+            <CircleHelp />
+          </Button>
+        </TooltipTrigger>
+        <TooltipContent>{children}</TooltipContent>
+      </Tooltip>
+    </TooltipProvider>
   );
 }
 
@@ -148,8 +181,11 @@ export type MetricCardProps = {
   period: string;
   delta?: MetricDelta;
   context?: ReactNode;
+  hint?: ReactNode;
   severity?: DashboardSeverity;
   to: string;
+  params?: Record<string, string>;
+  search?: Record<string, string>;
   linkLabel: string;
 };
 
@@ -160,29 +196,37 @@ export function MetricCard({
   period,
   delta,
   context,
+  hint,
   severity = "neutral",
   to,
+  params,
+  search,
   linkLabel,
 }: MetricCardProps) {
   const DeltaIcon = delta?.direction === "down" ? TrendingDown : TrendingUp;
   return (
     <Card
       size="sm"
+      data-slot="metric-card"
       className={cn(
+        "db-metric",
         severity === "critical" && "ring-destructive/40",
         severity === "attention" && "ring-primary/30",
       )}
     >
       <CardHeader>
-        <CardDescription className="text-xs font-medium tracking-widest uppercase">
-          {label}
+        <CardDescription className="flex items-center gap-1 text-xs font-medium tracking-widest uppercase">
+          <span className="db-metric-label">{label}</span>
+          {hint ? <MetricHint label={label}>{hint}</MetricHint> : null}
         </CardDescription>
         <CardAction>
           <span className="flex size-9 items-center justify-center rounded-xl bg-muted text-muted-foreground">
             <MetricIcon />
           </span>
         </CardAction>
-        <CardTitle className="text-3xl font-semibold tabular-nums">{value}</CardTitle>
+        <CardTitle className="db-metric-value text-3xl font-semibold tabular-nums">
+          {value}
+        </CardTitle>
       </CardHeader>
       <CardContent className="flex flex-col gap-2">
         <p className="text-xs text-muted-foreground">{period}</p>
@@ -193,7 +237,9 @@ export function MetricCard({
           </p>
         ) : null}
         {context ? <p className="text-xs text-muted-foreground">{context}</p> : null}
-        <DashboardLink to={to}>{linkLabel}</DashboardLink>
+        <DashboardLink to={to} params={params} search={search}>
+          {linkLabel}
+        </DashboardLink>
       </CardContent>
     </Card>
   );
@@ -208,6 +254,8 @@ export type ActionQueueEntry = {
   marker?: string;
   to: string;
   params?: Record<string, string>;
+  search?: Record<string, string>;
+  hash?: string;
   actionLabel: string;
 };
 
@@ -219,7 +267,7 @@ export function ActionQueue({
   items: readonly ActionQueueEntry[];
 }) {
   return (
-    <ItemGroup aria-label={label}>
+    <ItemGroup className="db-queue" aria-label={label}>
       {items.map((item) => {
         const ItemIcon = item.icon;
         return (
@@ -234,7 +282,7 @@ export function ActionQueue({
             <ItemActions>
               {item.marker ? <Badge variant="outline">{item.marker}</Badge> : null}
               <Button variant="ghost" size="sm" asChild>
-                <RouterLink to={item.to} params={item.params}>
+                <RouterLink to={item.to} params={item.params} search={item.search} hash={item.hash}>
                   {item.actionLabel}
                   <ArrowRight data-icon="inline-end" />
                 </RouterLink>
@@ -274,7 +322,7 @@ export function HealthWidget({
   emptyCopy: string;
 }) {
   return (
-    <div className="flex flex-col gap-5">
+    <div className="db-health flex flex-col gap-5">
       <p className="flex items-baseline gap-2">
         <strong className="text-2xl font-semibold tabular-nums">{total}</strong>
         <span className="text-sm text-muted-foreground">{totalLabel}</span>
@@ -286,7 +334,11 @@ export function HealthWidget({
               <span className="text-muted-foreground">{segment.label}</span>
               <strong className="tabular-nums">{segment.count}</strong>
             </div>
-            <Progress value={segment.percent} aria-label={`${segment.label}: ${segment.count}`} />
+            <Progress
+              className="db-health-bar"
+              value={segment.percent}
+              aria-label={`${segment.label}: ${segment.count}`}
+            />
           </div>
         ))}
       </div>
@@ -330,15 +382,25 @@ export function DashboardTable<Row>({
   columns,
   rows,
   rowKey,
+  onRowClick,
 }: {
   label: string;
   columns: readonly DashboardColumn<Row>[];
   rows: readonly Row[];
   rowKey: (row: Row) => string;
+  onRowClick?: (row: Row) => void;
 }) {
+  const onRowKeyDown = (row: Row, event: KeyboardEvent<HTMLTableRowElement>) => {
+    if (!onRowClick) return;
+    if (event.key === "Enter" || event.key === " ") {
+      event.preventDefault();
+      onRowClick(row);
+    }
+  };
+
   return (
     <div className="overflow-x-auto rounded-xl border">
-      <Table>
+      <Table className="db-table">
         <TableCaption className="sr-only">{label}</TableCaption>
         <TableHeader>
           <TableRow>
@@ -355,7 +417,13 @@ export function DashboardTable<Row>({
         </TableHeader>
         <TableBody>
           {rows.map((row) => (
-            <TableRow key={rowKey(row)}>
+            <TableRow
+              key={rowKey(row)}
+              className={onRowClick ? "cursor-pointer" : undefined}
+              tabIndex={onRowClick ? 0 : undefined}
+              onClick={onRowClick ? () => onRowClick(row) : undefined}
+              onKeyDown={onRowClick ? (event) => onRowKeyDown(row, event) : undefined}
+            >
               {columns.map((column) => (
                 <TableCell
                   className={column.numeric ? "text-right tabular-nums" : undefined}
@@ -375,7 +443,7 @@ export function DashboardTable<Row>({
 
 export function DashboardSkeleton({ label = "Loading the dashboard" }: { label?: string }) {
   return (
-    <div className="flex flex-col gap-4" role="status" aria-live="polite">
+    <div className="db-skeleton flex flex-col gap-4" role="status" aria-live="polite">
       <span className="sr-only">{label}</span>
       <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4" aria-hidden="true">
         {[0, 1, 2, 3].map((slot) => (
