@@ -123,6 +123,20 @@ function button(host: ParentNode, label: string): HTMLButtonElement {
   return match;
 }
 
+async function clickLogOut(host: ParentNode) {
+  const { userEvent } = await import("vite-plus/test/browser/context");
+  const trigger =
+    host.querySelector<HTMLButtonElement>('[aria-label="Account menu"]') ??
+    document.querySelector<HTMLButtonElement>('[aria-label="Account menu"]');
+  if (!trigger) throw new Error("Expected an Account menu trigger");
+  await act(async () => userEvent.click(trigger));
+  const item = [...document.querySelectorAll('[role="menuitem"]')].find(
+    (candidate) => candidate.textContent?.trim() === "Log out",
+  );
+  if (!item) throw new Error("Expected a Log out menu item");
+  await act(async () => userEvent.click(item as HTMLElement));
+}
+
 /** Reads a metric card by its label so assertions do not depend on card order. */
 function metric(host: ParentNode, label: string): HTMLElement {
   const match = [...host.querySelectorAll<HTMLElement>(".db-metric")].find(
@@ -457,7 +471,7 @@ describe("React workspace overview behavior", () => {
         await act(async () => resolveRefresh?.(adminDashboard()));
         expect(refresh.disabled).toBe(false);
 
-        await act(async () => userEvent.click(button(mounted.host, "Log out")));
+        await clickLogOut(mounted.host);
         await flush();
         expect(admin.signOutCalls()).toBe(1);
         expect(mounted.host.textContent).toBe("");
@@ -470,7 +484,6 @@ describe("React workspace overview behavior", () => {
   it.runIf(inBrowser)(
     "answers what changed, what is blocked, and what is next on the admin overview",
     async () => {
-      const { userEvent } = await import("vite-plus/test/browser/context");
       const admin = createSessionStore({
         id: "admin-1",
         email: "admin@example.com",
@@ -525,7 +538,7 @@ describe("React workspace overview behavior", () => {
         // Notifications are part of the overview, not a separate page.
         expect(mounted.host.textContent).toContain("Refund review needed");
         expect(button(mounted.host, "Mark as read")).toBeTruthy();
-        await act(async () => userEvent.click(button(mounted.host, "Log out")));
+        await clickLogOut(mounted.host);
       } finally {
         await unmount(mounted.root);
       }
@@ -533,7 +546,6 @@ describe("React workspace overview behavior", () => {
   );
 
   it.runIf(inBrowser)("leads the supplier overview with fulfillment and stock risk", async () => {
-    const { userEvent } = await import("vite-plus/test/browser/context");
     const seller = createSessionStore({
       id: "seller-1",
       email: "samira.supplier@example.com",
@@ -612,7 +624,7 @@ describe("React workspace overview behavior", () => {
         element<HTMLImageElement>(mounted.host, 'img[src="https://example.test/olive-oil.jpg"]'),
       ).toHaveProperty("loading", "lazy");
 
-      await act(async () => userEvent.click(button(mounted.host, "Log out")));
+      await clickLogOut(mounted.host);
       await flush();
       expect(seller.signOutCalls()).toBe(1);
       expect(router.state.location.pathname).toBe("/");

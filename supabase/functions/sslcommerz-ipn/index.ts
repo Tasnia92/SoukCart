@@ -38,8 +38,8 @@ Deno.serve(async (request) => {
     const tranId = readText(form.get("tran_id"));
     const valId = readText(form.get("val_id"));
     const status = readText(form.get("status")).toUpperCase();
-    if (!tranId || !valId) {
-      console.error("IPN received without tran_id or val_id");
+    if (!tranId) {
+      console.error("IPN received without tran_id");
       return new Response("Missing transaction details.", { status: 400 });
     }
 
@@ -61,7 +61,7 @@ Deno.serve(async (request) => {
     }
 
     let paid = false;
-    if (status === "VALID") {
+    if (status === "VALID" && valId) {
       const validation = await validateTransaction(valId);
       paid =
         (validation.status === "VALID" || validation.status === "VALIDATED") &&
@@ -81,6 +81,23 @@ Deno.serve(async (request) => {
       if (paymentError) {
         console.error("Paid order could not reserve stock", paymentError);
         return new Response("Payment requires administrator review.", { status: 409 });
+      }
+    } else if (isTerminalFailure(status)) {
+      // A failed or cancelled gateway result must release the reserved stock
+      // without waiting for the buyer to return to the app. Downgrading only
+      // an "unpaid" order fires handle_order_inventory_reservation, which
+      // returns the units to sellable stock. The unpaid guard makes this a
+      // no-op if the order was already paid or already released (e.g. by the
+      // expire_stale_unpaid_orders job), so stock is never released twice.
+      const nextStatus = status === "CANCELLED" ? "cancelled" : "failed";
+      const { error: releaseError } = await admin
+        .from("orders")
+        .update({ payment_status: nextStatus, val_id: valId || null })
+        .eq("id", order.id)
+        .eq("payment_status", "unpaid");
+      if (releaseError) {
+        console.error("Failed online order could not release stock", releaseError);
+        return new Response("IPN handling failed.", { status: 500 });
       }
     }
 
@@ -136,6 +153,18 @@ async function orderTotal(orderId: string): Promise<number> {
 
 function readText(value: FormDataEntryValue | null): string {
   return typeof value === "string" ? value : "";
+}
+
+// SSLCommerz reports a terminal, non-recoverable outcome with one of these
+// statuses. Anything else (e.g. a VALID result we could not validate) is left
+// untouched so the return handler or the scheduled expiry job can resolve it.
+function isTerminalFailure(status: string): boolean {
+  return (
+    status === "FAILED" ||
+    status === "CANCELLED" ||
+    status === "EXPIRED" ||
+    status === "UNATTEMPTED"
+  );
 }
 
 function isRecord(value: unknown): value is Record<string, unknown> {

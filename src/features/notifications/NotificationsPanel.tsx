@@ -1,5 +1,32 @@
 import { useEffect, useState } from "react";
+import { Bell } from "lucide-react";
+import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
+import {
+  Empty,
+  EmptyDescription,
+  EmptyHeader,
+  EmptyMedia,
+  EmptyTitle,
+} from "@/components/ui/empty";
+import {
+  Item,
+  ItemActions,
+  ItemContent,
+  ItemDescription,
+  ItemGroup,
+  ItemTitle,
+} from "@/components/ui/item";
+import {
+  Popover,
+  PopoverContent,
+  PopoverDescription,
+  PopoverHeader,
+  PopoverTitle,
+  PopoverTrigger,
+} from "@/components/ui/popover";
+import { ScrollArea } from "@/components/ui/scroll-area";
+import { Separator } from "@/components/ui/separator";
 import { formatDateTime } from "../workspace/format.ts";
 import {
   loadNotifications,
@@ -7,7 +34,7 @@ import {
   type OrderNotification,
 } from "./notifications-api.ts";
 
-export function NotificationsPanel() {
+export function NotificationsBell() {
   const [notifications, setNotifications] = useState<OrderNotification[]>([]);
 
   useEffect(() => {
@@ -17,7 +44,7 @@ export function NotificationsPanel() {
         if (current) setNotifications(items);
       })
       .catch(() => {
-        // Notifications are supplemental and must not block the order workspace.
+        // Notifications are supplemental and must not block the workspace.
       });
     return () => {
       current = false;
@@ -33,41 +60,81 @@ export function NotificationsPanel() {
     });
   };
 
-  if (!notifications.length) return null;
+  const unread = notifications.filter((notification) => !notification.read_at).length;
 
   return (
-    <section className="cp-list" aria-label="Order notifications">
-      <div className="rt-section-heading">
-        <div>
-          <p className="eyebrow">Updates</p>
-          <h2 className="display-sm">Notifications</h2>
-        </div>
-        <span className="admin-result-count">
-          {notifications.filter((notification) => !notification.read_at).length} unread
-        </span>
-      </div>
-      <div className="cp-list-cards">
-        {notifications.map((notification) => (
-          <article className="cp-card" key={notification.id}>
-            <div className="cp-card-top">
-              <strong>{notification.title}</strong>
-              {!notification.read_at ? <span className="rt-cancel-flag">New</span> : null}
-            </div>
-            <p>{notification.message}</p>
-            <small>{formatDateTime(notification.created_at)}</small>
-            {!notification.read_at ? (
-              <Button
-                variant="link"
-                className="h-auto p-0"
-                type="button"
-                onClick={() => markRead(notification)}
-              >
-                Mark as read
-              </Button>
-            ) : null}
-          </article>
-        ))}
-      </div>
-    </section>
+    <Popover>
+      <PopoverTrigger asChild>
+        <Button variant="ghost" size="icon" className="relative" aria-label="Notifications">
+          <Bell />
+          {unread > 0 ? (
+            <Badge
+              variant="default"
+              className="absolute top-1 right-1 min-w-4 px-1 py-0 text-[10px] leading-4"
+            >
+              {unread}
+            </Badge>
+          ) : null}
+        </Button>
+      </PopoverTrigger>
+      <PopoverContent align="end" className="w-80 p-0">
+        <PopoverHeader className="p-3">
+          <PopoverTitle>Notifications</PopoverTitle>
+          <PopoverDescription>
+            {unread === 0 ? "You're up to date" : `${unread} unread`}
+          </PopoverDescription>
+        </PopoverHeader>
+        <Separator />
+        {notifications.length ? (
+          <ScrollArea className="h-80">
+            <ItemGroup>
+              {notifications.map((notification) => (
+                <Item
+                  key={notification.id}
+                  size="sm"
+                  variant={notification.read_at ? "default" : "muted"}
+                >
+                  <ItemContent>
+                    <ItemTitle>
+                      {notification.title}
+                      {!notification.read_at ? <Badge variant="outline">New</Badge> : null}
+                    </ItemTitle>
+                    <ItemDescription>{notification.message}</ItemDescription>
+                    <ItemDescription>{formatDateTime(notification.created_at)}</ItemDescription>
+                  </ItemContent>
+                  {!notification.read_at ? (
+                    <ItemActions>
+                      <Button
+                        variant="ghost"
+                        size="xs"
+                        type="button"
+                        onClick={() => markRead(notification)}
+                      >
+                        Mark as read
+                      </Button>
+                    </ItemActions>
+                  ) : null}
+                </Item>
+              ))}
+            </ItemGroup>
+          </ScrollArea>
+        ) : (
+          <Empty className="py-8">
+            <EmptyHeader>
+              <EmptyMedia variant="icon">
+                <Bell />
+              </EmptyMedia>
+              <EmptyTitle>No notifications</EmptyTitle>
+              <EmptyDescription>Order updates will show up here.</EmptyDescription>
+            </EmptyHeader>
+          </Empty>
+        )}
+      </PopoverContent>
+    </Popover>
   );
+}
+
+/** @deprecated Use NotificationsBell in the workspace header. Kept for existing imports. */
+export function NotificationsPanel() {
+  return <NotificationsBell />;
 }

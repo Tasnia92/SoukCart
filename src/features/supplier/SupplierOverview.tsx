@@ -201,7 +201,6 @@ export function SupplierOverview({ loadDashboard = loadSupplierDashboard }: Supp
       onLogout={onLogout}
     >
       <PageHeader
-        eyebrow="Fulfillment"
         title={<>Good to see you, {firstName(userName)}.</>}
         copy="Accept what is waiting, restock what is running out, and see which products are carrying your sales."
         actions={
@@ -209,13 +208,13 @@ export function SupplierOverview({ loadDashboard = loadSupplierDashboard }: Supp
             <Button asChild>
               <RouterLink to="/supplier/orders">
                 <Icon name="package" />
-                <span>Process orders</span>
+                Process orders
               </RouterLink>
             </Button>
-            <Button asChild variant="ghost">
+            <Button asChild variant="outline">
               <RouterLink to="/supplier/products/new">
                 <Icon name="plus" />
-                <span>Add product</span>
+                Add product
               </RouterLink>
             </Button>
           </>

@@ -1,7 +1,23 @@
-import type { ComponentPropsWithoutRef, InputHTMLAttributes, ReactNode } from "react";
+import type {
+  ComponentPropsWithoutRef,
+  CSSProperties,
+  InputHTMLAttributes,
+  ReactNode,
+} from "react";
+import { ChevronsUpDown, LogOut } from "lucide-react";
 import { Alert, AlertDescription } from "@/components/ui/alert";
+import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuGroup,
+  DropdownMenuItem,
+  DropdownMenuLabel,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
 import {
   Empty,
   EmptyContent,
@@ -16,6 +32,7 @@ import {
   SidebarContent,
   SidebarFooter,
   SidebarGroup,
+  SidebarGroupLabel,
   SidebarHeader,
   SidebarInset,
   SidebarMenu,
@@ -24,20 +41,40 @@ import {
   SidebarMenuItem,
   SidebarProvider,
   SidebarTrigger,
+  useSidebar,
 } from "@/components/ui/sidebar";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Brand } from "./Brand.tsx";
 import { Icon, type IconName } from "./Icon.tsx";
 
-export function AppShell({ sidebar, children }: { sidebar: ReactNode; children: ReactNode }) {
+export function AppShell({
+  sidebar,
+  header,
+  children,
+}: {
+  sidebar: ReactNode;
+  header?: ReactNode;
+  children: ReactNode;
+}) {
   return (
-    <SidebarProvider>
+    <SidebarProvider
+      style={
+        {
+          "--sidebar-width": "16rem",
+          "--header-height": "3rem",
+        } as CSSProperties
+      }
+    >
       {sidebar}
       <SidebarInset className="min-w-0">
-        <div className="flex items-center gap-2 border-b p-2 md:hidden">
-          <SidebarTrigger />
+        {header ?? (
+          <div className="flex h-(--header-height) items-center gap-2 border-b px-3 md:hidden">
+            <SidebarTrigger />
+          </div>
+        )}
+        <div className="mx-auto flex w-full max-w-6xl flex-1 flex-col gap-6 p-4 md:p-6 lg:p-8">
+          {children}
         </div>
-        <div className="mx-auto w-full max-w-[75rem] px-6 py-8 lg:px-12 lg:pb-16">{children}</div>
       </SidebarInset>
     </SidebarProvider>
   );
@@ -59,32 +96,100 @@ type SidebarNavProps = {
   onLogout: () => void;
 };
 
+function initials(value: string): string {
+  const result = value
+    .trim()
+    .split(/\s+/)
+    .map((part) => part[0] ?? "")
+    .join("")
+    .slice(0, 2)
+    .toUpperCase();
+  return result || "U";
+}
+
 /**
  * User identity block shared by the anchor- and router-based sidebars. Semantic markup only,
  * no bespoke class contract: the name and email are the meaningful, asserted content.
  */
 export function SidebarUser({ userName, userEmail }: { userName: string; userEmail: string }) {
   return (
-    <div className="flex flex-col gap-0.5 px-2 text-sm">
-      <strong className="truncate">{userName}</strong>
-      <small className="truncate text-muted-foreground">{userEmail}</small>
+    <div className="grid flex-1 text-left text-sm leading-tight">
+      <strong className="truncate font-medium">{userName}</strong>
+      <small className="truncate text-xs font-normal text-muted-foreground">{userEmail}</small>
     </div>
+  );
+}
+
+export function NavUser({
+  userName,
+  userEmail,
+  onLogout,
+}: {
+  userName: string;
+  userEmail: string;
+  onLogout: () => void;
+}) {
+  const { isMobile } = useSidebar();
+
+  return (
+    <SidebarMenu>
+      <SidebarMenuItem>
+        <DropdownMenu>
+          <DropdownMenuTrigger asChild>
+            <SidebarMenuButton
+              size="lg"
+              aria-label="Account menu"
+              className="data-[state=open]:bg-sidebar-accent data-[state=open]:text-sidebar-accent-foreground"
+            >
+              <Avatar className="rounded-lg">
+                <AvatarFallback className="rounded-lg">{initials(userName)}</AvatarFallback>
+              </Avatar>
+              <SidebarUser userName={userName} userEmail={userEmail} />
+              <ChevronsUpDown className="ml-auto" />
+            </SidebarMenuButton>
+          </DropdownMenuTrigger>
+          <DropdownMenuContent
+            className="min-w-56"
+            side={isMobile ? "bottom" : "right"}
+            align="end"
+            sideOffset={4}
+          >
+            <DropdownMenuLabel className="p-0 font-normal">
+              <div className="flex items-center gap-2 px-1 py-1.5 text-left text-sm">
+                <Avatar className="rounded-lg">
+                  <AvatarFallback className="rounded-lg">{initials(userName)}</AvatarFallback>
+                </Avatar>
+                <SidebarUser userName={userName} userEmail={userEmail} />
+              </div>
+            </DropdownMenuLabel>
+            <DropdownMenuSeparator />
+            <DropdownMenuGroup>
+              <DropdownMenuItem onClick={onLogout}>
+                <LogOut />
+                Log out
+              </DropdownMenuItem>
+            </DropdownMenuGroup>
+          </DropdownMenuContent>
+        </DropdownMenu>
+      </SidebarMenuItem>
+    </SidebarMenu>
   );
 }
 
 export function SidebarNav({ label, items, userName, userEmail, onLogout }: SidebarNavProps) {
   return (
-    <Sidebar collapsible="none">
+    <Sidebar collapsible="none" className="border-r">
       <SidebarHeader>
-        <Brand variant="dark" />
+        <Brand />
       </SidebarHeader>
       <SidebarContent>
         <SidebarGroup>
+          <SidebarGroupLabel>Menu</SidebarGroupLabel>
           <nav aria-label={label}>
             <SidebarMenu>
               {items.map(({ href, icon, label: itemLabel, active, trailing }) => (
                 <SidebarMenuItem key={href}>
-                  <SidebarMenuButton asChild isActive={active}>
+                  <SidebarMenuButton asChild isActive={active} tooltip={itemLabel}>
                     <a href={href} aria-current={active ? "page" : undefined}>
                       <Icon name={icon} />
                       <span>{itemLabel}</span>
@@ -98,17 +203,14 @@ export function SidebarNav({ label, items, userName, userEmail, onLogout }: Side
         </SidebarGroup>
       </SidebarContent>
       <SidebarFooter>
-        <SidebarUser userName={userName} userEmail={userEmail} />
-        <Button variant="secondary" className="w-full" onClick={onLogout}>
-          Log out
-        </Button>
+        <NavUser userName={userName} userEmail={userEmail} onLogout={onLogout} />
       </SidebarFooter>
     </Sidebar>
   );
 }
 
 type PageHeaderProps = {
-  eyebrow: string;
+  eyebrow?: string;
   title: ReactNode;
   copy?: ReactNode;
   actions?: ReactNode;
@@ -116,13 +218,13 @@ type PageHeaderProps = {
 
 export function PageHeader({ eyebrow, title, copy, actions }: PageHeaderProps) {
   return (
-    <header className="admin-header">
-      <div>
-        <p className="eyebrow">{eyebrow}</p>
-        <h1 className="display-xl">{title}</h1>
-        {copy ? <p>{copy}</p> : null}
+    <header className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
+      <div className="flex min-w-0 flex-col gap-1">
+        {eyebrow ? <p className="text-sm font-medium text-muted-foreground">{eyebrow}</p> : null}
+        <h1 className="text-2xl font-semibold tracking-tight">{title}</h1>
+        {copy ? <p className="max-w-2xl text-sm text-muted-foreground">{copy}</p> : null}
       </div>
-      {actions ? <div className="admin-header-actions">{actions}</div> : null}
+      {actions ? <div className="flex flex-wrap items-center gap-2">{actions}</div> : null}
     </header>
   );
 }
@@ -166,14 +268,14 @@ type SearchToolbarProps = Omit<InputHTMLAttributes<HTMLInputElement>, "type"> & 
 
 export function SearchToolbar({ label, result, ...inputProps }: SearchToolbarProps) {
   return (
-    <div className="admin-toolbar">
-      <InputGroup>
+    <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
+      <InputGroup className="max-w-sm">
         <InputGroupAddon>
           <Icon name="search" />
         </InputGroupAddon>
         <InputGroupInput {...inputProps} type="search" aria-label={label} />
       </InputGroup>
-      <span className="admin-result-count">{result}</span>
+      <span className="text-sm whitespace-nowrap text-muted-foreground">{result}</span>
     </div>
   );
 }
@@ -196,18 +298,11 @@ export function InlineNotice({
   message?: string;
   state?: NoticeState;
 }) {
+  if (!message) return null;
   return (
-    <div className="mt-4 min-h-5">
-      {message ? (
-        <Alert
-          role="status"
-          aria-live="polite"
-          variant={state === "error" ? "destructive" : "default"}
-        >
-          <AlertDescription>{message}</AlertDescription>
-        </Alert>
-      ) : null}
-    </div>
+    <Alert role="status" aria-live="polite" variant={state === "error" ? "destructive" : "default"}>
+      <AlertDescription>{message}</AlertDescription>
+    </Alert>
   );
 }
 

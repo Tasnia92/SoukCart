@@ -2,6 +2,7 @@ import { useNavigate } from "@tanstack/react-router";
 import { useEffect, useRef, useState, type FormEvent, type ReactNode } from "react";
 import { Button } from "@/components/ui/button";
 import { Field, FieldLabel } from "@/components/ui/field";
+import { Input } from "@/components/ui/input";
 import {
   Select,
   SelectContent,
@@ -162,7 +163,7 @@ export function SupplierProductForm({
         return !category || category === UNCATEGORIZED ? null : category;
       })(),
     };
-    const validationMessage = productValidationError(payload);
+    const validationMessage = productValidationError(payload, { allowZeroStock: isEdit });
     if (validationMessage) {
       setFeedback({ message: validationMessage, state: "error" });
       return;
@@ -244,8 +245,7 @@ export function SupplierProductForm({
         </Button>
       </p>
       <PageHeader
-        eyebrow={editing ? "Edit listing" : "New listing"}
-        title={editing ? "Edit product." : "Add a product."}
+        title={editing ? "Edit product" : "Add a product"}
         copy={
           editing
             ? "Update the details or swap the photo — retailers see the changes right away."
@@ -319,14 +319,15 @@ export function SupplierProductForm({
           </Field>
           <label className="admin-field">
             <span>Stock</span>
-            <input
+            <Input
               name="stock"
               type="number"
-              min="1"
+              min={isEdit ? "0" : "1"}
               step="1"
               defaultValue={editing ? String(editing.stock) : "1"}
               required
             />
+            {isEdit ? <small>Set to 0 to mark the product out of stock.</small> : null}
           </label>
           <div className="sp-image-picker admin-field">
             <span>Product image</span>

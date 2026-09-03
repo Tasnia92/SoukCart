@@ -23,7 +23,7 @@ export function StockChip({ product }: { product: Pick<SupplierProduct, "is_acti
 
 export function ProductThumb({ product }: { product: Pick<SupplierProduct, "image_url"> }) {
   return product.image_url ? (
-    <img src={product.image_url} alt="" loading="lazy" />
+    <img src={product.image_url} alt="" loading="lazy" className="size-full object-cover" />
   ) : (
     <Icon name="bag" />
   );

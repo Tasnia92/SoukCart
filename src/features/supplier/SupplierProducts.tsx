@@ -1,7 +1,23 @@
 import { useNavigate } from "@tanstack/react-router";
 import { useEffect, useState } from "react";
+import { MoreHorizontal, Plus } from "lucide-react";
 import { Button } from "@/components/ui/button";
-import { Icon } from "../../components/ui/Icon.tsx";
+import {
+  Card,
+  CardContent,
+  CardDescription,
+  CardFooter,
+  CardHeader,
+  CardTitle,
+} from "@/components/ui/card";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuGroup,
+  DropdownMenuItem,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
 import {
   EmptyState,
   InlineNotice,
@@ -46,50 +62,65 @@ function ProductCard({
   onDelete: (product: SupplierProduct) => void;
 }) {
   return (
-    <article className={`rt-product-card${product.is_active ? "" : " is-hidden"}`}>
-      <div className="rt-product-art">
+    <Card className="overflow-hidden py-0">
+      <div className="flex aspect-[4/3] items-center justify-center bg-muted text-muted-foreground">
         <ProductThumb product={product} />
       </div>
-      <div className="rt-product-body">
-        <div className="rt-product-title-row">
-          <h3 className="rt-product-name">{product.name}</h3>
-          <span className="rt-product-price">{formatPrice(product.price)}</span>
-        </div>
-        <p className="rt-product-desc">{product.description || "No description yet."}</p>
-        <p className={`rt-product-stock${product.stock <= 0 ? " is-out" : ""}`}>
+      <CardHeader>
+        <CardTitle className="flex items-start justify-between gap-2">
+          <span className="truncate">{product.name}</span>
+          <span className="shrink-0 text-base">{formatPrice(product.price)}</span>
+        </CardTitle>
+        <CardDescription className="line-clamp-2">
+          {product.description || "No description yet."}
+        </CardDescription>
+      </CardHeader>
+      <CardContent className="flex flex-col gap-2">
+        <p className="text-sm text-muted-foreground">
           {product.stock <= 0 ? "Out of stock" : `${product.stock} in stock`} · per {product.unit}
         </p>
-        <div className="sp-product-meta">
+        <div className="flex items-center gap-2">
           <StockChip product={product} />
-          <small>Added {formatDate(product.created_at)}</small>
+          <span className="text-xs text-muted-foreground">
+            Added {formatDate(product.created_at)}
+          </span>
         </div>
-        <div className="sp-product-actions">
-          <RouterLink
-            className="sp-card-action"
-            to="/supplier/products/$productId/edit"
-            params={{ productId: product.id }}
-          >
+      </CardContent>
+      <CardFooter className="justify-between border-t">
+        <Button asChild variant="outline" size="sm">
+          <RouterLink to="/supplier/products/$productId/edit" params={{ productId: product.id }}>
             Edit
           </RouterLink>
-          <button
-            className="sp-card-action"
-            type="button"
-            disabled={product.stock <= 0}
-            onClick={() => onToggleActive(product)}
-          >
-            {product.is_active ? "Hide" : "Show"}
-          </button>
-          <button
-            className="sp-card-action is-danger"
-            type="button"
-            disabled={busy}
-            onClick={() => onDelete(product)}
-          >
-            Delete
-          </button>
-        </div>
-      </div>
-    </article>
+        </Button>
+        <DropdownMenu>
+          <DropdownMenuTrigger asChild>
+            <Button variant="ghost" size="icon-sm" aria-label={`More actions for ${product.name}`}>
+              <MoreHorizontal />
+            </Button>
+          </DropdownMenuTrigger>
+          <DropdownMenuContent align="end">
+            <DropdownMenuGroup>
+              <DropdownMenuItem
+                disabled={product.stock <= 0}
+                onClick={() => onToggleActive(product)}
+              >
+                {product.is_active ? "Hide from retailers" : "Show to retailers"}
+              </DropdownMenuItem>
+            </DropdownMenuGroup>
+            <DropdownMenuSeparator />
+            <DropdownMenuGroup>
+              <DropdownMenuItem
+                variant="destructive"
+                disabled={busy}
+                onClick={() => onDelete(product)}
+              >
+                Delete
+              </DropdownMenuItem>
+            </DropdownMenuGroup>
+          </DropdownMenuContent>
+        </DropdownMenu>
+      </CardFooter>
+    </Card>
   );
 }
 
@@ -206,14 +237,13 @@ export function SupplierProducts({ loadProducts = loadSupplierProducts }: Suppli
       onLogout={onLogout}
     >
       <PageHeader
-        eyebrow="Product catalog"
-        title="My products."
+        title="My products"
         copy="Add products, set your prices, and control what retailers can order."
         actions={
           <Button asChild>
             <RouterLink to="/supplier/products/new">
-              <Icon name="plus" />
-              <span>New product</span>
+              <Plus data-icon="inline-start" />
+              New product
             </RouterLink>
           </Button>
         }
@@ -229,7 +259,7 @@ export function SupplierProducts({ loadProducts = loadSupplierProducts }: Suppli
             result={`${filtered.length} of ${products.length} products`}
           />
           {filtered.length ? (
-            <div className="rt-catalog-grid">
+            <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-3">
               {filtered.map((product) => (
                 <ProductCard
                   key={product.id}

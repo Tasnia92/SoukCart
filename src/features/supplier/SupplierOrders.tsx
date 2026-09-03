@@ -1,6 +1,29 @@
 import { useNavigate } from "@tanstack/react-router";
-import { useEffect, useState } from "react";
+import { useMemo, useState, useEffect } from "react";
+import { Check, Layers } from "lucide-react";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
+import { Avatar, AvatarFallback } from "@/components/ui/avatar";
+import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
+import { Field, FieldGroup, FieldLabel } from "@/components/ui/field";
 import {
   Table,
   TableBody,
@@ -9,19 +32,18 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
-import { Icon } from "../../components/ui/Icon.tsx";
+import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { Textarea } from "@/components/ui/textarea";
 import {
   EmptyState,
   InlineNotice,
   LoadingState,
   PageHeader,
   SearchToolbar,
-  TableShell,
   WorkspaceError,
   type NoticeState,
 } from "../../components/ui/Workspace.tsx";
 import { useSessionSnapshot, useSessionStore } from "../../session.tsx";
-import { NotificationsPanel } from "../notifications/NotificationsPanel.tsx";
 import { OrderRow, PaymentBadge, shortId, StatusBadge } from "../orders/order-presentation.tsx";
 import { formatDate, formatPrice, initials } from "../workspace/format.ts";
 import { RouterLink, WorkspaceShell } from "../workspace/WorkspaceShell.tsx";
@@ -40,6 +62,18 @@ type SupplierOrdersProps = {
 };
 
 type Notice = { message: string; state: NoticeState } | null;
+type OrderFilter = "all" | "action" | "accepted" | "cancelled";
+
+function needsAction(order: SupplierOrder): boolean {
+  return (!order.accepted_at && order.status === "pending") || order.cancel_requested;
+}
+
+function matchesFilter(order: SupplierOrder, filter: OrderFilter): boolean {
+  if (filter === "all") return true;
+  if (filter === "action") return needsAction(order);
+  if (filter === "accepted") return Boolean(order.accepted_at) && order.status !== "cancelled";
+  return order.status === "cancelled";
+}
 
 function OrderActions({
   order,
@@ -54,57 +88,54 @@ function OrderActions({
 }) {
   if (order.status === "cancelled") {
     return (
-      <span className="admin-muted">
+      <p className="text-sm text-muted-foreground">
         Cancelled
         {order.manual_refund_status === "pending" ? " · full manual refund pending" : ""}
-      </span>
+      </p>
     );
   }
   if (order.cancel_requested) {
     return (
-      <span className="admin-muted">
+      <p className="text-sm text-muted-foreground">
         Cancellation requested by {order.cancellation_initiator ?? "a participant"} · waiting for
         admin
-      </span>
+      </p>
     );
   }
   if (order.status === "delivered" && order.delivery_verified_at) {
-    return <span className="admin-muted">Delivery verified · supplier cancellation is closed</span>;
+    return (
+      <p className="text-sm text-muted-foreground">
+        Delivery verified · supplier cancellation is closed
+      </p>
+    );
   }
 
   return (
-    <>
+    <div className="flex flex-wrap items-center gap-2">
       {!order.accepted_at && order.status === "pending" ? (
-        <Button
-          variant="link"
-          className="h-auto p-0"
-          type="button"
-          disabled={disabled}
-          onClick={() => onAccept(order)}
-        >
-          <Icon name="check" />
-          <span>Accept order</span>
+        <Button size="sm" type="button" disabled={disabled} onClick={() => onAccept(order)}>
+          <Check data-icon="inline-start" />
+          Accept order
         </Button>
       ) : order.accepted_at ? (
-        <span className="admin-muted">Accepted {formatDate(order.accepted_at)}</span>
+        <p className="text-sm text-muted-foreground">Accepted {formatDate(order.accepted_at)}</p>
       ) : null}
       {canSupplierCancel(order) ? (
         <Button
-          variant="ghost"
-          className="rt-cancel-button h-auto p-0 text-destructive hover:text-destructive"
+          variant="outline"
+          size="sm"
           type="button"
           disabled={disabled}
           onClick={() => onCancel(order)}
         >
-          <Icon name="trash" />
-          <span>Request cancellation</span>
+          Request cancellation
         </Button>
       ) : !order.supplier_can_cancel ? (
-        <span className="admin-muted">
+        <p className="text-sm text-muted-foreground">
           Multi-supplier order · contact admin to resolve your fulfillment
-        </span>
+        </p>
       ) : null}
-    </>
+    </div>
   );
 }
 
@@ -116,8 +147,13 @@ export function SupplierOrders({ loadOrders = loadSupplierOrders }: SupplierOrde
   const [error, setError] = useState<string | null>(null);
   const [loadVersion, setLoadVersion] = useState(0);
   const [searchTerm, setSearchTerm] = useState("");
+  const [filter, setFilter] = useState<OrderFilter>("all");
   const [notice, setNotice] = useState<Notice>(null);
   const [busyId, setBusyId] = useState<string | null>(null);
+  const [acceptTarget, setAcceptTarget] = useState<SupplierOrder | null>(null);
+  const [cancelTarget, setCancelTarget] = useState<SupplierOrder | null>(null);
+  const [cancelReason, setCancelReason] = useState("");
+  const [cancelInvalid, setCancelInvalid] = useState(false);
 
   const isSeller = state.status === "seller";
 
@@ -141,6 +177,17 @@ export function SupplierOrders({ loadOrders = loadSupplierOrders }: SupplierOrde
     };
   }, [isSeller, loadOrders, loadVersion]);
 
+  const counts = useMemo(() => {
+    const list = orders ?? [];
+    return {
+      all: list.length,
+      action: list.filter(needsAction).length,
+      accepted: list.filter((order) => Boolean(order.accepted_at) && order.status !== "cancelled")
+        .length,
+      cancelled: list.filter((order) => order.status === "cancelled").length,
+    };
+  }, [orders]);
+
   if (state.status !== "seller") return null;
 
   const onLogout = () => {
@@ -163,9 +210,10 @@ export function SupplierOrders({ loadOrders = loadSupplierOrders }: SupplierOrde
     );
   }
 
-  const onAccept = (order: SupplierOrder) => {
-    if (!window.confirm(`Accept order #${shortId(order.id)} from ${order.retailer_name}?`)) return;
-
+  const confirmAccept = () => {
+    const order = acceptTarget;
+    if (!order) return;
+    setAcceptTarget(null);
     setBusyId(order.id);
     void acceptSupplierOrder(order.id)
       .then((acceptedAt) => {
@@ -190,16 +238,17 @@ export function SupplierOrders({ loadOrders = loadSupplierOrders }: SupplierOrde
       .finally(() => setBusyId(null));
   };
 
-  const onCancel = (order: SupplierOrder) => {
-    const reason = window.prompt(
-      `Why should order #${shortId(order.id)} be cancelled? A paid online order will require a full manual refund.`,
-    );
-    if (reason === null) return;
-    if (!reason.trim()) {
-      setNotice({ message: "Add a cancellation reason.", state: "error" });
+  const confirmCancel = () => {
+    const order = cancelTarget;
+    if (!order) return;
+    if (!cancelReason.trim()) {
+      setCancelInvalid(true);
       return;
     }
-
+    const reason = cancelReason.trim();
+    setCancelTarget(null);
+    setCancelReason("");
+    setCancelInvalid(false);
     setBusyId(order.id);
     void requestSupplierCancellation(order.id, reason)
       .then(() => {
@@ -211,7 +260,7 @@ export function SupplierOrders({ loadOrders = loadSupplierOrders }: SupplierOrde
                     ...current,
                     cancel_requested: true,
                     cancellation_initiator: "supplier",
-                    cancellation_reason: reason.trim(),
+                    cancellation_reason: reason,
                   }
                 : current,
             ) ?? prev,
@@ -233,7 +282,8 @@ export function SupplierOrders({ loadOrders = loadSupplierOrders }: SupplierOrde
       .finally(() => setBusyId(null));
   };
 
-  const filtered = orders ? filterSupplierOrders(orders, searchTerm, shortId) : [];
+  const searched = orders ? filterSupplierOrders(orders, searchTerm, shortId) : [];
+  const filtered = searched.filter((order) => matchesFilter(order, filter));
 
   return (
     <WorkspaceShell
@@ -244,32 +294,44 @@ export function SupplierOrders({ loadOrders = loadSupplierOrders }: SupplierOrde
       onLogout={onLogout}
     >
       <PageHeader
-        eyebrow="Order fulfillment"
-        title="Orders."
+        title="Orders"
         copy="Accept incoming orders or request cancellation before delivery is verified. The admin completes all refunds manually."
         actions={
-          <Button asChild variant="ghost">
+          <Button asChild variant="outline">
             <RouterLink to="/supplier/stock">
-              <Icon name="layers" />
-              <span>Manage stock</span>
+              <Layers data-icon="inline-start" />
+              Manage stock
             </RouterLink>
           </Button>
         }
       />
       <InlineNotice message={notice?.message} state={notice?.state} />
-      <NotificationsPanel />
       {orders ? (
-        <>
-          <SearchToolbar
-            label="Search orders"
-            placeholder="Search orders"
-            value={searchTerm}
-            onChange={(event) => setSearchTerm(event.target.value)}
-            result={`${filtered.length} of ${orders.length} orders`}
-          />
-          {orders.length ? (
-            <TableShell>
-              <Table className="rt-orders-table">
+        orders.length ? (
+          <Card className="py-0">
+            <CardHeader className="border-b">
+              <CardTitle>Fulfillment</CardTitle>
+              <CardDescription>Orders that include your products</CardDescription>
+            </CardHeader>
+            <CardContent className="flex flex-col gap-4 py-4">
+              <Tabs value={filter} onValueChange={(value) => setFilter(value as OrderFilter)}>
+                <TabsList>
+                  <TabsTrigger value="all">All ({counts.all})</TabsTrigger>
+                  <TabsTrigger value="action">Needs action ({counts.action})</TabsTrigger>
+                  <TabsTrigger value="accepted">Accepted ({counts.accepted})</TabsTrigger>
+                  <TabsTrigger value="cancelled">Cancelled ({counts.cancelled})</TabsTrigger>
+                </TabsList>
+              </Tabs>
+              <SearchToolbar
+                label="Search orders"
+                placeholder="Search orders"
+                value={searchTerm}
+                onChange={(event) => setSearchTerm(event.target.value)}
+                result={`${filtered.length} of ${orders.length} orders`}
+              />
+            </CardContent>
+            {filtered.length ? (
+              <Table>
                 <TableHeader>
                   <TableRow>
                     <TableHead>Order</TableHead>
@@ -285,111 +347,195 @@ export function SupplierOrders({ loadOrders = loadSupplierOrders }: SupplierOrde
                   </TableRow>
                 </TableHeader>
                 <TableBody>
-                  {filtered.length ? (
-                    filtered.map((order) => (
-                      <OrderRow
-                        key={order.id}
-                        colSpan={8}
-                        toggleLabel={`Toggle lines for order #${shortId(order.id)}`}
-                        summaryCells={
-                          <>
-                            <TableCell>
-                              <strong className="rt-order-id">#{shortId(order.id)}</strong>
-                            </TableCell>
-                            <TableCell>{formatDate(order.created_at)}</TableCell>
-                            <TableCell>
-                              <div className="admin-user-cell">
-                                <span className="admin-avatar">
-                                  {initials(order.retailer_name)}
+                  {filtered.map((order) => (
+                    <OrderRow
+                      key={order.id}
+                      colSpan={8}
+                      toggleLabel={`Toggle lines for order #${shortId(order.id)}`}
+                      summaryCells={
+                        <>
+                          <TableCell>
+                            <span className="font-medium">#{shortId(order.id)}</span>
+                          </TableCell>
+                          <TableCell>{formatDate(order.created_at)}</TableCell>
+                          <TableCell>
+                            <div className="flex items-center gap-2">
+                              <Avatar size="sm">
+                                <AvatarFallback>{initials(order.retailer_name)}</AvatarFallback>
+                              </Avatar>
+                              <span className="flex min-w-0 flex-col">
+                                <span className="truncate font-medium">{order.retailer_name}</span>
+                                <span className="truncate text-xs text-muted-foreground">
+                                  {order.retailer_email}
                                 </span>
-                                <span>
-                                  <strong>{order.retailer_name}</strong>
-                                  <small>{order.retailer_email}</small>
-                                </span>
-                              </div>
-                            </TableCell>
-                            <TableCell>
-                              {order.items.reduce((sum, item) => sum + item.quantity, 0)}
-                            </TableCell>
-                            <TableCell>
-                              <strong>{formatPrice(order.supplier_total)}</strong>
-                            </TableCell>
-                            <TableCell>
-                              <PaymentBadge
-                                paymentStatus={order.payment_status}
-                                paymentMethod={order.payment_method}
-                              />
-                            </TableCell>
-                            <TableCell>
+                              </span>
+                            </div>
+                          </TableCell>
+                          <TableCell>
+                            {order.items.reduce((sum, item) => sum + item.quantity, 0)}
+                          </TableCell>
+                          <TableCell>
+                            <span className="font-medium">{formatPrice(order.supplier_total)}</span>
+                          </TableCell>
+                          <TableCell>
+                            <PaymentBadge
+                              paymentStatus={order.payment_status}
+                              paymentMethod={order.payment_method}
+                            />
+                          </TableCell>
+                          <TableCell>
+                            <div className="flex flex-wrap items-center gap-1">
                               <StatusBadge status={order.status} />
-                              {order.accepted_at ? (
-                                <span className="rt-cancel-flag">Accepted</span>
-                              ) : null}
+                              {order.accepted_at ? <Badge variant="outline">Accepted</Badge> : null}
                               {order.cancel_requested ? (
-                                <span className="rt-cancel-flag">
+                                <Badge variant="destructive">
                                   Cancel requested by {order.cancellation_initiator}
-                                </span>
+                                </Badge>
                               ) : null}
-                            </TableCell>
-                          </>
-                        }
-                        detail={
-                          <>
+                            </div>
+                          </TableCell>
+                        </>
+                      }
+                      detail={
+                        <div className="flex flex-col gap-4">
+                          <div className="flex flex-col gap-2">
                             {order.items.map((item) => (
-                              <div className="ad-activity-line" key={item.id}>
-                                <span className="ad-activity-product">
-                                  <strong>{item.product_name}</strong>
-                                </span>
-                                <span>
+                              <div
+                                className="flex items-center justify-between gap-4 text-sm"
+                                key={item.id}
+                              >
+                                <span className="font-medium">{item.product_name}</span>
+                                <span className="text-muted-foreground">
                                   {item.quantity} × {formatPrice(item.unit_price)}
                                 </span>
-                                <strong>{formatPrice(item.line_total)}</strong>
+                                <span className="font-medium">{formatPrice(item.line_total)}</span>
                               </div>
                             ))}
-                            {order.notes ? (
-                              <p className="rt-order-notes">
-                                <strong>Notes:</strong> {order.notes}
-                              </p>
-                            ) : null}
-                            {order.cancellation_reason ? (
-                              <p className="rt-order-notes">
-                                <strong>Cancellation reason:</strong> {order.cancellation_reason}
-                              </p>
-                            ) : null}
-                            <div className="rt-order-detail-actions">
-                              <OrderActions
-                                order={order}
-                                disabled={busyId === order.id}
-                                onAccept={onAccept}
-                                onCancel={onCancel}
-                              />
-                            </div>
-                          </>
-                        }
-                      />
-                    ))
-                  ) : (
-                    <TableRow>
-                      <TableCell className="admin-empty" colSpan={8}>
-                        <strong>No matching orders</strong>
-                        <span>Try a different order number, retailer, or product.</span>
-                      </TableCell>
-                    </TableRow>
-                  )}
+                          </div>
+                          {order.notes ? (
+                            <p className="text-sm">
+                              <span className="font-medium">Notes: </span>
+                              {order.notes}
+                            </p>
+                          ) : null}
+                          {order.cancellation_reason ? (
+                            <p className="text-sm">
+                              <span className="font-medium">Cancellation reason: </span>
+                              {order.cancellation_reason}
+                            </p>
+                          ) : null}
+                          <OrderActions
+                            order={order}
+                            disabled={busyId === order.id}
+                            onAccept={setAcceptTarget}
+                            onCancel={(next) => {
+                              setCancelReason("");
+                              setCancelInvalid(false);
+                              setCancelTarget(next);
+                            }}
+                          />
+                        </div>
+                      }
+                    />
+                  ))}
                 </TableBody>
               </Table>
-            </TableShell>
-          ) : (
-            <EmptyState
-              icon="package"
-              title="No orders yet"
-              copy="Orders that include your products will show up here."
-            />
-          )}
-        </>
+            ) : (
+              <EmptyState
+                icon="search"
+                title="No matching orders"
+                copy="Try a different order number, retailer, or product."
+              />
+            )}
+          </Card>
+        ) : (
+          <EmptyState
+            icon="package"
+            title="No orders yet"
+            copy="Orders that include your products will show up here."
+          />
+        )
       ) : (
         <LoadingState title="Loading your orders…" />
       )}
+
+      <AlertDialog
+        open={acceptTarget !== null}
+        onOpenChange={(open) => {
+          if (!open) setAcceptTarget(null);
+        }}
+      >
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>
+              Accept order #{acceptTarget ? shortId(acceptTarget.id) : ""}?
+            </AlertDialogTitle>
+            <AlertDialogDescription>
+              {acceptTarget
+                ? `Accept the order from ${acceptTarget.retailer_name}. The admin team will manage its status after you accept.`
+                : null}
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancel</AlertDialogCancel>
+            <AlertDialogAction onClick={confirmAccept}>Accept order</AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+
+      <Dialog
+        open={cancelTarget !== null}
+        onOpenChange={(open) => {
+          if (!open) {
+            setCancelTarget(null);
+            setCancelReason("");
+            setCancelInvalid(false);
+          }
+        }}
+      >
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>
+              Request cancellation{cancelTarget ? ` of #${shortId(cancelTarget.id)}` : ""}
+            </DialogTitle>
+            <DialogDescription>
+              A paid online order will require a full manual refund. Add a reason so admin and the
+              retailer can review the request.
+            </DialogDescription>
+          </DialogHeader>
+          <FieldGroup>
+            <Field data-invalid={cancelInvalid || undefined}>
+              <FieldLabel htmlFor="cancel-reason">Reason</FieldLabel>
+              <Textarea
+                id="cancel-reason"
+                value={cancelReason}
+                aria-invalid={cancelInvalid || undefined}
+                onChange={(event) => {
+                  setCancelReason(event.target.value);
+                  if (event.target.value.trim()) setCancelInvalid(false);
+                }}
+                placeholder="Why should this order be cancelled?"
+              />
+            </Field>
+          </FieldGroup>
+          <DialogFooter>
+            <Button
+              variant="outline"
+              type="button"
+              onClick={() => {
+                setCancelTarget(null);
+                setCancelReason("");
+                setCancelInvalid(false);
+              }}
+            >
+              Back
+            </Button>
+            <Button type="button" onClick={confirmCancel}>
+              Submit request
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </WorkspaceShell>
   );
 }

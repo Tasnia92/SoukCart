@@ -10,14 +10,14 @@ import {
 } from "@/components/ui/table";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { Icon } from "../../components/ui/Icon.tsx";
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { Input } from "@/components/ui/input";
 import {
   EmptyState,
   InlineNotice,
   LoadingState,
   PageHeader,
   SearchToolbar,
-  TableShell,
   WorkspaceError,
 } from "../../components/ui/Workspace.tsx";
 import { useProductChanges } from "../../product-realtime.ts";
@@ -78,9 +78,9 @@ function StockRow({
       <TableCell>
         <label className="sp-stock-field">
           <span className="sr-only">New stock for {product.name}</span>
-          <input
+          <Input
             type="number"
-            min="1"
+            min="0"
             step="1"
             inputMode="numeric"
             value={value}
@@ -161,8 +161,8 @@ export function SupplierStock({ loadProducts = loadSupplierProducts }: SupplierS
   const onSave = async (product: SupplierProduct, raw: string): Promise<boolean> => {
     const trimmed = raw.trim();
     const next = Number(trimmed);
-    if (!trimmed || !Number.isInteger(next) || next < 1) {
-      setNotice({ message: "Stock must be a whole number of at least 1.", state: "error" });
+    if (!trimmed || !Number.isInteger(next) || next < 0) {
+      setNotice({ message: "Stock must be a whole number of 0 or more.", state: "error" });
       return false;
     }
     try {
@@ -172,7 +172,10 @@ export function SupplierStock({ loadProducts = loadSupplierProducts }: SupplierS
           prev?.map((item) => (item.id === product.id ? { ...item, stock: next } : item)) ?? prev,
       );
       setNotice({
-        message: `${product.name} now has ${next} unit${next === 1 ? "" : "s"} in stock.`,
+        message:
+          next === 0
+            ? `${product.name} is now marked out of stock.`
+            : `${product.name} now has ${next} unit${next === 1 ? "" : "s"} in stock.`,
         state: "success",
       });
       return true;
@@ -199,55 +202,60 @@ export function SupplierStock({ loadProducts = loadSupplierProducts }: SupplierS
       onLogout={onLogout}
     >
       <PageHeader
-        eyebrow="Stock availability"
-        title="Manage stock."
+        title="Stock"
         copy="Set how many units of each product retailers may order. Changes apply immediately."
         actions={
-          <Button asChild variant="ghost">
-            <RouterLink to="/supplier/products">
-              <Icon name="bag" />
-              <span>My products</span>
-            </RouterLink>
+          <Button asChild variant="outline">
+            <RouterLink to="/supplier/products">My products</RouterLink>
           </Button>
         }
       />
       <InlineNotice message={notice?.message} state={notice?.state} />
       {products ? (
         <>
-          <SearchToolbar
-            label="Search products"
-            placeholder="Search products"
-            value={searchTerm}
-            onChange={(event) => setSearchTerm(event.target.value)}
-            result={`${filtered.length} of ${products.length} products`}
-          />
           {activeProducts.length ? (
-            <>
+            <Card className="py-0">
+              <CardHeader className="border-b">
+                <CardTitle>Active listings</CardTitle>
+                <CardDescription>
+                  Only active listings are shown.{" "}
+                  {outOfStock
+                    ? `${outOfStock} active product${outOfStock === 1 ? "" : "s"} is out of stock.`
+                    : "All active products have stock available."}
+                </CardDescription>
+              </CardHeader>
+              <CardContent className="py-4">
+                <SearchToolbar
+                  label="Search products"
+                  placeholder="Search products"
+                  value={searchTerm}
+                  onChange={(event) => setSearchTerm(event.target.value)}
+                  result={`${filtered.length} of ${products.length} products`}
+                />
+              </CardContent>
               {filteredActive.length ? (
-                <TableShell>
-                  <Table className="sp-stock-table">
-                    <TableHeader>
-                      <TableRow>
-                        <TableHead>Product</TableHead>
-                        <TableHead>Unit</TableHead>
-                        <TableHead>Available now</TableHead>
-                        <TableHead>New stock</TableHead>
-                        <TableHead>
-                          <span className="sr-only">Save</span>
-                        </TableHead>
-                      </TableRow>
-                    </TableHeader>
-                    <TableBody>
-                      {filteredActive.map((product) => (
-                        <StockRow
-                          key={`${product.id}:${product.stock}`}
-                          product={product}
-                          onSave={onSave}
-                        />
-                      ))}
-                    </TableBody>
-                  </Table>
-                </TableShell>
+                <Table>
+                  <TableHeader>
+                    <TableRow>
+                      <TableHead>Product</TableHead>
+                      <TableHead>Unit</TableHead>
+                      <TableHead>Available now</TableHead>
+                      <TableHead>New stock</TableHead>
+                      <TableHead>
+                        <span className="sr-only">Save</span>
+                      </TableHead>
+                    </TableRow>
+                  </TableHeader>
+                  <TableBody>
+                    {filteredActive.map((product) => (
+                      <StockRow
+                        key={`${product.id}:${product.stock}`}
+                        product={product}
+                        onSave={onSave}
+                      />
+                    ))}
+                  </TableBody>
+                </Table>
               ) : (
                 <EmptyState
                   icon="search"
@@ -255,13 +263,7 @@ export function SupplierStock({ loadProducts = loadSupplierProducts }: SupplierS
                   copy="Try a different search term."
                 />
               )}
-              <p className="sp-stock-hint">
-                Only active listings are shown.{" "}
-                {outOfStock
-                  ? `${outOfStock} active product${outOfStock === 1 ? "" : "s"} is out of stock.`
-                  : "All active products have stock available."}
-              </p>
-            </>
+            </Card>
           ) : (
             <EmptyState
               icon="store"

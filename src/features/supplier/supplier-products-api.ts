@@ -31,18 +31,26 @@ export type ProductPayload = {
   category: string | null;
 };
 
-export function productValidationError(payload: ProductPayload): string | null {
+export type ProductValidationOptions = { allowZeroStock?: boolean };
+
+export function productValidationError(
+  payload: ProductPayload,
+  options: ProductValidationOptions = {},
+): string | null {
   if (!Number.isFinite(payload.price) || payload.price <= 0) {
     return "Price must be greater than 0.";
   }
-  if (!Number.isInteger(payload.stock) || payload.stock < 1) {
-    return "Quantity must be a whole number of at least 1.";
+  const minStock = options.allowZeroStock ? 0 : 1;
+  if (!Number.isInteger(payload.stock) || payload.stock < minStock) {
+    return options.allowZeroStock
+      ? "Quantity must be a whole number of 0 or more."
+      : "Quantity must be a whole number of at least 1.";
   }
   return null;
 }
 
-function assertValidProduct(payload: ProductPayload): void {
-  const message = productValidationError(payload);
+function assertValidProduct(payload: ProductPayload, options?: ProductValidationOptions): void {
+  const message = productValidationError(payload, options);
   if (message) throw new Error(message);
 }
 
@@ -96,8 +104,8 @@ export async function saveProductStock(
   productId: string,
   stock: number,
 ): Promise<void> {
-  if (!Number.isInteger(stock) || stock < 1) {
-    throw new Error("Quantity must be a whole number of at least 1.");
+  if (!Number.isInteger(stock) || stock < 0) {
+    throw new Error("Quantity must be a whole number of 0 or more.");
   }
   const { error } = await supabase
     .from("products")
@@ -148,7 +156,7 @@ export async function updateSupplierProduct(
   payload: ProductPayload,
   imageUrl: string | null,
 ): Promise<void> {
-  assertValidProduct(payload);
+  assertValidProduct(payload, { allowZeroStock: true });
   const { error } = await supabase
     .from("products")
     .update({ ...payload, image_url: imageUrl })
