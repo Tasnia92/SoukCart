@@ -15,6 +15,7 @@ import { AdminInbox } from "./features/admin/AdminInbox.tsx";
 import { AdminOverview } from "./features/admin/AdminOverview.tsx";
 import { AdminSupplierVerifications } from "./features/admin/AdminSupplierVerifications.tsx";
 import { AdminSupplierVerificationDetail } from "./features/admin/AdminSupplierVerificationDetail.tsx";
+import { AdminPayouts } from "./features/admin/AdminPayouts.tsx";
 import { AdminUsers } from "./features/admin/AdminUsers.tsx";
 import { CheckoutResult } from "./features/retailer/CheckoutResult.tsx";
 import { PaymentReturn } from "./features/retailer/PaymentReturn.tsx";
@@ -47,6 +48,7 @@ export const routeContract = [
   { path: "/admin/inbox/queue", target: "admin" },
   { path: "/admin/users", target: "admin" },
   { path: "/admin/activity", target: "admin" },
+  { path: "/admin/payouts", target: "admin" },
   { path: "/admin/complaints", target: "admin" },
   { path: "/admin/verifications", target: "admin" },
   { path: "/admin/verifications/$userId", target: "admin" },
@@ -161,6 +163,7 @@ function AdminRoute(): ReactElement {
   }
   if (pathname === "/admin/users") return <AdminUsers />;
   if (pathname === "/admin/activity") return <AdminActivity />;
+  if (pathname === "/admin/payouts") return <AdminPayouts />;
   if (pathname === "/admin/verifications") return <AdminSupplierVerifications />;
   const verificationMatch = ADMIN_VERIFICATION_DETAIL_PATTERN.exec(pathname);
   if (verificationMatch) return <AdminSupplierVerificationDetail userId={verificationMatch[1]} />;

@@ -30,6 +30,10 @@ function order(overrides: Partial<ActivityOrder>): ActivityOrder {
     created_at: iso(1),
     delivered_at: null,
     delivery_verified_at: null,
+    delivery_phone: "01700000000",
+    delivery_address: "12 Road",
+    delivery_city: "Dhaka",
+    delivery_postcode: "1205",
     platform_charge: 0,
     delivery_charge: 0,
     refund_amount: 0,
@@ -121,6 +125,45 @@ describe("buildAdminDashboard", () => {
     expect(dashboard.summary.orderValueDelta.percent).toBe(140);
     expect(dashboard.series).toHaveLength(30);
     expect(dashboard.series.reduce((sum, bucket) => sum + bucket.value, 0)).toBe(480);
+  });
+
+  it("does not queue unpaid or failed online orders for confirmation", () => {
+    const dashboard = buildAdminDashboard(
+      {
+        orders: [
+          order({ id: "paid-pending", status: "pending", payment_status: "paid" }),
+          order({
+            id: "unpaid-online",
+            status: "pending",
+            payment_status: "unpaid",
+            payment_method: "online",
+          }),
+          order({
+            id: "failed-online",
+            status: "pending",
+            payment_status: "failed",
+            payment_method: "online",
+          }),
+          order({
+            id: "cod-pending",
+            status: "pending",
+            payment_status: "unpaid",
+            payment_method: "cod",
+          }),
+        ],
+        users: [],
+        complaints: [],
+      },
+      now,
+    );
+
+    expect(dashboard.summary.pendingOrders).toBe(2);
+    expect(
+      dashboard.queue
+        .filter((item) => item.kind === "confirmation")
+        .map((item) => item.recordId)
+        .sort(),
+    ).toEqual(["cod-pending", "paid-pending"]);
   });
 
   it("counts each blocked order once across pending, cancellation and refund work", () => {

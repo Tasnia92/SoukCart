@@ -12,9 +12,14 @@ export type InvoiceOrder = {
   id: string;
   created_at: string;
   paid_at: string | null;
+  payment_method: "online" | "cod";
   tran_id: string | null;
   val_id: string | null;
   bank_tran_id: string | null;
+  delivery_phone: string | null;
+  delivery_address: string | null;
+  delivery_city: string | null;
+  delivery_postcode: string | null;
   items: InvoiceItem[];
 };
 
@@ -24,7 +29,7 @@ export type InvoiceResult =
   | { kind: "paid"; order: InvoiceOrder };
 
 const INVOICE_SELECT =
-  "id, status, cancel_requested, payment_status, payment_method, notes, created_at, paid_at, tran_id, val_id, bank_tran_id, order_items(id, product_id, quantity, unit_price, products(name))";
+  "id, status, cancel_requested, payment_status, payment_method, notes, created_at, paid_at, tran_id, val_id, bank_tran_id, delivery_phone, delivery_address, delivery_city, delivery_postcode, order_items(id, product_id, quantity, unit_price, products(name))";
 
 type InvoiceItemRow = {
   id: string;
@@ -37,11 +42,16 @@ type InvoiceItemRow = {
 type InvoiceRow = {
   id: string;
   payment_status: string | null;
+  payment_method: string | null;
   created_at: string;
   paid_at: string | null;
   tran_id: string | null;
   val_id: string | null;
   bank_tran_id: string | null;
+  delivery_phone: string | null;
+  delivery_address: string | null;
+  delivery_city: string | null;
+  delivery_postcode: string | null;
   order_items: InvoiceItemRow[] | null;
 };
 
@@ -74,9 +84,14 @@ export async function loadInvoice(orderId: string): Promise<InvoiceResult> {
       id: row.id,
       created_at: row.created_at,
       paid_at: row.paid_at,
+      payment_method: row.payment_method === "cod" ? "cod" : "online",
       tran_id: row.tran_id,
       val_id: row.val_id,
       bank_tran_id: row.bank_tran_id,
+      delivery_phone: row.delivery_phone ?? null,
+      delivery_address: row.delivery_address ?? null,
+      delivery_city: row.delivery_city ?? null,
+      delivery_postcode: row.delivery_postcode ?? null,
       items,
     },
   };

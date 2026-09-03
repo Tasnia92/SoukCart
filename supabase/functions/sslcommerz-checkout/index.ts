@@ -107,6 +107,10 @@ async function initiate(userId: string, body: Record<string, unknown>): Promise<
     p_retailer_id: userId,
     p_notes: notes,
     p_payment_method: paymentMethod,
+    p_phone: phone,
+    p_address: address,
+    p_city: city,
+    p_postcode: postcode,
   });
   if (reserveError) {
     return json({ error: reserveError.message }, 409);
@@ -268,6 +272,15 @@ async function complete(userId: string, body: Record<string, unknown>): Promise<
   if (order.payment_status === "paid") {
     return json({ orderId: order.id, paymentStatus: "paid" });
   }
+  if (order.payment_status !== "unpaid") {
+    return json(
+      {
+        error:
+          "This checkout is no longer valid. If money was taken, contact support for a refund.",
+      },
+      409,
+    );
+  }
 
   const validation = await validateTransaction(valId);
   const paid =
@@ -284,7 +297,7 @@ async function complete(userId: string, body: Record<string, unknown>): Promise<
         paid_at: new Date().toISOString(),
       })
       .eq("id", order.id)
-      .neq("payment_status", "paid")
+      .eq("payment_status", "unpaid")
       .select("payment_status")
       .maybeSingle();
     if (updateError) {
@@ -296,7 +309,16 @@ async function complete(userId: string, body: Record<string, unknown>): Promise<
         409,
       );
     }
-    return json({ orderId: order.id, paymentStatus: updated?.payment_status ?? "paid" });
+    if (!updated) {
+      return json(
+        {
+          error:
+            "This checkout is no longer valid. If money was taken, contact support for a refund.",
+        },
+        409,
+      );
+    }
+    return json({ orderId: order.id, paymentStatus: updated.payment_status ?? "paid" });
   }
 
   const nextStatus = status === "CANCELLED" ? "cancelled" : "failed";
@@ -343,6 +365,15 @@ async function queryByTranId(userId: string, body: Record<string, unknown>): Pro
   }
   if (order.payment_status === "paid") {
     return json({ orderId: order.id, paymentStatus: "paid" });
+  }
+  if (order.payment_status !== "unpaid") {
+    return json(
+      {
+        error:
+          "This checkout is no longer valid. If money was taken, contact support for a refund.",
+      },
+      409,
+    );
   }
 
   const params = new URLSearchParams({
@@ -395,7 +426,7 @@ async function queryByTranId(userId: string, body: Record<string, unknown>): Pro
         paid_at: new Date().toISOString(),
       })
       .eq("id", order.id)
-      .neq("payment_status", "paid")
+      .eq("payment_status", "unpaid")
       .select("payment_status")
       .maybeSingle();
     if (updateError) {
@@ -407,7 +438,16 @@ async function queryByTranId(userId: string, body: Record<string, unknown>): Pro
         409,
       );
     }
-    return json({ orderId: order.id, paymentStatus: updated?.payment_status ?? "paid" });
+    if (!updated) {
+      return json(
+        {
+          error:
+            "This checkout is no longer valid. If money was taken, contact support for a refund.",
+        },
+        409,
+      );
+    }
+    return json({ orderId: order.id, paymentStatus: updated.payment_status ?? "paid" });
   }
 
   if (outcome === "failed" || outcome === "cancelled") {

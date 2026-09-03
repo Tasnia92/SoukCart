@@ -57,6 +57,14 @@ Deno.serve(async (request) => {
       await clearCart(order.retailer_id);
       return respond(appBase, "success", order.id);
     }
+    if (order.payment_status !== "unpaid") {
+      return respond(
+        appBase,
+        "failed",
+        order.id,
+        `Capture refused for ${tranId}: payment_status=${order.payment_status}`,
+      );
+    }
 
     const result = await settle({
       orderId: order.id,
@@ -72,7 +80,7 @@ Deno.serve(async (request) => {
         .from("orders")
         .update({ payment_status: "paid", paid_at: new Date().toISOString() })
         .eq("id", order.id)
-        .neq("payment_status", "paid");
+        .eq("payment_status", "unpaid");
       if (paymentError) {
         console.error("Paid order could not reserve stock", paymentError);
         return respond(

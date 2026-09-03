@@ -25,6 +25,10 @@ export type RetailerOrder = {
   notes: string | null;
   created_at: string;
   delivery_verified_at: string | null;
+  delivery_phone: string | null;
+  delivery_address: string | null;
+  delivery_city: string | null;
+  delivery_postcode: string | null;
   manual_refund_status: ManualRefundStatus;
   refund_amount: number;
   platform_charge: number;
@@ -33,7 +37,7 @@ export type RetailerOrder = {
 };
 
 const ORDERS_SELECT =
-  "id, status, cancel_requested, cancellation_initiator, payment_status, payment_method, tran_id, notes, created_at, delivery_verified_at, manual_refund_status, refund_amount, platform_charge, delivery_charge, order_items(id, product_id, quantity, unit_price, products(name))";
+  "id, status, cancel_requested, cancellation_initiator, payment_status, payment_method, tran_id, notes, created_at, delivery_verified_at, delivery_phone, delivery_address, delivery_city, delivery_postcode, manual_refund_status, refund_amount, platform_charge, delivery_charge, order_items(id, product_id, quantity, unit_price, products(name))";
 
 type OrderItemRow = {
   id: string;
@@ -54,6 +58,10 @@ type OrderRow = {
   notes: string | null;
   created_at: string;
   delivery_verified_at: string | null;
+  delivery_phone: string | null;
+  delivery_address: string | null;
+  delivery_city: string | null;
+  delivery_postcode: string | null;
   manual_refund_status: string | null;
   refund_amount: number | string | null;
   platform_charge: number | string | null;
@@ -78,6 +86,10 @@ function normalizeOrder(row: OrderRow): RetailerOrder {
     notes: row.notes,
     created_at: row.created_at,
     delivery_verified_at: row.delivery_verified_at ?? null,
+    delivery_phone: row.delivery_phone ?? null,
+    delivery_address: row.delivery_address ?? null,
+    delivery_city: row.delivery_city ?? null,
+    delivery_postcode: row.delivery_postcode ?? null,
     manual_refund_status: (row.manual_refund_status ?? "not_required") as ManualRefundStatus,
     refund_amount: Number(row.refund_amount ?? 0),
     platform_charge: Number(row.platform_charge ?? 0),

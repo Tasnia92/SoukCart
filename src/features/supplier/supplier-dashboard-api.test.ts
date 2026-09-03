@@ -38,6 +38,10 @@ function order(overrides: Partial<SupplierOrder>): SupplierOrder {
     payment_status: "paid",
     payment_method: "online",
     delivery_verified_at: null,
+    delivery_phone: "01700000000",
+    delivery_address: "12 Road",
+    delivery_city: "Dhaka",
+    delivery_postcode: "1205",
     manual_refund_status: "not_required",
     supplier_can_cancel: true,
     notes: null,
@@ -59,6 +63,7 @@ function product(overrides: Partial<SupplierProduct>): SupplierProduct {
     price: 100,
     unit: "kg",
     stock: 20,
+    min_order_qty: 1,
     category: "Pantry",
     image_url: null,
     is_active: true,
@@ -86,12 +91,13 @@ describe("buildSupplierDashboard", () => {
     expect(dashboard.series.reduce((sum, bucket) => sum + bucket.value, 0)).toBe(500);
   });
 
-  it("counts only unaccepted pending orders as awaiting fulfillment", () => {
+  it("counts pending and confirmed orders as awaiting fulfillment", () => {
     const dashboard = buildSupplierDashboard(
       [
-        order({ id: "waiting", status: "pending", accepted_at: null }),
-        order({ id: "accepted", status: "pending", accepted_at: iso(0) }),
-        order({ id: "moving", status: "shipped", accepted_at: iso(2) }),
+        order({ id: "waiting", status: "pending" }),
+        order({ id: "unpaid-online", status: "pending", payment_status: "unpaid" }),
+        order({ id: "to-ship", status: "confirmed" }),
+        order({ id: "moving", status: "shipped" }),
         order({ id: "requested", status: "confirmed", cancel_requested: true }),
         order({ id: "dead", status: "cancelled", cancel_requested: true }),
       ],
@@ -99,9 +105,9 @@ describe("buildSupplierDashboard", () => {
       now,
     );
 
-    expect(dashboard.summary.awaitingFulfillment).toBe(1);
+    expect(dashboard.summary.awaitingFulfillment).toBe(2);
     expect(dashboard.summary.cancellationRequests).toBe(1);
-    expect(dashboard.queue.map((entry) => entry.id)).toEqual(["waiting", "requested"]);
+    expect(dashboard.queue.map((entry) => entry.id)).toEqual(["waiting", "to-ship", "requested"]);
   });
 
   it("puts the most overdue order first and escalates anything older than a day", () => {

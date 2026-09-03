@@ -1,7 +1,7 @@
 import { supabase } from "../../supabase.ts";
 
 export const SUPPLIER_PRODUCT_COLUMNS =
-  "id, name, description, price, unit, stock, category, image_url, is_active, created_at";
+  "id, name, description, price, unit, stock, min_order_qty, category, image_url, is_active, created_at";
 
 export type SupplierProduct = {
   id: string;
@@ -10,14 +10,16 @@ export type SupplierProduct = {
   price: number;
   unit: string;
   stock: number;
+  min_order_qty: number;
   category: string | null;
   image_url: string | null;
   is_active: boolean;
   created_at: string;
 };
 
-type SupplierProductRecord = Omit<SupplierProduct, "price" | "category"> & {
+type SupplierProductRecord = Omit<SupplierProduct, "price" | "category" | "min_order_qty"> & {
   price: number | string;
+  min_order_qty: number | string | null;
   category: string | null;
 };
 
@@ -38,9 +40,11 @@ export type SupplierProductsGateway = {
 const supplierGateway = supabase as unknown as SupplierProductsGateway;
 
 export function normalizeSupplierProduct(product: SupplierProductRecord): SupplierProduct {
+  const minQty = Number(product.min_order_qty);
   return {
     ...product,
     price: Number(product.price),
+    min_order_qty: Number.isInteger(minQty) && minQty >= 1 ? minQty : 1,
     category: product.category ?? null,
   };
 }

@@ -175,7 +175,11 @@ function isPaidMerchandise(order: ActivityOrder): boolean {
 }
 
 export function awaitsConfirmation(order: ActivityOrder): boolean {
-  return order.status === "pending" && !order.cancel_requested;
+  return (
+    order.status === "pending" &&
+    !order.cancel_requested &&
+    (order.payment_method === "cod" || order.payment_status === "paid")
+  );
 }
 
 export function hasOpenCancellation(order: ActivityOrder): boolean {

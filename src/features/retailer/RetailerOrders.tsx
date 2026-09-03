@@ -34,7 +34,13 @@ import {
 } from "../../components/ui/Workspace.tsx";
 import { useSessionSnapshot, useSessionStore } from "../../session.tsx";
 import { NotificationsPanel } from "../notifications/NotificationsPanel.tsx";
-import { OrderRow, PaymentBadge, shortId, StatusBadge } from "../orders/order-presentation.tsx";
+import {
+  DeliveryDetails,
+  OrderRow,
+  PaymentBadge,
+  shortId,
+  StatusBadge,
+} from "../orders/order-presentation.tsx";
 import { formatDate, formatPrice } from "../workspace/format.ts";
 import { RouterLink, WorkspaceShell } from "../workspace/WorkspaceShell.tsx";
 import {
@@ -378,6 +384,12 @@ export function RetailerOrders({
                             </li>
                           ))}
                         </ul>
+                        <DeliveryDetails
+                          phone={order.delivery_phone}
+                          address={order.delivery_address}
+                          city={order.delivery_city}
+                          postcode={order.delivery_postcode}
+                        />
                         {order.notes ? (
                           <Alert role="note">
                             <MessageSquare />

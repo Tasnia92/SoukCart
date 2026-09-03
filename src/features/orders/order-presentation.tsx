@@ -46,6 +46,28 @@ export function StatusBadge({ status }: { status: string }) {
   return <Badge variant={statusVariant(status)}>{statusLabel(status)}</Badge>;
 }
 
+export function DeliveryDetails({
+  phone,
+  address,
+  city,
+  postcode,
+}: {
+  phone: string | null;
+  address: string | null;
+  city: string | null;
+  postcode: string | null;
+}) {
+  const line = [address, city, postcode].filter(Boolean).join(", ");
+  if (!line && !phone) return null;
+  return (
+    <p className="text-sm">
+      <span className="font-medium">Deliver to: </span>
+      {line || "Address not provided"}
+      {phone ? ` · ${phone}` : ""}
+    </p>
+  );
+}
+
 export function PaymentBadge({
   paymentStatus,
   paymentMethod,

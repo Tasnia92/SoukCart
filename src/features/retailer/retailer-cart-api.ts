@@ -1,7 +1,7 @@
 import { supabase } from "../../supabase.ts";
 import {
-  loadActiveProducts,
   loadCartQuantities,
+  loadRetailerProducts,
   type RetailerProduct,
 } from "./retailer-catalog-api.ts";
 
@@ -25,7 +25,7 @@ type CartLineLoaders = {
 };
 
 const defaultLoaders: CartLineLoaders = {
-  products: loadActiveProducts,
+  products: loadRetailerProducts,
   quantities: loadCartQuantities,
 };
 
@@ -53,11 +53,16 @@ export function cartSubtotal(lines: readonly CartLine[]): number {
   return lines.reduce((sum, line) => sum + line.product.price * line.quantity, 0);
 }
 
-// Legacy stepper clamp: never exceed stock and never drop below 1. Returns the same
-// current value (a no-op) when the change would move out of range.
-export function clampCartQuantity(current: number, change: number, stock: number): number {
+// Stepper clamp: never exceed stock and never drop below the product MOQ.
+export function clampCartQuantity(
+  current: number,
+  change: number,
+  stock: number,
+  minQty = 1,
+): number {
+  const floor = Math.max(1, minQty);
   const next = Math.min(current + change, stock);
-  return next < 1 ? current : next;
+  return next < floor ? current : next;
 }
 
 export async function updateCartQuantity(
@@ -85,11 +90,28 @@ export async function removeCartLine(userId: string, productId: string): Promise
 // Mirrors the pre-checkout stock guard: pending order items are checked against stock.
 export function assertCartWithinStock(lines: readonly CartLine[]): void {
   for (const { product, quantity } of lines) {
+    const minQty = Math.max(1, product.min_order_qty || 1);
+    if (quantity < minQty) {
+      throw new Error(
+        `Order at least ${minQty} unit${minQty === 1 ? "" : "s"} of ${product.name}.`,
+      );
+    }
     if (quantity > product.stock) {
       throw new Error(
         `Only ${product.stock} unit${product.stock === 1 ? "" : "s"} of ${product.name} are in stock, but your order has ${quantity}. Reduce the quantity and try again.`,
       );
     }
+  }
+}
+
+export function assertSingleSupplierCart(lines: readonly CartLine[]): void {
+  const sellerIds = new Set(
+    lines
+      .map((line) => line.product.seller_id)
+      .filter((sellerId): sellerId is string => Boolean(sellerId)),
+  );
+  if (sellerIds.size > 1) {
+    throw new Error("Checkout one supplier at a time. Remove items from other suppliers first.");
   }
 }
 

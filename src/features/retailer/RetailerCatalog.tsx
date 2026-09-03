@@ -36,6 +36,7 @@ import { useSessionSnapshot, useSessionStore } from "../../session.tsx";
 import { formatPrice } from "../workspace/format.ts";
 import { RouterLink, WorkspaceShell } from "../workspace/WorkspaceShell.tsx";
 import {
+  cartSupplierConflict,
   filterProducts,
   getCategoryCounts,
   loadActiveProducts,
@@ -148,14 +149,22 @@ export function RetailerCatalog({
 
   const setQuantity = (product: RetailerProduct, change: number) => {
     setQuantities((prev) => {
-      const current = prev[product.id] ?? 1;
-      const next = Math.min(Math.max(1, current + change), product.stock);
+      const minQty = Math.max(1, product.min_order_qty || 1);
+      const current = prev[product.id] ?? minQty;
+      const next = Math.min(Math.max(minQty, current + change), product.stock);
       return { ...prev, [product.id]: next };
     });
   };
 
   const onAdd = async (product: RetailerProduct) => {
     if (addingId === product.id) return;
+    const inCart = (products ?? []).filter((item) => (cart[item.id] ?? 0) > 0);
+    const conflict = cartSupplierConflict(product, inCart);
+    if (conflict) {
+      setNotice({ message: conflict, state: "error" });
+      return;
+    }
+
     let wanted: number;
     try {
       wanted = nextCartQuantity(product, cart[product.id] ?? 0, quantities[product.id] ?? 1);
@@ -276,7 +285,7 @@ export function RetailerCatalog({
                 <ProductCard
                   key={product.id}
                   product={product}
-                  quantity={quantities[product.id] ?? 1}
+                  quantity={quantities[product.id] ?? product.min_order_qty}
                   inCart={cart[product.id] ?? 0}
                   adding={addingId === product.id}
                   added={addedId === product.id}
@@ -341,6 +350,9 @@ function ProductCard({
             <Badge variant={outOfStock ? "destructive" : "secondary"}>
               {outOfStock ? "Out of stock" : `${product.stock} in stock`}
             </Badge>
+            {product.min_order_qty > 1 ? (
+              <Badge variant="outline">Min {product.min_order_qty}</Badge>
+            ) : null}
             {inCart ? <Badge variant="outline">{inCart} in your order</Badge> : null}
             {!outOfStock ? <Badge variant="outline">Per {product.unit}</Badge> : null}
           </div>
@@ -356,7 +368,7 @@ function ProductCard({
               variant="outline"
               size="icon-sm"
               aria-label="Decrease quantity"
-              disabled={outOfStock || quantity <= 1}
+              disabled={outOfStock || quantity <= product.min_order_qty}
               onClick={() => onStep(product, -1)}
             >
               <Minus />

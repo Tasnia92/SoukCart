@@ -1,3 +1,4 @@
+import { supabase } from "../../supabase.ts";
 import { invokeAdmin } from "./admin-overview-api.ts";
 
 export const ADMIN_ACTIVITY_FUNCTION = "admin-order-overview";
@@ -33,6 +34,10 @@ export type ActivityOrder = {
   created_at: string;
   delivered_at: string | null;
   delivery_verified_at: string | null;
+  delivery_phone: string | null;
+  delivery_address: string | null;
+  delivery_city: string | null;
+  delivery_postcode: string | null;
   platform_charge: number;
   delivery_charge: number;
   refund_amount: number;
@@ -82,14 +87,77 @@ export async function completeManualRefund(orderId: string): Promise<void> {
   await invokeAdmin<unknown>({ action: "complete-refund", orderId }, ADMIN_ACTIVITY_FUNCTION);
 }
 
+export function canFulfillOrder(
+  order: Pick<ActivityOrder, "payment_method" | "payment_status">,
+): boolean {
+  return order.payment_method === "cod" || order.payment_status === "paid";
+}
+
+export function needsCodCollection(
+  order: Pick<ActivityOrder, "payment_method" | "payment_status" | "status">,
+): boolean {
+  return (
+    order.payment_method === "cod" &&
+    order.payment_status === "unpaid" &&
+    order.status !== "cancelled"
+  );
+}
+
+export async function collectCodPayment(orderId: string): Promise<void> {
+  const { error } = await supabase.rpc("collect_cod_payment", { p_order_id: orderId });
+  if (error) throw new Error(error.message || "Cash collection could not be recorded.");
+}
+
+export const ADMIN_ORDER_VIEW_IDS = [
+  "all",
+  "pending",
+  "confirmed",
+  "shipped",
+  "cancellations",
+  "refunds",
+  "cod",
+] as const;
+
+export type AdminOrderView = (typeof ADMIN_ORDER_VIEW_IDS)[number];
+
+export function parseAdminOrderView(value: string | null): AdminOrderView {
+  if (value && (ADMIN_ORDER_VIEW_IDS as readonly string[]).includes(value)) {
+    return value as AdminOrderView;
+  }
+  return "all";
+}
+
+export function matchesAdminOrderView(order: ActivityOrder, view: AdminOrderView): boolean {
+  switch (view) {
+    case "all":
+      return true;
+    case "pending":
+      return order.status === "pending";
+    case "confirmed":
+      return order.status === "confirmed";
+    case "shipped":
+      return order.status === "shipped";
+    case "cancellations":
+      return order.cancel_requested || order.status === "cancelled";
+    case "refunds":
+      return (
+        order.manual_refund_status === "review_required" || order.manual_refund_status === "pending"
+      );
+    case "cod":
+      return needsCodCollection(order);
+  }
+}
+
 export function filterActivityOrders(
   orders: readonly ActivityOrder[],
   searchTerm: string,
   shortId: (value: string) => string,
+  view: AdminOrderView = "all",
 ): ActivityOrder[] {
   const query = searchTerm.trim().toLowerCase();
-  if (!query) return [...orders];
   return orders.filter((order) => {
+    if (!matchesAdminOrderView(order, view)) return false;
+    if (!query) return true;
     if (
       shortId(order.id).toLowerCase().includes(query) ||
       `${order.retailer_name} ${order.retailer_email} ${order.cancellation_reason ?? ""}`

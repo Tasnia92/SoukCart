@@ -5,6 +5,12 @@ export function formatPrice(value: number): string {
   })}`;
 }
 
+export function formatPercent(rate: number): string {
+  return `${(rate * 100).toLocaleString(undefined, {
+    maximumFractionDigits: 2,
+  })}%`;
+}
+
 export function formatDate(value: string): string {
   return new Date(value).toLocaleDateString(undefined, {
     day: "2-digit",

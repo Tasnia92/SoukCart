@@ -20,6 +20,10 @@ export type SupplierOrder = {
   payment_status: string;
   payment_method: string;
   delivery_verified_at: string | null;
+  delivery_phone: string | null;
+  delivery_address: string | null;
+  delivery_city: string | null;
+  delivery_postcode: string | null;
   manual_refund_status: "not_required" | "review_required" | "pending" | "completed";
   supplier_can_cancel: boolean;
   notes: string | null;
@@ -50,6 +54,10 @@ function normalizeOrder(row: SupplierOrderRow): SupplierOrder {
     status: row.status as SupplierOrderStatus,
     cancel_requested: row.cancel_requested === true,
     accepted_at: row.accepted_at ?? null,
+    delivery_phone: row.delivery_phone ?? null,
+    delivery_address: row.delivery_address ?? null,
+    delivery_city: row.delivery_city ?? null,
+    delivery_postcode: row.delivery_postcode ?? null,
     supplier_total: Number(row.supplier_total),
     items: (row.items ?? []).map((item) => ({
       ...item,
@@ -65,13 +73,27 @@ export async function loadSupplierOrders(): Promise<SupplierOrder[]> {
   return ((Array.isArray(data) ? data : []) as SupplierOrderRow[]).map(normalizeOrder);
 }
 
-export async function acceptSupplierOrder(orderId: string): Promise<string> {
-  const { data, error } = await supabase.rpc("seller_accept_order", {
+export async function setSupplierOrderStatus(
+  orderId: string,
+  status: "confirmed" | "shipped" | "delivered",
+): Promise<"confirmed" | "shipped" | "delivered"> {
+  const { data, error } = await supabase.rpc("seller_set_order_status", {
     p_order_id: orderId,
+    p_status: status,
   });
-  if (error) throw new Error("The order could not be accepted.");
-  if (typeof data !== "string") throw new Error("The order acceptance was not confirmed.");
+  if (error) throw new Error(error.message || "The order status could not be updated.");
+  if (data !== "confirmed" && data !== "shipped" && data !== "delivered") {
+    throw new Error("The order status was not updated.");
+  }
   return data;
+}
+
+export async function collectCodPayment(orderId: string): Promise<void> {
+  const { data, error } = await supabase.rpc("collect_cod_payment", { p_order_id: orderId });
+  if (error) throw new Error(error.message || "Cash collection could not be recorded.");
+  if (typeof data !== "object" || data === null || !("paymentStatus" in data)) {
+    throw new Error("Cash collection was not recorded.");
+  }
 }
 
 export async function requestSupplierCancellation(orderId: string, reason: string): Promise<void> {
@@ -88,6 +110,33 @@ export async function requestSupplierCancellation(orderId: string, reason: strin
   ) {
     throw new Error("The cancellation request was not confirmed.");
   }
+}
+
+export function canFulfillPayment(
+  order: Pick<SupplierOrder, "payment_method" | "payment_status">,
+): boolean {
+  return order.payment_method === "cod" || order.payment_status === "paid";
+}
+
+export function canConfirmOrder(order: SupplierOrder): boolean {
+  return order.status === "pending" && !order.cancel_requested && canFulfillPayment(order);
+}
+
+export function canShipOrder(order: SupplierOrder): boolean {
+  return order.status === "confirmed" && !order.cancel_requested && canFulfillPayment(order);
+}
+
+export function canMarkDelivered(order: SupplierOrder): boolean {
+  return order.status === "shipped" && !order.cancel_requested && canFulfillPayment(order);
+}
+
+export function canCollectCod(order: SupplierOrder): boolean {
+  return (
+    order.payment_method === "cod" &&
+    order.payment_status === "unpaid" &&
+    order.status !== "cancelled" &&
+    order.status !== "pending"
+  );
 }
 
 export function canSupplierCancel(order: SupplierOrder): boolean {

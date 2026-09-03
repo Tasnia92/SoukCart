@@ -38,7 +38,7 @@ import {
   WorkspaceError,
 } from "../../components/ui/Workspace.tsx";
 import { useSessionSnapshot, useSessionStore } from "../../session.tsx";
-import { shortId } from "../orders/order-presentation.tsx";
+import { DeliveryDetails, shortId } from "../orders/order-presentation.tsx";
 import { formatDate, formatDateTime, formatPrice } from "../workspace/format.ts";
 import { RouterLink, WorkspaceShell } from "../workspace/WorkspaceShell.tsx";
 import { loadCartCount } from "./retailer-orders-api.ts";
@@ -166,7 +166,7 @@ export function RetailerInvoice({
             <EmptyState
               icon={Clock}
               title="Invoice not available yet"
-              copy="The invoice appears once the order has been paid."
+              copy="The invoice appears once the order has been paid, or cash on delivery has been collected."
               action={
                 <Button asChild>
                   <RouterLink to="/retailer/orders">Back to orders</RouterLink>
@@ -236,10 +236,18 @@ function InvoiceCard({
               </CardDescription>
             </CardHeader>
             <CardContent>
-              <p className="font-medium">SSLCommerz</p>
+              <p className="font-medium">
+                {order.payment_method === "cod" ? "Cash on delivery" : "SSLCommerz"}
+              </p>
             </CardContent>
           </Card>
         </div>
+        <DeliveryDetails
+          phone={order.delivery_phone}
+          address={order.delivery_address}
+          city={order.delivery_city}
+          postcode={order.delivery_postcode}
+        />
 
         <Table>
           <TableHeader>
@@ -270,16 +278,20 @@ function InvoiceCard({
           <dd className="text-right text-lg font-semibold tabular-nums">{formatPrice(total)}</dd>
         </dl>
 
-        <div className="flex flex-col gap-2">
-          <h3 className="text-sm font-medium">Transaction reference</h3>
-          <code className="break-all text-sm text-muted-foreground">{order.tran_id ?? ""}</code>
-          {order.val_id ? (
-            <code className="break-all text-sm text-muted-foreground">{order.val_id}</code>
-          ) : null}
-          {order.bank_tran_id ? (
-            <code className="break-all text-sm text-muted-foreground">{order.bank_tran_id}</code>
-          ) : null}
-        </div>
+        {order.tran_id || order.val_id || order.bank_tran_id ? (
+          <div className="flex flex-col gap-2">
+            <h3 className="text-sm font-medium">Transaction reference</h3>
+            {order.tran_id ? (
+              <code className="break-all text-sm text-muted-foreground">{order.tran_id}</code>
+            ) : null}
+            {order.val_id ? (
+              <code className="break-all text-sm text-muted-foreground">{order.val_id}</code>
+            ) : null}
+            {order.bank_tran_id ? (
+              <code className="break-all text-sm text-muted-foreground">{order.bank_tran_id}</code>
+            ) : null}
+          </div>
+        ) : null}
       </CardContent>
       <CardFooter className="justify-end gap-2 print:hidden">
         <Button type="button" onClick={() => window.print()}>

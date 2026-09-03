@@ -175,6 +175,7 @@ export function SupplierProductForm({
       price: Number(readText(formData, "price")),
       unit: readText(formData, "unit").trim() || "piece",
       stock: Number(readText(formData, "stock")),
+      min_order_qty: Number(readText(formData, "min_order_qty")),
       category: (() => {
         const category = readText(formData, "category").trim();
         return !category || category === UNCATEGORIZED ? null : category;
@@ -362,6 +363,19 @@ export function SupplierProductForm({
                   {isEdit ? (
                     <FieldDescription>Set to 0 to mark the product out of stock.</FieldDescription>
                   ) : null}
+                </Field>
+                <Field>
+                  <FieldLabel htmlFor="product-moq">Minimum order quantity</FieldLabel>
+                  <Input
+                    id="product-moq"
+                    name="min_order_qty"
+                    type="number"
+                    min="1"
+                    step="1"
+                    defaultValue={editing ? String(editing.min_order_qty) : "1"}
+                    required
+                  />
+                  <FieldDescription>Retailers must buy at least this many units.</FieldDescription>
                 </Field>
                 <Field className="md:col-span-2">
                   <FieldLabel htmlFor="product-image">Product image</FieldLabel>

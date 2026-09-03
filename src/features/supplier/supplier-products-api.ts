@@ -28,6 +28,7 @@ export type ProductPayload = {
   price: number;
   unit: string;
   stock: number;
+  min_order_qty: number;
   category: string | null;
 };
 
@@ -40,11 +41,17 @@ export function productValidationError(
   if (!Number.isFinite(payload.price) || payload.price <= 0) {
     return "Price must be greater than 0.";
   }
+  if (!Number.isInteger(payload.min_order_qty) || payload.min_order_qty < 1) {
+    return "Minimum order quantity must be a whole number of at least 1.";
+  }
   const minStock = options.allowZeroStock ? 0 : 1;
   if (!Number.isInteger(payload.stock) || payload.stock < minStock) {
     return options.allowZeroStock
       ? "Quantity must be a whole number of 0 or more."
       : "Quantity must be a whole number of at least 1.";
+  }
+  if (!options.allowZeroStock && payload.stock < payload.min_order_qty) {
+    return "Stock must be at least the minimum order quantity.";
   }
   return null;
 }

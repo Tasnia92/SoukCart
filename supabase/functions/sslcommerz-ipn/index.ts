@@ -59,6 +59,12 @@ Deno.serve(async (request) => {
     if (order.payment_status === "paid") {
       return new Response("OK");
     }
+    if (order.payment_status !== "unpaid") {
+      // Superseded or expired checkouts stay failed/cancelled. Applying this
+      // leftover gateway tab would mark a dead order paid and re-reserve stock.
+      console.error(`IPN capture refused for ${tranId}: payment_status=${order.payment_status}`);
+      return new Response("OK");
+    }
 
     let paid = false;
     if (status === "VALID" && valId) {
@@ -77,7 +83,7 @@ Deno.serve(async (request) => {
           paid_at: new Date().toISOString(),
         })
         .eq("id", order.id)
-        .neq("payment_status", "paid");
+        .eq("payment_status", "unpaid");
       if (paymentError) {
         console.error("Paid order could not reserve stock", paymentError);
         return new Response("Payment requires administrator review.", { status: 409 });

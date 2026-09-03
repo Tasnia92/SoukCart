@@ -2,6 +2,7 @@ import { describe, expect, it } from "vite-plus/test";
 import type { RetailerProduct } from "./retailer-catalog-api.ts";
 import {
   assertCartWithinStock,
+  assertSingleSupplierCart,
   buildCheckoutBody,
   cartItemCount,
   cartSubtotal,
@@ -18,8 +19,10 @@ function product(overrides: Partial<RetailerProduct>): RetailerProduct {
     price: 100,
     unit: "kg",
     stock: 10,
+    min_order_qty: 1,
     category: "Groceries",
     image_url: null,
+    seller_id: "seller-1",
     seller_name: "Samira",
     ...overrides,
   };
@@ -71,6 +74,26 @@ describe("retailer cart API", () => {
     );
     expect(() =>
       assertCartWithinStock([line({ product: product({ stock: 10 }), quantity: 4 })]),
+    ).not.toThrow();
+    expect(() =>
+      assertCartWithinStock([
+        line({ product: product({ name: "Rice sack", min_order_qty: 10 }), quantity: 4 }),
+      ]),
+    ).toThrow("Order at least 10 units of Rice sack.");
+  });
+
+  it("rejects a mixed-supplier cart", () => {
+    expect(() =>
+      assertSingleSupplierCart([
+        line({ product: product({ id: "a", seller_id: "seller-1" }), quantity: 1 }),
+        line({ product: product({ id: "b", seller_id: "seller-2" }), quantity: 1 }),
+      ]),
+    ).toThrow("Checkout one supplier at a time. Remove items from other suppliers first.");
+    expect(() =>
+      assertSingleSupplierCart([
+        line({ product: product({ id: "a", seller_id: "seller-1" }), quantity: 1 }),
+        line({ product: product({ id: "b", seller_id: "seller-1" }), quantity: 2 }),
+      ]),
     ).not.toThrow();
   });
 

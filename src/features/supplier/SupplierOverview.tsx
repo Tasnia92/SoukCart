@@ -10,6 +10,7 @@ import {
   Plus,
   ShoppingBag,
   Store,
+  Wallet,
 } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -211,7 +212,7 @@ export function SupplierOverview({ loadDashboard = loadSupplierDashboard }: Supp
     >
       <PageHeader
         title={<>Good to see you, {firstName(userName)}.</>}
-        copy="Accept what is waiting, restock what is running out, and see which products are carrying your sales."
+        copy="Confirm and ship what is waiting, restock what is running out, and see which products are carrying your sales."
         actions={
           <>
             <Button asChild>
@@ -240,7 +241,17 @@ export function SupplierOverview({ loadDashboard = loadSupplierDashboard }: Supp
               value={formatPrice(summary.sales)}
               period={period}
               delta={summary.salesDelta}
-              context={`${summary.orders} orders included your products`}
+              context={`${summary.orders} paid orders included your products`}
+              to="/supplier/orders"
+              linkLabel="Open orders"
+            />
+            <MetricCard
+              icon={Wallet}
+              label="Available payout"
+              value={formatPrice(dashboard.earnings.available)}
+              period="After commission"
+              context={`${formatPrice(dashboard.earnings.paid)} already paid · ${formatPrice(dashboard.earnings.commission)} commission held`}
+              hint="Earnings accrue when an order is delivered and paid. The admin marks the payout when they send you the money."
               to="/supplier/orders"
               linkLabel="Open orders"
             />
@@ -252,11 +263,11 @@ export function SupplierOverview({ loadDashboard = loadSupplierDashboard }: Supp
               context={
                 summary.cancellationRequests
                   ? `${summary.cancellationRequests} cancellation request${summary.cancellationRequests === 1 ? "" : "s"} also need a decision`
-                  : "Orders you have not accepted yet"
+                  : "Orders waiting for you to confirm or ship"
               }
               severity={severityFor(summary.awaitingFulfillment, summary.cancellationRequests > 0)}
               to="/supplier/orders"
-              linkLabel="Accept orders"
+              linkLabel="Process orders"
             />
             <MetricCard
               icon={Layers}
@@ -328,7 +339,7 @@ export function SupplierOverview({ loadDashboard = loadSupplierDashboard }: Supp
             <DashboardCard
               eyebrow="Needs action"
               title="Fulfillment queue"
-              meta="Orders you can accept or resolve now"
+              meta="Orders you can confirm, ship, or resolve now"
               severity={dashboard.queue.length ? "critical" : "neutral"}
               action={<DashboardLink to="/supplier/orders">Open orders</DashboardLink>}
             >
@@ -343,7 +354,7 @@ export function SupplierOverview({ loadDashboard = loadSupplierDashboard }: Supp
                 <SectionEmpty
                   icon={Check}
                   title="Nothing waiting on you"
-                  copy="Every incoming order has been accepted. New ones will land here."
+                  copy="Every incoming order has been confirmed. New ones will land here."
                 />
               )}
             </DashboardCard>

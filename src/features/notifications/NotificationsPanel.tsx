@@ -1,38 +1,53 @@
 import { useEffect, useState } from "react";
-import { Bell } from "lucide-react";
+import {
+  Ban,
+  Banknote,
+  Bell,
+  CircleX,
+  LifeBuoy,
+  PackageCheck,
+  Wallet,
+  type LucideIcon,
+} from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import {
-  Empty,
-  EmptyDescription,
-  EmptyHeader,
-  EmptyMedia,
-  EmptyTitle,
-} from "@/components/ui/empty";
-import {
-  Item,
-  ItemActions,
-  ItemContent,
-  ItemDescription,
-  ItemGroup,
-  ItemTitle,
-} from "@/components/ui/item";
-import {
-  Popover,
-  PopoverContent,
-  PopoverDescription,
-  PopoverHeader,
-  PopoverTitle,
-  PopoverTrigger,
-} from "@/components/ui/popover";
-import { ScrollArea } from "@/components/ui/scroll-area";
-import { Separator } from "@/components/ui/separator";
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuGroup,
+  DropdownMenuItem,
+  DropdownMenuLabel,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
 import { formatDateTime } from "../workspace/format.ts";
 import {
   loadNotifications,
   markNotificationRead,
   type OrderNotification,
 } from "./notifications-api.ts";
+
+function notificationIcon(type: string): LucideIcon {
+  switch (type) {
+    case "order_cancellation_requested":
+    case "supplier_cancellation_requested":
+      return Ban;
+    case "order_cancellation_rejected":
+    case "order_cancelled":
+      return CircleX;
+    case "manual_refund_completed":
+    case "payout_paid":
+      return Banknote;
+    case "cod_collected":
+      return Wallet;
+    case "delivery_verified":
+      return PackageCheck;
+    case "order_support_requested":
+      return LifeBuoy;
+    default:
+      return Bell;
+  }
+}
 
 export function NotificationsBell() {
   const [notifications, setNotifications] = useState<OrderNotification[]>([]);
@@ -63,8 +78,8 @@ export function NotificationsBell() {
   const unread = notifications.filter((notification) => !notification.read_at).length;
 
   return (
-    <Popover>
-      <PopoverTrigger asChild>
+    <DropdownMenu>
+      <DropdownMenuTrigger asChild>
         <Button variant="ghost" size="icon" className="relative" aria-label="Notifications">
           <Bell />
           {unread > 0 ? (
@@ -76,61 +91,54 @@ export function NotificationsBell() {
             </Badge>
           ) : null}
         </Button>
-      </PopoverTrigger>
-      <PopoverContent align="end" className="w-80 p-0">
-        <PopoverHeader className="p-3">
-          <PopoverTitle>Notifications</PopoverTitle>
-          <PopoverDescription>
-            {unread === 0 ? "You're up to date" : `${unread} unread`}
-          </PopoverDescription>
-        </PopoverHeader>
-        <Separator />
-        {notifications.length ? (
-          <ScrollArea className="h-80">
-            <ItemGroup>
-              {notifications.map((notification) => (
-                <Item
+      </DropdownMenuTrigger>
+      <DropdownMenuContent align="end" className="w-80">
+        <DropdownMenuGroup>
+          <DropdownMenuLabel>
+            {unread > 0 ? `Notifications · ${unread} unread` : "Notifications"}
+          </DropdownMenuLabel>
+        </DropdownMenuGroup>
+        <DropdownMenuSeparator />
+        {notifications.length > 0 ? (
+          <DropdownMenuGroup>
+            {notifications.map((notification) => {
+              const Icon = notificationIcon(notification.type);
+              return (
+                <DropdownMenuItem
                   key={notification.id}
-                  size="sm"
-                  variant={notification.read_at ? "default" : "muted"}
+                  className="items-start"
+                  onSelect={(event) => {
+                    event.preventDefault();
+                    markRead(notification);
+                  }}
                 >
-                  <ItemContent>
-                    <ItemTitle>
-                      {notification.title}
-                      {!notification.read_at ? <Badge variant="outline">New</Badge> : null}
-                    </ItemTitle>
-                    <ItemDescription>{notification.message}</ItemDescription>
-                    <ItemDescription>{formatDateTime(notification.created_at)}</ItemDescription>
-                  </ItemContent>
-                  {!notification.read_at ? (
-                    <ItemActions>
-                      <Button
-                        variant="ghost"
-                        size="xs"
-                        type="button"
-                        onClick={() => markRead(notification)}
-                      >
-                        Mark as read
-                      </Button>
-                    </ItemActions>
-                  ) : null}
-                </Item>
-              ))}
-            </ItemGroup>
-          </ScrollArea>
+                  <Icon />
+                  <span className="flex min-w-0 flex-col gap-1">
+                    <span className="flex items-center gap-2">
+                      <span className="truncate font-medium">{notification.title}</span>
+                      {notification.read_at ? null : <Badge variant="outline">New</Badge>}
+                    </span>
+                    <span className="text-muted-foreground whitespace-normal">
+                      {notification.message}
+                    </span>
+                    <span className="text-muted-foreground">
+                      {formatDateTime(notification.created_at)}
+                    </span>
+                  </span>
+                </DropdownMenuItem>
+              );
+            })}
+          </DropdownMenuGroup>
         ) : (
-          <Empty className="py-8">
-            <EmptyHeader>
-              <EmptyMedia variant="icon">
-                <Bell />
-              </EmptyMedia>
-              <EmptyTitle>No notifications</EmptyTitle>
-              <EmptyDescription>Order updates will show up here.</EmptyDescription>
-            </EmptyHeader>
-          </Empty>
+          <DropdownMenuGroup>
+            <DropdownMenuItem disabled>
+              <Bell />
+              No notifications
+            </DropdownMenuItem>
+          </DropdownMenuGroup>
         )}
-      </PopoverContent>
-    </Popover>
+      </DropdownMenuContent>
+    </DropdownMenu>
   );
 }
 

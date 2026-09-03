@@ -22,6 +22,7 @@ import {
   type MetricDelta,
   type SizedSegment,
 } from "../../components/dashboard/dashboard-model.ts";
+import { supabase } from "../../supabase.ts";
 import { loadSupplierOrders, type SupplierOrder } from "./supplier-orders-api.ts";
 import { loadSupplierProducts, type SupplierProduct } from "./supplier-overview-api.ts";
 
@@ -78,6 +79,20 @@ export type SupplierTopProduct = {
   value: number;
 };
 
+export type SellerEarnings = {
+  commissionRate: number;
+  available: number;
+  paid: number;
+  commission: number;
+};
+
+export const EMPTY_SELLER_EARNINGS: SellerEarnings = {
+  commissionRate: 0,
+  available: 0,
+  paid: 0,
+  commission: 0,
+};
+
 export type SupplierDashboard = {
   summary: SupplierSummary;
   /** One point per day: `value` is the supplier's earnings, `count` is order lines received. */
@@ -88,15 +103,38 @@ export type SupplierDashboard = {
   topProducts: SupplierTopProduct[];
   recentListings: SupplierProduct[];
   windowDays: number;
+  earnings: SellerEarnings;
 };
 
-function isEarning(order: SupplierOrder): boolean {
-  return order.status !== "cancelled";
+function asMoney(value: unknown): number {
+  const amount = Number(value);
+  return Number.isFinite(amount) ? amount : 0;
 }
 
-/** An order the supplier still has to accept. Mirrors the accept control on /supplier/orders. */
+export async function loadSellerEarnings(): Promise<SellerEarnings> {
+  const { data, error } = await supabase.rpc("seller_earnings");
+  if (error) throw new Error(error.message);
+  if (!data || typeof data !== "object") return EMPTY_SELLER_EARNINGS;
+  const row = data as Record<string, unknown>;
+  return {
+    commissionRate: asMoney(row.commissionRate),
+    available: asMoney(row.available),
+    paid: asMoney(row.paid),
+    commission: asMoney(row.commission),
+  };
+}
+
+function isEarning(order: SupplierOrder): boolean {
+  return order.status !== "cancelled" && order.payment_status === "paid";
+}
+
+/** Pending or confirmed orders the supplier still has to confirm or ship. */
 export function awaitsFulfillment(order: SupplierOrder): boolean {
-  return !order.accepted_at && order.status === "pending" && !order.cancel_requested;
+  return (
+    (order.status === "pending" || order.status === "confirmed") &&
+    !order.cancel_requested &&
+    (order.payment_method === "cod" || order.payment_status === "paid")
+  );
 }
 
 export function hasOpenCancellation(order: SupplierOrder): boolean {
@@ -107,7 +145,7 @@ function orderUnits(order: SupplierOrder): number {
   return order.items.reduce((sum, item) => sum + item.quantity, 0);
 }
 
-/** Unaccepted orders turn critical once they have sat for more than a day. */
+/** Unconfirmed orders turn critical once they have sat for more than a day. */
 function queueSeverity(order: SupplierOrder, now: number): DashboardSeverity {
   if (hasOpenCancellation(order)) return "critical";
   return ageInDays(order.created_at, now) >= 1 ? "critical" : "attention";
@@ -120,7 +158,7 @@ function stockSeverity(product: SupplierProduct): DashboardSeverity {
 
 /**
  * Aggregates the supplier overview. Sales exclude cancelled orders. The queue holds
- * only orders the supplier can act on now, oldest first, because an unaccepted order
+ * only orders the supplier can act on now, oldest first, because an unconfirmed order
  * only gets more expensive with age.
  */
 export function buildSupplierDashboard(
@@ -227,17 +265,20 @@ export function buildSupplierDashboard(
       .sort((left, right) => Date.parse(right.created_at) - Date.parse(left.created_at))
       .slice(0, SUPPLIER_RECENT_LISTING_LIMIT),
     windowDays,
+    earnings: EMPTY_SELLER_EARNINGS,
   };
 }
 
 export type SupplierDashboardDeps = {
   loadOrders: () => Promise<SupplierOrder[]>;
   loadProducts: (sellerId: string) => Promise<SupplierProduct[]>;
+  loadEarnings?: () => Promise<SellerEarnings>;
 };
 
 const defaultDeps: SupplierDashboardDeps = {
   loadOrders: loadSupplierOrders,
   loadProducts: loadSupplierProducts,
+  loadEarnings: loadSellerEarnings,
 };
 
 export async function loadSupplierDashboard(
@@ -245,6 +286,10 @@ export async function loadSupplierDashboard(
   deps: SupplierDashboardDeps = defaultDeps,
   now = Date.now(),
 ): Promise<SupplierDashboard> {
-  const [orders, products] = await Promise.all([deps.loadOrders(), deps.loadProducts(sellerId)]);
-  return buildSupplierDashboard(orders, products, now);
+  const [orders, products, earnings] = await Promise.all([
+    deps.loadOrders(),
+    deps.loadProducts(sellerId),
+    deps.loadEarnings ? deps.loadEarnings() : Promise.resolve(EMPTY_SELLER_EARNINGS),
+  ]);
+  return { ...buildSupplierDashboard(orders, products, now), earnings };
 }

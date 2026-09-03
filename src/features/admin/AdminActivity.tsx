@@ -63,8 +63,8 @@ import {
   type NoticeState,
 } from "../../components/ui/Workspace.tsx";
 import { useSessionSnapshot, useSessionStore } from "../../session.tsx";
-import { NotificationsPanel } from "../notifications/NotificationsPanel.tsx";
 import {
+  DeliveryDetails,
   OrderRow,
   PaymentBadge,
   shortId,
@@ -74,10 +74,15 @@ import {
 import { formatDate, formatPrice, initials } from "../workspace/format.ts";
 import { recordIdFromHash, searchParam } from "../workspace/search.ts";
 import { AdminWorkspaceShell } from "./admin-workspace-shell.tsx";
+import { adminOrderViewMeta } from "./admin-nav.ts";
 import {
+  canFulfillOrder,
+  collectCodPayment,
   completeManualRefund,
   filterActivityOrders,
   loadAdminActivity,
+  needsCodCollection,
+  parseAdminOrderView,
   updateOrderStatus,
   type ActivityOrder,
   type ActivityResponse,
@@ -108,13 +113,14 @@ type PendingStatusChange = {
 };
 
 function nextStatuses(order: ActivityOrder): string[] {
+  const unpaidOnline = !canFulfillOrder(order);
   switch (order.status) {
     case "pending":
-      return ["pending", "confirmed", "cancelled"];
+      return unpaidOnline ? ["pending", "cancelled"] : ["pending", "confirmed", "cancelled"];
     case "confirmed":
-      return ["confirmed", "shipped", "cancelled"];
+      return unpaidOnline ? ["confirmed", "cancelled"] : ["confirmed", "shipped", "cancelled"];
     case "shipped":
-      return ["shipped", "delivered", "cancelled"];
+      return unpaidOnline ? ["shipped", "cancelled"] : ["shipped", "delivered", "cancelled"];
     case "delivered":
       return ["delivered", "cancelled"];
     default:
@@ -142,6 +148,8 @@ export function AdminActivity({ loadActivity = loadAdminActivity }: AdminActivit
   const location = useRouterState({ select: (routerState) => routerState.location });
   const focusedOrderId =
     searchParam(location.searchStr, "order") ?? recordIdFromHash(location.hash, "order");
+  const orderView = parseAdminOrderView(searchParam(location.searchStr, "view"));
+  const viewMeta = adminOrderViewMeta(orderView);
   const [data, setData] = useState<ActivityResponse | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [loadVersion, setLoadVersion] = useState(0);
@@ -153,6 +161,7 @@ export function AdminActivity({ loadActivity = loadAdminActivity }: AdminActivit
   const [chargeError, setChargeError] = useState<string | null>(null);
   const [pendingStatusChange, setPendingStatusChange] = useState<PendingStatusChange | null>(null);
   const [refundConfirmation, setRefundConfirmation] = useState<ActivityOrder | null>(null);
+  const [codConfirmation, setCodConfirmation] = useState<ActivityOrder | null>(null);
 
   useEffect(() => {
     let current = true;
@@ -318,6 +327,29 @@ export function AdminActivity({ loadActivity = loadAdminActivity }: AdminActivit
       .finally(() => setBusyId(null));
   };
 
+  const confirmCollectCod = () => {
+    if (!codConfirmation) return;
+    const order = codConfirmation;
+    setCodConfirmation(null);
+    setBusyId(order.id);
+    void collectCodPayment(order.id)
+      .then(() => {
+        setNotice({
+          message: `Cash collected for order #${shortId(order.id)}.`,
+          state: "success",
+        });
+        setLoadVersion((version) => version + 1);
+      })
+      .catch((codError: unknown) => {
+        setNotice({
+          message:
+            codError instanceof Error ? codError.message : "Cash collection could not be recorded.",
+          state: "error",
+        });
+      })
+      .finally(() => setBusyId(null));
+  };
+
   const confirmCompleteRefund = () => {
     if (!refundConfirmation) return;
     const order = refundConfirmation;
@@ -350,7 +382,7 @@ export function AdminActivity({ loadActivity = loadAdminActivity }: AdminActivit
 
   const orders = data?.orders ?? null;
   const summary = data?.summary ?? null;
-  const filtered = orders ? filterActivityOrders(orders, searchTerm, shortId) : [];
+  const filtered = orders ? filterActivityOrders(orders, searchTerm, shortId, orderView) : [];
 
   return (
     <AdminWorkspaceShell
@@ -360,9 +392,9 @@ export function AdminActivity({ loadActivity = loadAdminActivity }: AdminActivit
       onLogout={onLogout}
     >
       <PageHeader
-        eyebrow="Order activity"
-        title="Every order, end to end."
-        copy="Approve cancellations, calculate refundable amounts, and record manual refunds."
+        eyebrow="Orders"
+        title={viewMeta.title}
+        copy={viewMeta.copy}
         actions={
           <Button type="button" variant="ghost" disabled={loading} onClick={retry}>
             <RefreshCw data-icon="inline-start" />
@@ -371,7 +403,6 @@ export function AdminActivity({ loadActivity = loadAdminActivity }: AdminActivit
         }
       />
       <InlineNotice message={notice?.message} state={notice?.state} />
-      <NotificationsPanel />
       {data && orders && summary ? (
         <>
           <StatGrid label="Order activity summary">
@@ -496,6 +527,12 @@ export function AdminActivity({ loadActivity = loadAdminActivity }: AdminActivit
                                 </Item>
                               ))}
                             </ItemGroup>
+                            <DeliveryDetails
+                              phone={order.delivery_phone}
+                              address={order.delivery_address}
+                              city={order.delivery_city}
+                              postcode={order.delivery_postcode}
+                            />
                             {order.cancellation_reason ? (
                               <Alert>
                                 <AlertTitle>Cancellation reason</AlertTitle>
@@ -573,6 +610,17 @@ export function AdminActivity({ loadActivity = loadAdminActivity }: AdminActivit
                                       </Button>
                                     </>
                                   ) : null}
+                                  {needsCodCollection(order) ? (
+                                    <Button
+                                      type="button"
+                                      size="sm"
+                                      variant="outline"
+                                      disabled={busyId === order.id}
+                                      onClick={() => setCodConfirmation(order)}
+                                    >
+                                      Record cash collected
+                                    </Button>
+                                  ) : null}
                                   {order.manual_refund_status === "pending" ? (
                                     <Button
                                       type="button"
@@ -596,7 +644,11 @@ export function AdminActivity({ loadActivity = loadAdminActivity }: AdminActivit
                         <EmptyState
                           icon={Search}
                           title="No matching orders"
-                          copy="Try a different retailer, supplier, or product."
+                          copy={
+                            orderView === "all"
+                              ? "Try a different retailer, supplier, or product."
+                              : "Nothing in this order view right now."
+                          }
                         />
                       </TableCell>
                     </TableRow>
@@ -730,6 +782,30 @@ export function AdminActivity({ loadActivity = loadAdminActivity }: AdminActivit
             <AlertDialogCancel type="button">Cancel</AlertDialogCancel>
             <AlertDialogAction type="button" onClick={confirmCompleteRefund}>
               Mark completed
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+
+      <AlertDialog
+        open={Boolean(codConfirmation)}
+        onOpenChange={(open) => {
+          if (!open) setCodConfirmation(null);
+        }}
+      >
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Record cash collected</AlertDialogTitle>
+            <AlertDialogDescription>
+              {codConfirmation
+                ? `Record that cash on delivery was collected for order #${shortId(codConfirmation.id)}? The retailer can then download an invoice.`
+                : null}
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel type="button">Cancel</AlertDialogCancel>
+            <AlertDialogAction type="button" onClick={confirmCollectCod}>
+              Record cash collected
             </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>

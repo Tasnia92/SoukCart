@@ -1,5 +1,6 @@
 import type { ReactNode } from "react";
-import { ChevronsUpDown, type LucideIcon } from "lucide-react";
+import { ChevronRight, ChevronsUpDown, type LucideIcon } from "lucide-react";
+import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
 import { RouterLink } from "../../components/ui/RouterLink.tsx";
 import {
   Breadcrumb,
@@ -29,6 +30,9 @@ import {
   SidebarMenuBadge,
   SidebarMenuButton,
   SidebarMenuItem,
+  SidebarMenuSub,
+  SidebarMenuSubButton,
+  SidebarMenuSubItem,
   SidebarRail,
   SidebarTrigger,
   useSidebar,
@@ -46,6 +50,7 @@ export type WorkspacePath =
   | "/admin/users"
   | "/admin/activity"
   | "/admin/complaints"
+  | "/admin/payouts"
   | "/admin/verifications"
   | "/retailer"
   | "/retailer/catalog"
@@ -60,8 +65,10 @@ export type WorkspacePath =
 export type WorkspaceNavMenuChoice = {
   id: string;
   label: string;
+  icon?: LucideIcon;
   to?: WorkspacePath;
   search?: Record<string, string>;
+  active?: boolean;
 };
 
 export type WorkspaceNavItem = {
@@ -91,6 +98,16 @@ function workspaceRole(items: WorkspaceNavItem[]): { label: string; home: Worksp
   return { label: "Workspace", home: "/" };
 }
 
+function NavChoiceLabel({ choice }: { choice: WorkspaceNavMenuChoice }) {
+  const Icon = choice.icon;
+  return (
+    <>
+      {Icon ? <Icon /> : null}
+      <span>{choice.label}</span>
+    </>
+  );
+}
+
 function WorkspaceNavLink({ item }: { item: WorkspaceNavItem }) {
   const to = item.to;
   if (!to) return null;
@@ -113,7 +130,7 @@ function WorkspaceNavLink({ item }: { item: WorkspaceNavItem }) {
   );
 }
 
-function WorkspaceNavDropdown({ item }: { item: WorkspaceNavItem }) {
+function WorkspaceNavFlyout({ item }: { item: WorkspaceNavItem }) {
   const { isMobile, setOpenMobile } = useSidebar();
   const ItemIcon = item.icon;
   const choices = item.menu ?? [];
@@ -151,7 +168,7 @@ function WorkspaceNavDropdown({ item }: { item: WorkspaceNavItem }) {
                       if (isMobile) setOpenMobile(false);
                     }}
                   >
-                    {choice.label}
+                    <NavChoiceLabel choice={choice} />
                   </RouterLink>
                 </DropdownMenuItem>
               ) : (
@@ -162,13 +179,74 @@ function WorkspaceNavDropdown({ item }: { item: WorkspaceNavItem }) {
                     item.onSelect?.(choice.id);
                   }}
                 >
-                  {choice.label}
+                  <NavChoiceLabel choice={choice} />
                 </DropdownMenuItem>
               ),
             )}
           </DropdownMenuGroup>
         </DropdownMenuContent>
       </DropdownMenu>
+      {item.trailing ? (
+        <SidebarMenuBadge className="rt-nav-badge bg-primary text-primary-foreground">
+          {item.trailing}
+        </SidebarMenuBadge>
+      ) : null}
+    </SidebarMenuItem>
+  );
+}
+
+function WorkspaceNavDropdown({ item }: { item: WorkspaceNavItem }) {
+  const { isMobile, setOpenMobile, state } = useSidebar();
+  const ItemIcon = item.icon;
+  const choices = item.menu ?? [];
+
+  if (state === "collapsed" && !isMobile) {
+    return <WorkspaceNavFlyout item={item} />;
+  }
+
+  return (
+    <SidebarMenuItem>
+      <Collapsible defaultOpen={item.active} className="group/collapsible">
+        <CollapsibleTrigger asChild>
+          <SidebarMenuButton isActive={item.active} aria-label={item.label} title={item.label}>
+            <ItemIcon />
+            <span>{item.label}</span>
+            <ChevronRight className="ml-auto transition-transform group-data-[state=open]/collapsible:rotate-90" />
+          </SidebarMenuButton>
+        </CollapsibleTrigger>
+        <CollapsibleContent>
+          <SidebarMenuSub>
+            {choices.map((choice) => (
+              <SidebarMenuSubItem key={choice.id}>
+                {choice.to ? (
+                  <SidebarMenuSubButton asChild isActive={choice.active}>
+                    <RouterLink
+                      to={choice.to}
+                      search={choice.search}
+                      aria-current={choice.active ? "page" : undefined}
+                      onClick={() => {
+                        if (isMobile) setOpenMobile(false);
+                      }}
+                    >
+                      <NavChoiceLabel choice={choice} />
+                    </RouterLink>
+                  </SidebarMenuSubButton>
+                ) : (
+                  <SidebarMenuSubButton
+                    isActive={choice.active}
+                    onClick={() => {
+                      if (isMobile) setOpenMobile(false);
+                      item.onSelect?.(choice.id);
+                    }}
+                  >
+                    <NavChoiceLabel choice={choice} />
+                  </SidebarMenuSubButton>
+                )}
+              </SidebarMenuSubItem>
+            ))}
+          </SidebarMenuSub>
+        </CollapsibleContent>
+      </Collapsible>
       {item.trailing ? (
         <SidebarMenuBadge className="rt-nav-badge bg-primary text-primary-foreground">
           {item.trailing}
@@ -200,6 +278,52 @@ function WorkspaceNavList({
   );
 }
 
+function WorkspaceBreadcrumb({ items }: { items: WorkspaceNavItem[] }) {
+  const role = workspaceRole(items);
+  const parent = items.find((item) => item.active);
+  const child = parent?.menu?.find((choice) => choice.active);
+  const showParent = Boolean(parent && parent.to !== role.home);
+  const parentTo = parent?.to && parent.to !== role.home ? parent.to : null;
+
+  return (
+    <Breadcrumb>
+      <BreadcrumbList>
+        <BreadcrumbItem className="hidden sm:block">
+          {showParent ? (
+            <BreadcrumbLink asChild>
+              <RouterLink to={role.home}>{role.label}</RouterLink>
+            </BreadcrumbLink>
+          ) : (
+            <BreadcrumbPage>{role.label}</BreadcrumbPage>
+          )}
+        </BreadcrumbItem>
+        {showParent && parent ? (
+          <>
+            <BreadcrumbSeparator className="hidden sm:block" />
+            <BreadcrumbItem>
+              {child && parentTo ? (
+                <BreadcrumbLink asChild>
+                  <RouterLink to={parentTo}>{parent.label}</RouterLink>
+                </BreadcrumbLink>
+              ) : (
+                <BreadcrumbPage>{parent.label}</BreadcrumbPage>
+              )}
+            </BreadcrumbItem>
+          </>
+        ) : null}
+        {showParent && child ? (
+          <>
+            <BreadcrumbSeparator />
+            <BreadcrumbItem>
+              <BreadcrumbPage>{child.label}</BreadcrumbPage>
+            </BreadcrumbItem>
+          </>
+        ) : null}
+      </BreadcrumbList>
+    </Breadcrumb>
+  );
+}
+
 export function WorkspaceShell({
   navigationLabel,
   items,
@@ -209,7 +333,6 @@ export function WorkspaceShell({
   children,
 }: WorkspaceShellProps) {
   const role = workspaceRole(items);
-  const current = items.find((item) => item.active && item.to) ?? items.find((item) => item.active);
 
   return (
     <AppShell
@@ -249,27 +372,7 @@ export function WorkspaceShell({
         <header className="flex h-(--header-height) shrink-0 items-center gap-2 border-b px-4">
           <SidebarTrigger />
           <Separator orientation="vertical" className="mr-1 h-4" />
-          <Breadcrumb>
-            <BreadcrumbList>
-              <BreadcrumbItem className="hidden sm:block">
-                {current && current.to !== role.home ? (
-                  <BreadcrumbLink asChild>
-                    <RouterLink to={role.home}>{role.label}</RouterLink>
-                  </BreadcrumbLink>
-                ) : (
-                  <BreadcrumbPage>{role.label}</BreadcrumbPage>
-                )}
-              </BreadcrumbItem>
-              {current && current.to !== role.home ? (
-                <>
-                  <BreadcrumbSeparator className="hidden sm:block" />
-                  <BreadcrumbItem>
-                    <BreadcrumbPage>{current.label}</BreadcrumbPage>
-                  </BreadcrumbItem>
-                </>
-              ) : null}
-            </BreadcrumbList>
-          </Breadcrumb>
+          <WorkspaceBreadcrumb items={items} />
           <div className="ml-auto flex items-center gap-1">
             <NotificationsBell />
           </div>

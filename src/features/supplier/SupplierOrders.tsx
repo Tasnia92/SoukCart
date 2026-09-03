@@ -44,16 +44,27 @@ import {
   type NoticeState,
 } from "../../components/ui/Workspace.tsx";
 import { useSessionSnapshot, useSessionStore } from "../../session.tsx";
-import { OrderRow, PaymentBadge, shortId, StatusBadge } from "../orders/order-presentation.tsx";
+import {
+  DeliveryDetails,
+  OrderRow,
+  PaymentBadge,
+  shortId,
+  StatusBadge,
+} from "../orders/order-presentation.tsx";
 import { formatDate, formatPrice, initials } from "../workspace/format.ts";
 import { RouterLink, WorkspaceShell } from "../workspace/WorkspaceShell.tsx";
 import { supplierNavItems } from "./supplier-shared.tsx";
 import {
-  acceptSupplierOrder,
+  canCollectCod,
+  canConfirmOrder,
+  canMarkDelivered,
+  canShipOrder,
   canSupplierCancel,
+  collectCodPayment,
   filterSupplierOrders,
   loadSupplierOrders,
   requestSupplierCancellation,
+  setSupplierOrderStatus,
   type SupplierOrder,
 } from "./supplier-orders-api.ts";
 
@@ -62,28 +73,64 @@ type SupplierOrdersProps = {
 };
 
 type Notice = { message: string; state: NoticeState } | null;
-type OrderFilter = "all" | "action" | "accepted" | "cancelled";
+type OrderFilter = "all" | "action" | "open" | "cancelled";
+type FulfillAction = "confirmed" | "shipped" | "delivered" | "collect";
 
 function needsAction(order: SupplierOrder): boolean {
-  return (!order.accepted_at && order.status === "pending") || order.cancel_requested;
+  return (
+    canConfirmOrder(order) ||
+    canShipOrder(order) ||
+    canMarkDelivered(order) ||
+    canCollectCod(order) ||
+    order.cancel_requested
+  );
 }
 
 function matchesFilter(order: SupplierOrder, filter: OrderFilter): boolean {
   if (filter === "all") return true;
   if (filter === "action") return needsAction(order);
-  if (filter === "accepted") return Boolean(order.accepted_at) && order.status !== "cancelled";
+  if (filter === "open") return order.status !== "pending" && order.status !== "cancelled";
   return order.status === "cancelled";
+}
+
+function fulfillCopy(action: FulfillAction): { title: string; body: string; confirm: string } {
+  if (action === "confirmed") {
+    return {
+      title: "Confirm order",
+      body: "Confirm that you can fulfill this order. The retailer will see it as confirmed.",
+      confirm: "Confirm order",
+    };
+  }
+  if (action === "shipped") {
+    return {
+      title: "Mark shipped",
+      body: "Mark this order as shipped using the delivery address on the order.",
+      confirm: "Mark shipped",
+    };
+  }
+  if (action === "delivered") {
+    return {
+      title: "Mark delivered",
+      body: "Mark this order as delivered. The retailer can then verify receipt.",
+      confirm: "Mark delivered",
+    };
+  }
+  return {
+    title: "Record cash collected",
+    body: "Record that cash on delivery was collected. The retailer can then download an invoice.",
+    confirm: "Record cash collected",
+  };
 }
 
 function OrderActions({
   order,
   disabled,
-  onAccept,
+  onFulfill,
   onCancel,
 }: {
   order: SupplierOrder;
   disabled: boolean;
-  onAccept: (order: SupplierOrder) => void;
+  onFulfill: (order: SupplierOrder, action: FulfillAction) => void;
   onCancel: (order: SupplierOrder) => void;
 }) {
   if (order.status === "cancelled") {
@@ -112,13 +159,52 @@ function OrderActions({
 
   return (
     <div className="flex flex-wrap items-center gap-2">
-      {!order.accepted_at && order.status === "pending" ? (
-        <Button size="sm" type="button" disabled={disabled} onClick={() => onAccept(order)}>
+      {canConfirmOrder(order) ? (
+        <Button
+          size="sm"
+          type="button"
+          disabled={disabled}
+          onClick={() => onFulfill(order, "confirmed")}
+        >
           <Check data-icon="inline-start" />
-          Accept order
+          Confirm order
         </Button>
-      ) : order.accepted_at ? (
-        <p className="text-sm text-muted-foreground">Accepted {formatDate(order.accepted_at)}</p>
+      ) : null}
+      {canShipOrder(order) ? (
+        <Button
+          size="sm"
+          type="button"
+          disabled={disabled}
+          onClick={() => onFulfill(order, "shipped")}
+        >
+          Mark shipped
+        </Button>
+      ) : null}
+      {canMarkDelivered(order) ? (
+        <Button
+          size="sm"
+          type="button"
+          disabled={disabled}
+          onClick={() => onFulfill(order, "delivered")}
+        >
+          Mark delivered
+        </Button>
+      ) : null}
+      {canCollectCod(order) ? (
+        <Button
+          variant="outline"
+          size="sm"
+          type="button"
+          disabled={disabled}
+          onClick={() => onFulfill(order, "collect")}
+        >
+          Record cash collected
+        </Button>
+      ) : null}
+      {order.status === "pending" && !canConfirmOrder(order) ? (
+        <p className="text-sm text-muted-foreground">
+          Waiting for online payment before fulfillment
+        </p>
       ) : null}
       {canSupplierCancel(order) ? (
         <Button
@@ -150,7 +236,10 @@ export function SupplierOrders({ loadOrders = loadSupplierOrders }: SupplierOrde
   const [filter, setFilter] = useState<OrderFilter>("all");
   const [notice, setNotice] = useState<Notice>(null);
   const [busyId, setBusyId] = useState<string | null>(null);
-  const [acceptTarget, setAcceptTarget] = useState<SupplierOrder | null>(null);
+  const [fulfillTarget, setFulfillTarget] = useState<{
+    order: SupplierOrder;
+    action: FulfillAction;
+  } | null>(null);
   const [cancelTarget, setCancelTarget] = useState<SupplierOrder | null>(null);
   const [cancelReason, setCancelReason] = useState("");
   const [cancelInvalid, setCancelInvalid] = useState(false);
@@ -182,7 +271,7 @@ export function SupplierOrders({ loadOrders = loadSupplierOrders }: SupplierOrde
     return {
       all: list.length,
       action: list.filter(needsAction).length,
-      accepted: list.filter((order) => Boolean(order.accepted_at) && order.status !== "cancelled")
+      open: list.filter((order) => order.status !== "pending" && order.status !== "cancelled")
         .length,
       cancelled: list.filter((order) => order.status === "cancelled").length,
     };
@@ -210,28 +299,45 @@ export function SupplierOrders({ loadOrders = loadSupplierOrders }: SupplierOrde
     );
   }
 
-  const confirmAccept = () => {
-    const order = acceptTarget;
-    if (!order) return;
-    setAcceptTarget(null);
+  const confirmFulfill = () => {
+    const target = fulfillTarget;
+    if (!target) return;
+    const { order, action } = target;
+    setFulfillTarget(null);
     setBusyId(order.id);
-    void acceptSupplierOrder(order.id)
-      .then((acceptedAt) => {
-        setOrders(
-          (prev) =>
-            prev?.map((current) =>
-              current.id === order.id ? { ...current, accepted_at: acceptedAt } : current,
-            ) ?? prev,
-        );
-        setNotice({
-          message: `Order #${shortId(order.id)} was accepted. The admin team will manage its status.`,
-          state: "success",
-        });
-      })
-      .catch((acceptError: unknown) => {
+    const work =
+      action === "collect"
+        ? collectCodPayment(order.id).then(() => {
+            setOrders(
+              (prev) =>
+                prev?.map((current) =>
+                  current.id === order.id ? { ...current, payment_status: "paid" } : current,
+                ) ?? prev,
+            );
+            setNotice({
+              message: `Cash collected for order #${shortId(order.id)}. The retailer can download an invoice.`,
+              state: "success",
+            });
+          })
+        : setSupplierOrderStatus(order.id, action).then((status) => {
+            setOrders(
+              (prev) =>
+                prev?.map((current) =>
+                  current.id === order.id ? { ...current, status } : current,
+                ) ?? prev,
+            );
+            setNotice({
+              message: `Order #${shortId(order.id)} is now ${status}.`,
+              state: "success",
+            });
+          });
+    void work
+      .catch((fulfillError: unknown) => {
         setNotice({
           message:
-            acceptError instanceof Error ? acceptError.message : "The order could not be accepted.",
+            fulfillError instanceof Error
+              ? fulfillError.message
+              : "The order could not be updated.",
           state: "error",
         });
       })
@@ -295,7 +401,7 @@ export function SupplierOrders({ loadOrders = loadSupplierOrders }: SupplierOrde
     >
       <PageHeader
         title="Orders"
-        copy="Accept incoming orders or request cancellation before delivery is verified. The admin completes all refunds manually."
+        copy="Confirm, ship, and mark delivered using the address on each order. Record COD cash so the retailer can download an invoice."
         actions={
           <Button asChild variant="outline">
             <RouterLink to="/supplier/stock">
@@ -318,7 +424,7 @@ export function SupplierOrders({ loadOrders = loadSupplierOrders }: SupplierOrde
                 <TabsList>
                   <TabsTrigger value="all">All ({counts.all})</TabsTrigger>
                   <TabsTrigger value="action">Needs action ({counts.action})</TabsTrigger>
-                  <TabsTrigger value="accepted">Accepted ({counts.accepted})</TabsTrigger>
+                  <TabsTrigger value="open">Open ({counts.open})</TabsTrigger>
                   <TabsTrigger value="cancelled">Cancelled ({counts.cancelled})</TabsTrigger>
                 </TabsList>
               </Tabs>
@@ -389,9 +495,6 @@ export function SupplierOrders({ loadOrders = loadSupplierOrders }: SupplierOrde
                             <TableCell>
                               <div className="flex flex-wrap items-center gap-1">
                                 <StatusBadge status={order.status} />
-                                {order.accepted_at ? (
-                                  <Badge variant="outline">Accepted</Badge>
-                                ) : null}
                                 {order.cancel_requested ? (
                                   <Badge variant="destructive">
                                     Cancel requested by {order.cancellation_initiator}
@@ -419,6 +522,12 @@ export function SupplierOrders({ loadOrders = loadSupplierOrders }: SupplierOrde
                                 </div>
                               ))}
                             </div>
+                            <DeliveryDetails
+                              phone={order.delivery_phone}
+                              address={order.delivery_address}
+                              city={order.delivery_city}
+                              postcode={order.delivery_postcode}
+                            />
                             {order.notes ? (
                               <p className="text-sm">
                                 <span className="font-medium">Notes: </span>
@@ -434,7 +543,9 @@ export function SupplierOrders({ loadOrders = loadSupplierOrders }: SupplierOrde
                             <OrderActions
                               order={order}
                               disabled={busyId === order.id}
-                              onAccept={setAcceptTarget}
+                              onFulfill={(next, action) =>
+                                setFulfillTarget({ order: next, action })
+                              }
                               onCancel={(next) => {
                                 setCancelReason("");
                                 setCancelInvalid(false);
@@ -468,26 +579,26 @@ export function SupplierOrders({ loadOrders = loadSupplierOrders }: SupplierOrde
       )}
 
       <AlertDialog
-        open={acceptTarget !== null}
+        open={fulfillTarget !== null}
         onOpenChange={(open) => {
-          if (!open) setAcceptTarget(null);
+          if (!open) setFulfillTarget(null);
         }}
       >
         <AlertDialogContent>
           <AlertDialogHeader>
             <AlertDialogTitle>
-              Accept order #{acceptTarget ? shortId(acceptTarget.id) : ""}?
+              {fulfillTarget
+                ? `${fulfillCopy(fulfillTarget.action).title} #${shortId(fulfillTarget.order.id)}?`
+                : ""}
             </AlertDialogTitle>
             <AlertDialogDescription>
-              {acceptTarget
-                ? `Accept the order from ${acceptTarget.retailer_name}. The admin team will manage its status after you accept.`
-                : null}
+              {fulfillTarget ? fulfillCopy(fulfillTarget.action).body : null}
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
             <AlertDialogCancel type="button">Cancel</AlertDialogCancel>
-            <AlertDialogAction type="button" onClick={confirmAccept}>
-              Accept order
+            <AlertDialogAction type="button" onClick={confirmFulfill}>
+              {fulfillTarget ? fulfillCopy(fulfillTarget.action).confirm : "Confirm"}
             </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>

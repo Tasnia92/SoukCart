@@ -52,6 +52,7 @@ import { formatPrice } from "../workspace/format.ts";
 import { RouterLink, WorkspaceShell } from "../workspace/WorkspaceShell.tsx";
 import {
   assertCartWithinStock,
+  assertSingleSupplierCart,
   cartItemCount,
   cartSubtotal,
   clampCartQuantity,
@@ -151,7 +152,12 @@ export function RetailerCart({
     setForm((prev) => ({ ...prev, [name]: value }));
 
   const onStep = (line: CartLine, change: number) => {
-    const next = clampCartQuantity(line.quantity, change, line.product.stock);
+    const next = clampCartQuantity(
+      line.quantity,
+      change,
+      line.product.stock,
+      line.product.min_order_qty,
+    );
     if (next === line.quantity) return;
     setBusyId(line.product.id);
     void updateQuantity(retailerId, line.product.id, next)
@@ -209,6 +215,7 @@ export function RetailerCart({
     setCheckingOut(true);
     try {
       assertCartWithinStock(lines);
+      assertSingleSupplierCart(lines);
       const outcome = await checkout(paymentMethod, { phone, address, city, postcode, notes });
       if ("method" in outcome) {
         await clearRetailerCart(retailerId);
@@ -486,7 +493,7 @@ function CartLineRow({
               variant="outline"
               size="icon-sm"
               aria-label="Decrease quantity"
-              disabled={busy}
+              disabled={busy || quantity <= product.min_order_qty}
               onClick={() => onStep(line, -1)}
             >
               <Minus />
@@ -505,7 +512,10 @@ function CartLineRow({
           </div>
         </CardContent>
         <CardFooter className="justify-between">
-          <span className="text-sm text-muted-foreground">{product.stock} available</span>
+          <span className="text-sm text-muted-foreground">
+            {product.stock} available
+            {product.min_order_qty > 1 ? ` · min ${product.min_order_qty}` : ""}
+          </span>
           <Button
             type="button"
             variant="destructive"
