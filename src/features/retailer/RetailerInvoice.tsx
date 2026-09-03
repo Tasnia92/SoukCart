@@ -1,6 +1,26 @@
 import { useNavigate } from "@tanstack/react-router";
+import {
+  Clock,
+  Download,
+  House,
+  MessageSquare,
+  Package,
+  ShoppingBag,
+  ShoppingCart,
+} from "lucide-react";
 import { useEffect, useState } from "react";
+import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
+import {
+  Card,
+  CardAction,
+  CardContent,
+  CardDescription,
+  CardFooter,
+  CardHeader,
+  CardTitle,
+} from "@/components/ui/card";
+import { Separator } from "@/components/ui/separator";
 import {
   Table,
   TableBody,
@@ -10,13 +30,11 @@ import {
   TableRow,
 } from "@/components/ui/table";
 import { Brand } from "../../components/ui/Brand.tsx";
-import { Icon } from "../../components/ui/Icon.tsx";
 import {
   EmptyState,
   InlineNotice,
   LoadingState,
   PageHeader,
-  TableShell,
   WorkspaceError,
 } from "../../components/ui/Workspace.tsx";
 import { useSessionSnapshot, useSessionStore } from "../../session.tsx";
@@ -97,63 +115,61 @@ export function RetailerInvoice({
   }
 
   return (
-    <WorkspaceShell
-      navigationLabel="Retailer navigation"
-      items={[
-        { to: "/retailer", icon: "home", label: "Overview" },
-        { to: "/retailer/catalog", icon: "bag", label: "Place order" },
-        {
-          to: "/retailer/cart",
-          icon: "cart",
-          label: "Cart",
-          trailing: cartCount || undefined,
-        },
-        { to: "/retailer/orders", icon: "package", label: "My orders", active: true },
-        { to: "/retailer/complaints", icon: "message", label: "Help Center" },
-      ]}
-      userName={userName}
-      userEmail={state.profile.email}
-      onLogout={onLogout}
-    >
-      <PageHeader
-        eyebrow="Invoice"
-        title={`Order ${shortId(orderId)}.`}
-        copy="Download a copy of this invoice for your records."
-        actions={
-          <Button asChild variant="ghost">
-            <RouterLink to="/retailer/orders">
-              <Icon name="package" />
-              <span>Back to orders</span>
-            </RouterLink>
-          </Button>
-        }
-      />
-      <InlineNotice />
-      <div className="rt-invoice-panel">
+    <div className="print:[&_[data-slot=sidebar]]:hidden print:[&_[data-slot=sidebar-gap]]:hidden print:[&_[data-slot=sidebar-inset]>header]:hidden print:[&_[data-slot=sidebar-inset]]:block print:[&_[data-slot=sidebar-inset]>main]:block print:[&_[data-slot=sidebar-inset]>main]:max-w-none print:[&_[data-slot=sidebar-inset]>main]:p-0">
+      <WorkspaceShell
+        navigationLabel="Retailer navigation"
+        items={[
+          { to: "/retailer", icon: House, label: "Overview" },
+          { to: "/retailer/catalog", icon: ShoppingBag, label: "Place order" },
+          {
+            to: "/retailer/cart",
+            icon: ShoppingCart,
+            label: "Cart",
+            trailing: cartCount || undefined,
+          },
+          { to: "/retailer/orders", icon: Package, label: "My orders", active: true },
+          { to: "/retailer/complaints", icon: MessageSquare, label: "Help Center" },
+        ]}
+        userName={userName}
+        userEmail={state.profile.email}
+        onLogout={onLogout}
+      >
+        <div className="print:hidden">
+          <PageHeader
+            eyebrow="Invoice"
+            title={`Order ${shortId(orderId)}.`}
+            copy="Download a copy of this invoice for your records."
+            actions={
+              <Button asChild variant="ghost">
+                <RouterLink to="/retailer/orders">
+                  <Package data-icon="inline-start" />
+                  Back to orders
+                </RouterLink>
+              </Button>
+            }
+          />
+          <InlineNotice />
+        </div>
         {result ? (
           result.kind === "not-found" ? (
             <EmptyState
-              icon="bag"
+              icon={ShoppingBag}
               title="Invoice not found"
               copy="This order could not be loaded."
               action={
                 <Button asChild>
-                  <RouterLink to="/retailer/orders">
-                    <span>Back to orders</span>
-                  </RouterLink>
+                  <RouterLink to="/retailer/orders">Back to orders</RouterLink>
                 </Button>
               }
             />
           ) : result.kind === "unpaid" ? (
             <EmptyState
-              icon="clock"
+              icon={Clock}
               title="Invoice not available yet"
               copy="The invoice appears once the order has been paid."
               action={
                 <Button asChild>
-                  <RouterLink to="/retailer/orders">
-                    <span>Back to orders</span>
-                  </RouterLink>
+                  <RouterLink to="/retailer/orders">Back to orders</RouterLink>
                 </Button>
               }
             />
@@ -167,8 +183,8 @@ export function RetailerInvoice({
         ) : (
           <LoadingState title="Loading the invoice…" />
         )}
-      </div>
-    </WorkspaceShell>
+      </WorkspaceShell>
+    </div>
   );
 }
 
@@ -182,38 +198,56 @@ function InvoiceCard({
   billToEmail: string;
 }) {
   const total = invoiceTotal(order);
+
   return (
-    <div className="rt-invoice">
-      <div className="rt-invoice-head">
-        <Brand variant="dark" />
-        <div className="rt-invoice-meta">
-          <p className="eyebrow">Invoice</p>
-          <h2 className="display-sm">#{shortId(order.id)}</h2>
-          <p>Issued {formatDate(order.created_at)}</p>
+    <Card className="print:break-inside-auto print:overflow-visible print:rounded-none print:bg-background print:shadow-none print:ring-0">
+      <CardHeader className="print:pt-8">
+        <div className="mb-4">
+          <Brand variant="dark" />
         </div>
-      </div>
+        <CardTitle>
+          <h2>Invoice #{shortId(order.id)}</h2>
+        </CardTitle>
+        <CardDescription>Issued {formatDate(order.created_at)}</CardDescription>
+        <CardAction>
+          <Badge>Paid</Badge>
+        </CardAction>
+      </CardHeader>
+      <CardContent className="flex flex-col gap-6 print:gap-4">
+        <div className="grid gap-4 sm:grid-cols-2">
+          <Card size="sm" className="print:shadow-none print:ring-1">
+            <CardHeader>
+              <CardTitle>
+                <h3>Bill to</h3>
+              </CardTitle>
+              <CardDescription>{billToEmail}</CardDescription>
+            </CardHeader>
+            <CardContent>
+              <p className="font-medium">{billToName}</p>
+            </CardContent>
+          </Card>
+          <Card size="sm" className="print:shadow-none print:ring-1">
+            <CardHeader>
+              <CardTitle>
+                <h3>Payment</h3>
+              </CardTitle>
+              <CardDescription>
+                Paid {formatDateTime(order.paid_at ?? order.created_at)}
+              </CardDescription>
+            </CardHeader>
+            <CardContent>
+              <p className="font-medium">SSLCommerz</p>
+            </CardContent>
+          </Card>
+        </div>
 
-      <div className="rt-invoice-grid">
-        <div>
-          <p className="rt-invoice-label">Bill to</p>
-          <strong>{billToName}</strong>
-          <span>{billToEmail}</span>
-        </div>
-        <div>
-          <p className="rt-invoice-label">Payment</p>
-          <strong>SSLCommerz</strong>
-          <span>Paid {formatDateTime(order.paid_at ?? order.created_at)}</span>
-        </div>
-      </div>
-
-      <TableShell>
-        <Table className="rt-invoice-table">
+        <Table>
           <TableHeader>
             <TableRow>
               <TableHead>Item</TableHead>
               <TableHead>Qty</TableHead>
               <TableHead>Unit price</TableHead>
-              <TableHead>Total</TableHead>
+              <TableHead className="text-right">Total</TableHead>
             </TableRow>
           </TableHeader>
           <TableBody>
@@ -222,38 +256,40 @@ function InvoiceCard({
                 <TableCell>{item.product_name}</TableCell>
                 <TableCell>{item.quantity}</TableCell>
                 <TableCell>{formatPrice(item.unit_price)}</TableCell>
-                <TableCell>
+                <TableCell className="text-right">
                   <strong>{formatPrice(item.unit_price * item.quantity)}</strong>
                 </TableCell>
               </TableRow>
             ))}
           </TableBody>
         </Table>
-      </TableShell>
 
-      <div className="rt-invoice-total">
-        <span>Subtotal</span>
-        <strong>{formatPrice(total)}</strong>
-      </div>
+        <Separator />
+        <dl className="grid grid-cols-[1fr_auto] gap-3 text-sm">
+          <dt className="text-muted-foreground">Subtotal</dt>
+          <dd className="text-right text-lg font-semibold tabular-nums">{formatPrice(total)}</dd>
+        </dl>
 
-      <div className="rt-invoice-payment">
-        <p className="rt-invoice-label">Transaction reference</p>
-        <code>{order.tran_id ?? ""}</code>
-        {order.val_id ? <code>{order.val_id}</code> : null}
-        {order.bank_tran_id ? <code>{order.bank_tran_id}</code> : null}
-      </div>
-
-      <div className="rt-invoice-actions">
+        <div className="flex flex-col gap-2">
+          <h3 className="text-sm font-medium">Transaction reference</h3>
+          <code className="break-all text-sm text-muted-foreground">{order.tran_id ?? ""}</code>
+          {order.val_id ? (
+            <code className="break-all text-sm text-muted-foreground">{order.val_id}</code>
+          ) : null}
+          {order.bank_tran_id ? (
+            <code className="break-all text-sm text-muted-foreground">{order.bank_tran_id}</code>
+          ) : null}
+        </div>
+      </CardContent>
+      <CardFooter className="justify-end gap-2 print:hidden">
         <Button type="button" onClick={() => window.print()}>
-          <Icon name="download" />
-          <span>Download PDF</span>
+          <Download data-icon="inline-start" />
+          Download PDF
         </Button>
         <Button asChild variant="ghost">
-          <RouterLink to="/retailer/orders">
-            <span>Back to orders</span>
-          </RouterLink>
+          <RouterLink to="/retailer/orders">Back to orders</RouterLink>
         </Button>
-      </div>
-    </div>
+      </CardFooter>
+    </Card>
   );
 }

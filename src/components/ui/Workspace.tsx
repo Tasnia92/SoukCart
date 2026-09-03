@@ -4,7 +4,7 @@ import type {
   InputHTMLAttributes,
   ReactNode,
 } from "react";
-import { ChevronsUpDown, LogOut } from "lucide-react";
+import { ChevronsUpDown, LogOut, Search, type LucideIcon } from "lucide-react";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { Button } from "@/components/ui/button";
@@ -44,8 +44,8 @@ import {
   useSidebar,
 } from "@/components/ui/sidebar";
 import { Skeleton } from "@/components/ui/skeleton";
+import { cn } from "@/lib/utils";
 import { Brand } from "./Brand.tsx";
-import { Icon, type IconName } from "./Icon.tsx";
 
 export function AppShell({
   sidebar,
@@ -60,21 +60,21 @@ export function AppShell({
     <SidebarProvider
       style={
         {
-          "--sidebar-width": "16rem",
-          "--header-height": "3rem",
+          "--sidebar-width": "17rem",
+          "--header-height": "3.5rem",
         } as CSSProperties
       }
     >
       {sidebar}
       <SidebarInset className="min-w-0">
         {header ?? (
-          <div className="flex h-(--header-height) items-center gap-2 border-b px-3 md:hidden">
+          <div className="flex h-(--header-height) shrink-0 items-center gap-2 border-b px-4">
             <SidebarTrigger />
           </div>
         )}
-        <div className="mx-auto flex w-full max-w-6xl flex-1 flex-col gap-6 p-4 md:p-6 lg:p-8">
+        <main className="mx-auto flex w-full max-w-7xl flex-1 flex-col gap-6 p-4 md:p-6 lg:p-8">
           {children}
-        </div>
+        </main>
       </SidebarInset>
     </SidebarProvider>
   );
@@ -82,7 +82,7 @@ export function AppShell({
 
 export type SidebarItem = {
   href: string;
-  icon: IconName;
+  icon: LucideIcon;
   label: string;
   active?: boolean;
   trailing?: ReactNode;
@@ -107,10 +107,6 @@ function initials(value: string): string {
   return result || "U";
 }
 
-/**
- * User identity block shared by the anchor- and router-based sidebars. Semantic markup only,
- * no bespoke class contract: the name and email are the meaningful, asserted content.
- */
 export function SidebarUser({ userName, userEmail }: { userName: string; userEmail: string }) {
   return (
     <div className="grid flex-1 text-left text-sm leading-tight">
@@ -178,20 +174,20 @@ export function NavUser({
 
 export function SidebarNav({ label, items, userName, userEmail, onLogout }: SidebarNavProps) {
   return (
-    <Sidebar collapsible="none" className="border-r">
+    <Sidebar collapsible="icon">
       <SidebarHeader>
-        <Brand />
+        <Brand className="px-2 py-1 group-data-[collapsible=icon]:overflow-hidden" />
       </SidebarHeader>
       <SidebarContent>
         <SidebarGroup>
           <SidebarGroupLabel>Menu</SidebarGroupLabel>
           <nav aria-label={label}>
             <SidebarMenu>
-              {items.map(({ href, icon, label: itemLabel, active, trailing }) => (
+              {items.map(({ href, icon: ItemIcon, label: itemLabel, active, trailing }) => (
                 <SidebarMenuItem key={href}>
-                  <SidebarMenuButton asChild isActive={active} tooltip={itemLabel}>
-                    <a href={href} aria-current={active ? "page" : undefined}>
-                      <Icon name={icon} />
+                  <SidebarMenuButton asChild isActive={active}>
+                    <a href={href} aria-current={active ? "page" : undefined} title={itemLabel}>
+                      <ItemIcon />
                       <span>{itemLabel}</span>
                     </a>
                   </SidebarMenuButton>
@@ -221,7 +217,7 @@ export function PageHeader({ eyebrow, title, copy, actions }: PageHeaderProps) {
     <header className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
       <div className="flex min-w-0 flex-col gap-1">
         {eyebrow ? <p className="text-sm font-medium text-muted-foreground">{eyebrow}</p> : null}
-        <h1 className="text-2xl font-semibold tracking-tight">{title}</h1>
+        <h1 className="font-heading text-2xl font-semibold tracking-tight md:text-3xl">{title}</h1>
         {copy ? <p className="max-w-2xl text-sm text-muted-foreground">{copy}</p> : null}
       </div>
       {actions ? <div className="flex flex-wrap items-center gap-2">{actions}</div> : null}
@@ -231,7 +227,7 @@ export function PageHeader({ eyebrow, title, copy, actions }: PageHeaderProps) {
 
 export function StatGrid({ label, children }: { label: string; children: ReactNode }) {
   return (
-    <section className="admin-stats" aria-label={label}>
+    <section className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4" aria-label={label}>
       {children}
     </section>
   );
@@ -247,16 +243,14 @@ export function StatCard({
   detail?: ReactNode;
 }) {
   return (
-    <Card className="min-h-32 gap-2 border-0 bg-muted py-6 shadow-none">
-      <CardHeader className="gap-1">
+    <Card size="sm" className="min-h-32">
+      <CardHeader>
         <CardDescription className="text-xs font-medium tracking-widest uppercase">
           {label}
         </CardDescription>
+        <CardTitle className="text-3xl font-semibold tabular-nums">{value}</CardTitle>
       </CardHeader>
-      <CardContent className="flex flex-col gap-1">
-        <CardTitle className="text-3xl">{value}</CardTitle>
-        {detail ? <CardDescription>{detail}</CardDescription> : null}
-      </CardContent>
+      {detail ? <CardContent className="text-muted-foreground">{detail}</CardContent> : null}
     </Card>
   );
 }
@@ -271,7 +265,7 @@ export function SearchToolbar({ label, result, ...inputProps }: SearchToolbarPro
     <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
       <InputGroup className="max-w-sm">
         <InputGroupAddon>
-          <Icon name="search" />
+          <Search />
         </InputGroupAddon>
         <InputGroupInput {...inputProps} type="search" aria-label={label} />
       </InputGroup>
@@ -281,12 +275,7 @@ export function SearchToolbar({ label, result, ...inputProps }: SearchToolbarPro
 }
 
 export function TableShell({ className, ...props }: ComponentPropsWithoutRef<"div">) {
-  return (
-    <div
-      {...props}
-      className={["overflow-hidden rounded-xl border bg-card", className].filter(Boolean).join(" ")}
-    />
-  );
+  return <div {...props} className={cn("overflow-hidden rounded-2xl border bg-card", className)} />;
 }
 
 export type NoticeState = "info" | "success" | "error";
@@ -307,19 +296,19 @@ export function InlineNotice({
 }
 
 type EmptyStateProps = {
-  icon: IconName;
+  icon: LucideIcon;
   title: ReactNode;
   copy?: ReactNode;
   action?: ReactNode;
   role?: "status";
 };
 
-export function EmptyState({ icon, title, copy, action, role }: EmptyStateProps) {
+export function EmptyState({ icon: EmptyIcon, title, copy, action, role }: EmptyStateProps) {
   return (
     <Empty role={role} aria-live={role ? "polite" : undefined}>
       <EmptyHeader>
         <EmptyMedia variant="icon">
-          <Icon name={icon} />
+          <EmptyIcon />
         </EmptyMedia>
         <EmptyTitle>{title}</EmptyTitle>
         {copy ? <EmptyDescription>{copy}</EmptyDescription> : null}
@@ -359,16 +348,22 @@ export function WorkspaceError({
   onLogout,
 }: WorkspaceErrorProps) {
   return (
-    <div className="admin-error-screen">
-      <p className="eyebrow">{eyebrow}</p>
-      <h1 className="display-lg">{title}</h1>
-      <p>{message}</p>
-      <div className="admin-error-actions">
-        <Button onClick={onRetry}>Try again</Button>
-        <Button variant="ghost" onClick={onLogout}>
-          Log out
-        </Button>
-      </div>
-    </div>
+    <main className="flex min-h-svh items-center justify-center p-6">
+      <Empty className="max-w-lg rounded-2xl border bg-card">
+        <EmptyHeader>
+          <EmptyDescription>{eyebrow}</EmptyDescription>
+          <EmptyTitle>{title}</EmptyTitle>
+          <EmptyDescription>{message}</EmptyDescription>
+        </EmptyHeader>
+        <EmptyContent className="flex-row justify-center">
+          <Button type="button" onClick={onRetry}>
+            Try again
+          </Button>
+          <Button type="button" variant="outline" onClick={onLogout}>
+            Log out
+          </Button>
+        </EmptyContent>
+      </Empty>
+    </main>
   );
 }

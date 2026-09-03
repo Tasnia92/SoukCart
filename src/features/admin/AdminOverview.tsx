@@ -1,5 +1,25 @@
 import { useEffect, useState } from "react";
 import {
+  Activity,
+  ArrowRight,
+  Clock3,
+  Mail,
+  MessageSquare,
+  Package,
+  RefreshCw,
+  ShieldCheck,
+  Users,
+} from "lucide-react";
+import { Button } from "@/components/ui/button";
+import {
+  Item,
+  ItemActions,
+  ItemContent,
+  ItemDescription,
+  ItemGroup,
+  ItemTitle,
+} from "@/components/ui/item";
+import {
   ActionQueue,
   DashboardBadge,
   DashboardCard,
@@ -19,8 +39,6 @@ import {
   type DashboardBucket,
   type DashboardSeverity,
 } from "../../components/dashboard/dashboard-model.ts";
-import { Button } from "@/components/ui/button";
-import { Icon } from "../../components/ui/Icon.tsx";
 import { InlineNotice, PageHeader, WorkspaceError } from "../../components/ui/Workspace.tsx";
 import { useSessionSnapshot, useSessionStore } from "../../session.tsx";
 import {
@@ -37,6 +55,7 @@ import {
   type AdminDashboard,
   type AdminRecentOrder,
 } from "./admin-dashboard-api.ts";
+import { ADMIN_NAV_ITEMS } from "./admin-nav.ts";
 
 type AdminOverviewProps = {
   loadDashboard?: () => Promise<AdminDashboard>;
@@ -59,15 +78,15 @@ const recentColumns: DashboardColumn<AdminRecentOrder>[] = [
   {
     key: "order",
     header: "Order",
-    cell: (order) => <span className="db-cell-strong">#{shortId(order.id)}</span>,
+    cell: (order) => <span className="font-medium">#{shortId(order.id)}</span>,
   },
   {
     key: "retailer",
     header: "Retailer",
     cell: (order) => (
-      <span className="db-cell-stack">
-        <span className="db-cell-strong">{order.retailerName}</span>
-        <small>{order.retailerEmail}</small>
+      <span className="flex flex-col gap-1">
+        <span className="font-medium">{order.retailerName}</span>
+        <small className="text-xs text-muted-foreground">{order.retailerEmail}</small>
       </span>
     ),
   },
@@ -77,7 +96,7 @@ const recentColumns: DashboardColumn<AdminRecentOrder>[] = [
     key: "total",
     header: "Total",
     numeric: true,
-    cell: (order) => <span className="db-cell-strong">{formatPrice(order.total)}</span>,
+    cell: (order) => <span className="font-medium">{formatPrice(order.total)}</span>,
   },
   {
     key: "payment",
@@ -94,12 +113,12 @@ const recentColumns: DashboardColumn<AdminRecentOrder>[] = [
     key: "status",
     header: "Status",
     cell: (order) => (
-      <>
+      <div className="flex flex-wrap items-center gap-2">
         <StatusBadge status={order.status} />
         {order.cancelRequested ? (
           <DashboardBadge severity="critical">Cancel requested</DashboardBadge>
         ) : null}
-      </>
+      </div>
     ),
   },
 ];
@@ -112,33 +131,34 @@ function NotificationFeed({
   onMarkRead: (notification: OrderNotification) => void;
 }) {
   return (
-    <ul className="db-feed">
+    <ItemGroup aria-label="System activity notifications">
       {notifications.map((notification) => (
-        <li
-          className={`db-feed-item${notification.read_at ? "" : " is-unread"}`}
-          key={notification.id}
-        >
-          <span className="db-feed-top">
-            <strong>{notification.title}</strong>
+        <Item key={notification.id} variant={notification.read_at ? "default" : "outline"}>
+          <ItemContent>
+            <ItemTitle>{notification.title}</ItemTitle>
+            <ItemDescription>{notification.message}</ItemDescription>
+            <span className="text-xs text-muted-foreground">
+              {formatDateTime(notification.created_at)}
+            </span>
+          </ItemContent>
+          <ItemActions className="self-start">
             {notification.read_at ? null : (
-              <DashboardBadge severity="attention">New</DashboardBadge>
+              <>
+                <DashboardBadge severity="attention">New</DashboardBadge>
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  type="button"
+                  onClick={() => onMarkRead(notification)}
+                >
+                  Mark as read
+                </Button>
+              </>
             )}
-          </span>
-          <p>{notification.message}</p>
-          <small>{formatDateTime(notification.created_at)}</small>
-          {notification.read_at ? null : (
-            <Button
-              variant="link"
-              className="h-auto p-0"
-              type="button"
-              onClick={() => onMarkRead(notification)}
-            >
-              Mark as read
-            </Button>
-          )}
-        </li>
+          </ItemActions>
+        </Item>
       ))}
-    </ul>
+    </ItemGroup>
   );
 }
 
@@ -219,13 +239,7 @@ export function AdminOverview({ loadDashboard = loadAdminDashboard }: AdminOverv
   return (
     <WorkspaceShell
       navigationLabel="Admin navigation"
-      items={[
-        { to: "/admin", icon: "layers", label: "Overview", active: true },
-        { to: "/admin/activity", icon: "activity", label: "Order activity" },
-        { to: "/admin/complaints", icon: "message", label: "Disputes & Claims" },
-        { to: "/admin/verifications", icon: "shield-check", label: "Supplier verifications" },
-        { to: "/admin/users", icon: "person", label: "User directory" },
-      ]}
+      items={ADMIN_NAV_ITEMS.map((item) => ({ ...item, active: item.to === "/admin" }))}
       userName={userName}
       userEmail={state.profile.email}
       onLogout={onLogout}
@@ -235,9 +249,9 @@ export function AdminOverview({ loadDashboard = loadAdminDashboard }: AdminOverv
         title="Command center."
         copy="What moved in the last 30 days, what is blocked right now, and where to act next."
         actions={
-          <Button variant="ghost" disabled={loading} onClick={retry}>
-            <Icon name="refresh" />
-            <span>Refresh</span>
+          <Button type="button" variant="ghost" disabled={loading} onClick={retry}>
+            <RefreshCw data-icon="inline-start" />
+            Refresh
           </Button>
         }
       />
@@ -247,7 +261,7 @@ export function AdminOverview({ loadDashboard = loadAdminDashboard }: AdminOverv
         <>
           <MetricRow label="Marketplace performance and open work">
             <MetricCard
-              icon="activity"
+              icon={Activity}
               label="Revenue"
               value={formatPrice(summary.revenue)}
               period={period}
@@ -257,7 +271,7 @@ export function AdminOverview({ loadDashboard = loadAdminDashboard }: AdminOverv
               linkLabel="Open order activity"
             />
             <MetricCard
-              icon="clock"
+              icon={Clock3}
               label="Orders awaiting action"
               value={summary.ordersAwaitingAction}
               period="Open right now"
@@ -267,7 +281,7 @@ export function AdminOverview({ loadDashboard = loadAdminDashboard }: AdminOverv
               linkLabel="Work the queue"
             />
             <MetricCard
-              icon="message"
+              icon={MessageSquare}
               label="Open disputes"
               value={summary.openDisputes}
               period="Open right now"
@@ -277,7 +291,7 @@ export function AdminOverview({ loadDashboard = loadAdminDashboard }: AdminOverv
               linkLabel="Review disputes"
             />
             <MetricCard
-              icon="person"
+              icon={Users}
               label="Accounts needing setup"
               value={summary.accountsNeedingSetup}
               period="Open right now"
@@ -331,7 +345,7 @@ export function AdminOverview({ loadDashboard = loadAdminDashboard }: AdminOverv
                 <ActionQueue label="Items needing an admin decision" items={dashboard.queue} />
               ) : (
                 <SectionEmpty
-                  icon="shield-check"
+                  icon={ShieldCheck}
                   title="Nothing is blocked"
                   copy="No refunds, cancellation requests or open disputes are waiting on you."
                 />
@@ -355,7 +369,7 @@ export function AdminOverview({ loadDashboard = loadAdminDashboard }: AdminOverv
                 />
               ) : (
                 <SectionEmpty
-                  icon="package"
+                  icon={Package}
                   title="No orders yet"
                   copy="Orders will appear here as soon as retailers start checking out."
                 />
@@ -373,7 +387,7 @@ export function AdminOverview({ loadDashboard = loadAdminDashboard }: AdminOverv
                 <NotificationFeed notifications={dashboard.notifications} onMarkRead={onMarkRead} />
               ) : (
                 <SectionEmpty
-                  icon="mail"
+                  icon={Mail}
                   title="No notifications"
                   copy="Order and refund events will show up here."
                 />
@@ -381,12 +395,14 @@ export function AdminOverview({ loadDashboard = loadAdminDashboard }: AdminOverv
             </DashboardCard>
           </DashboardRow>
 
-          <p className="db-note db-page-note">
-            Need the full ledger?{" "}
-            <RouterLink className="db-link" to="/admin/activity">
-              <span>Open order activity</span>
-              <Icon name="arrow-right" />
-            </RouterLink>
+          <p className="flex flex-wrap items-center gap-1 text-sm text-muted-foreground">
+            Need the full ledger?
+            <Button asChild variant="link" size="sm">
+              <RouterLink to="/admin/activity">
+                Open order activity
+                <ArrowRight data-icon="inline-end" />
+              </RouterLink>
+            </Button>
           </p>
         </>
       ) : (

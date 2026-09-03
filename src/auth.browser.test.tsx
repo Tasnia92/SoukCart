@@ -1,6 +1,4 @@
 import "./tailwind.css";
-import "./theme.css";
-import "./style.css";
 import { act, type ReactNode } from "react";
 import { createRoot, type Root } from "react-dom/client";
 import { describe, expect, it } from "vite-plus/test";
@@ -162,16 +160,14 @@ describe("auth browser behavior", () => {
     try {
       for (const width of [1440, 992, 720, 560]) {
         await page.viewport(width, 900);
-        const layout = element<HTMLElement>(mounted.host, ".auth-layout");
-        const options = element<HTMLElement>(mounted.host, ".form-options");
+        const layout = element<HTMLElement>(mounted.host, "[data-auth-mode]");
         const heading = element<HTMLElement>(mounted.host, "#auth-title");
         const columns = getComputedStyle(layout).gridTemplateColumns.split(" ");
 
         expect(document.documentElement.scrollWidth).toBeLessThanOrEqual(width);
         expect(getComputedStyle(layout).display).toBe("grid");
-        expect(columns.length).toBe(width > 992 ? 2 : 1);
-        expect(getComputedStyle(options).flexDirection).toBe(width <= 560 ? "column" : "row");
-        if (width === 560) expect(getComputedStyle(heading).fontSize).toBe("32px");
+        expect(columns.length).toBe(width >= 1024 ? 2 : 1);
+        if (width === 560) expect(getComputedStyle(heading).fontSize).toBe("30px");
       }
     } finally {
       await page.viewport(1024, 768);

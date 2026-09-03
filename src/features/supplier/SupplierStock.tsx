@@ -1,5 +1,10 @@
 import { useNavigate } from "@tanstack/react-router";
 import { useEffect, useState, type KeyboardEvent } from "react";
+import { Search, Store } from "lucide-react";
+import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { Input } from "@/components/ui/input";
 import {
   Table,
   TableBody,
@@ -8,10 +13,6 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
-import { Badge } from "@/components/ui/badge";
-import { Button } from "@/components/ui/button";
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
-import { Input } from "@/components/ui/input";
 import {
   EmptyState,
   InlineNotice,
@@ -66,17 +67,19 @@ function StockRow({
   return (
     <TableRow data-stock-row={product.id}>
       <TableCell>
-        <strong className="sp-stock-name">{product.name}</strong>
-        <Badge variant={product.stock <= 0 ? "destructive" : "secondary"}>
-          {product.stock <= 0 ? "Out of stock" : "In stock"}
-        </Badge>
+        <div className="flex flex-col items-start gap-1">
+          <strong className="font-medium">{product.name}</strong>
+          <Badge variant={product.stock <= 0 ? "destructive" : "secondary"}>
+            {product.stock <= 0 ? "Out of stock" : "In stock"}
+          </Badge>
+        </div>
       </TableCell>
       <TableCell>{product.unit}</TableCell>
       <TableCell>
         <strong>{product.stock}</strong>
       </TableCell>
       <TableCell>
-        <label className="sp-stock-field">
+        <label className="block min-w-24">
           <span className="sr-only">New stock for {product.name}</span>
           <Input
             type="number"
@@ -89,8 +92,8 @@ function StockRow({
           />
         </label>
       </TableCell>
-      <TableCell className="sp-stock-save">
-        <Button onClick={save} disabled={saving}>
+      <TableCell className="text-right">
+        <Button type="button" onClick={save} disabled={saving}>
           Save
         </Button>
       </TableCell>
@@ -214,8 +217,8 @@ export function SupplierStock({ loadProducts = loadSupplierProducts }: SupplierS
       {products ? (
         <>
           {activeProducts.length ? (
-            <Card className="py-0">
-              <CardHeader className="border-b">
+            <Card>
+              <CardHeader>
                 <CardTitle>Active listings</CardTitle>
                 <CardDescription>
                   Only active listings are shown.{" "}
@@ -224,7 +227,7 @@ export function SupplierStock({ loadProducts = loadSupplierProducts }: SupplierS
                     : "All active products have stock available."}
                 </CardDescription>
               </CardHeader>
-              <CardContent className="py-4">
+              <CardContent className="flex flex-col gap-4">
                 <SearchToolbar
                   label="Search products"
                   placeholder="Search products"
@@ -232,48 +235,46 @@ export function SupplierStock({ loadProducts = loadSupplierProducts }: SupplierS
                   onChange={(event) => setSearchTerm(event.target.value)}
                   result={`${filtered.length} of ${products.length} products`}
                 />
+                {filteredActive.length ? (
+                  <Table>
+                    <TableHeader>
+                      <TableRow>
+                        <TableHead>Product</TableHead>
+                        <TableHead>Unit</TableHead>
+                        <TableHead>Available now</TableHead>
+                        <TableHead>New stock</TableHead>
+                        <TableHead>
+                          <span className="sr-only">Save</span>
+                        </TableHead>
+                      </TableRow>
+                    </TableHeader>
+                    <TableBody>
+                      {filteredActive.map((product) => (
+                        <StockRow
+                          key={`${product.id}:${product.stock}`}
+                          product={product}
+                          onSave={onSave}
+                        />
+                      ))}
+                    </TableBody>
+                  </Table>
+                ) : (
+                  <EmptyState
+                    icon={Search}
+                    title="No matching products"
+                    copy="Try a different search term."
+                  />
+                )}
               </CardContent>
-              {filteredActive.length ? (
-                <Table>
-                  <TableHeader>
-                    <TableRow>
-                      <TableHead>Product</TableHead>
-                      <TableHead>Unit</TableHead>
-                      <TableHead>Available now</TableHead>
-                      <TableHead>New stock</TableHead>
-                      <TableHead>
-                        <span className="sr-only">Save</span>
-                      </TableHead>
-                    </TableRow>
-                  </TableHeader>
-                  <TableBody>
-                    {filteredActive.map((product) => (
-                      <StockRow
-                        key={`${product.id}:${product.stock}`}
-                        product={product}
-                        onSave={onSave}
-                      />
-                    ))}
-                  </TableBody>
-                </Table>
-              ) : (
-                <EmptyState
-                  icon="search"
-                  title="No matching products"
-                  copy="Try a different search term."
-                />
-              )}
             </Card>
           ) : (
             <EmptyState
-              icon="store"
+              icon={Store}
               title="No active products"
               copy="Activate a listing from My products and its stock will appear here."
               action={
                 <Button asChild>
-                  <RouterLink to="/supplier/products">
-                    <span>My products</span>
-                  </RouterLink>
+                  <RouterLink to="/supplier/products">My products</RouterLink>
                 </Button>
               }
             />

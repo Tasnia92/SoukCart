@@ -1,18 +1,30 @@
 import type { AnchorHTMLAttributes } from "react";
+import { cn } from "@/lib/utils";
 
 type BrandProps = Omit<AnchorHTMLAttributes<HTMLAnchorElement>, "aria-label" | "children"> & {
   variant?: "default" | "dark";
 };
 
 export function Brand({ variant = "default", className, ...props }: BrandProps) {
-  const classes = ["brand", variant === "dark" && "brand-dark", className]
-    .filter(Boolean)
-    .join(" ");
-
   return (
-    <a {...props} className={classes} href={props.href ?? "/"} aria-label="SoukCart home">
-      <img className="brand-logo" src="/soukcart-logo.png" alt="" width="1536" height="1024" />
-      <span className="brand-word">SoukCart</span>
+    <a
+      {...props}
+      className={cn(
+        "inline-flex items-center gap-2.5 self-start font-heading text-xl font-semibold no-underline",
+        variant === "dark" ? "text-primary-foreground" : "text-foreground",
+        className,
+      )}
+      href={props.href ?? "/"}
+      aria-label="SoukCart home"
+    >
+      <img
+        className="size-9 object-contain"
+        src="/soukcart-logo.png"
+        alt=""
+        width="36"
+        height="36"
+      />
+      <span>SoukCart</span>
     </a>
   );
 }

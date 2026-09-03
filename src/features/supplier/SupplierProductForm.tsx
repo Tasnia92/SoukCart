@@ -1,7 +1,24 @@
 import { useNavigate } from "@tanstack/react-router";
 import { useEffect, useRef, useState, type FormEvent, type ReactNode } from "react";
+import { ImageIcon } from "lucide-react";
+import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { Button } from "@/components/ui/button";
-import { Field, FieldLabel } from "@/components/ui/field";
+import {
+  Card,
+  CardContent,
+  CardDescription,
+  CardFooter,
+  CardHeader,
+  CardTitle,
+} from "@/components/ui/card";
+import {
+  Field,
+  FieldDescription,
+  FieldGroup,
+  FieldLabel,
+  FieldLegend,
+  FieldSet,
+} from "@/components/ui/field";
 import { Input } from "@/components/ui/input";
 import {
   Select,
@@ -11,7 +28,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { Icon } from "../../components/ui/Icon.tsx";
+import { Textarea } from "@/components/ui/textarea";
 import {
   InlineNotice,
   LoadingState,
@@ -239,11 +256,11 @@ export function SupplierProductForm({
 
   return shell(
     <>
-      <p className="sp-back-row">
+      <div className="flex">
         <Button asChild variant="link" className="h-auto p-0">
           <RouterLink to="/supplier/products">Back to my products</RouterLink>
         </Button>
-      </p>
+      </div>
       <PageHeader
         title={editing ? "Edit product" : "Add a product"}
         copy={
@@ -253,124 +270,154 @@ export function SupplierProductForm({
         }
       />
       <InlineNotice />
-      <form className="sp-form-card" onSubmit={onSubmit} noValidate>
-        <div className="sp-form-grid">
-          <label className="admin-field sp-field-full">
-            <span>Product name</span>
-            <input
-              name="name"
-              type="text"
-              maxLength={120}
-              placeholder="e.g. Miniket rice, 50 kg sack"
-              defaultValue={editing?.name ?? ""}
-              required
-            />
-          </label>
-          <label className="admin-field sp-field-full">
-            <span>Description</span>
-            <textarea
-              name="description"
-              rows={3}
-              maxLength={500}
-              placeholder="Short detail retailers will see"
-              defaultValue={editing?.description ?? ""}
-            />
-          </label>
-          <label className="admin-field">
-            <span>Price (৳)</span>
-            <input
-              name="price"
-              type="number"
-              min="0.01"
-              step="0.01"
-              placeholder="0.01"
-              defaultValue={editing ? String(editing.price) : ""}
-              required
-            />
-          </label>
-          <label className="admin-field">
-            <span>Unit</span>
-            <input
-              name="unit"
-              type="text"
-              maxLength={24}
-              placeholder="kg, crate, piece…"
-              defaultValue={editing ? editing.unit : "piece"}
-              required
-            />
-          </label>
-          <Field>
-            <FieldLabel htmlFor="product-category">Category</FieldLabel>
-            <Select name="category" defaultValue={editing?.category ?? UNCATEGORIZED}>
-              <SelectTrigger id="product-category" className="w-full">
-                <SelectValue />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectGroup>
-                  <SelectItem value={UNCATEGORIZED}>Choose a category</SelectItem>
-                  {PRODUCT_CATEGORIES.map((category) => (
-                    <SelectItem value={category} key={category}>
-                      {category}
-                    </SelectItem>
-                  ))}
-                </SelectGroup>
-              </SelectContent>
-            </Select>
-          </Field>
-          <label className="admin-field">
-            <span>Stock</span>
-            <Input
-              name="stock"
-              type="number"
-              min={isEdit ? "0" : "1"}
-              step="1"
-              defaultValue={editing ? String(editing.stock) : "1"}
-              required
-            />
-            {isEdit ? <small>Set to 0 to mark the product out of stock.</small> : null}
-          </label>
-          <div className="sp-image-picker admin-field">
-            <span>Product image</span>
-            <label className="sp-image-drop" hidden={Boolean(displayUrl)}>
-              <Icon name="image" />
-              <strong>Add a product image</strong>
-              <small>PNG or JPG, up to 5 MB</small>
-              <input
-                ref={fileInputRef}
-                className="sr-only"
-                type="file"
-                name="image"
-                accept="image/png,image/jpeg,image/webp"
-                onChange={onFileChange}
-              />
-            </label>
-            <div className="sp-image-preview-wrap" hidden={!displayUrl}>
-              <img
-                className="sp-image-preview"
-                src={displayUrl ?? ""}
-                alt="Product image preview"
-              />
-              <Button variant="ghost" onClick={onRemoveImage}>
-                <span>Choose a different image</span>
+      <form onSubmit={onSubmit} noValidate>
+        <Card>
+          <CardHeader>
+            <CardTitle>{editing ? "Product details" : "New product details"}</CardTitle>
+            <CardDescription>
+              Add the listing information retailers need before placing an order.
+            </CardDescription>
+          </CardHeader>
+          <CardContent>
+            <FieldSet>
+              <FieldLegend className="sr-only">Product details</FieldLegend>
+              <FieldGroup className="grid grid-cols-1 gap-4 md:grid-cols-2">
+                <Field className="md:col-span-2">
+                  <FieldLabel htmlFor="product-name">Product name</FieldLabel>
+                  <Input
+                    id="product-name"
+                    name="name"
+                    type="text"
+                    maxLength={120}
+                    placeholder="e.g. Miniket rice, 50 kg sack"
+                    defaultValue={editing?.name ?? ""}
+                    required
+                  />
+                </Field>
+                <Field className="md:col-span-2">
+                  <FieldLabel htmlFor="product-description">Description</FieldLabel>
+                  <Textarea
+                    id="product-description"
+                    name="description"
+                    rows={3}
+                    maxLength={500}
+                    placeholder="Short detail retailers will see"
+                    defaultValue={editing?.description ?? ""}
+                  />
+                </Field>
+                <Field>
+                  <FieldLabel htmlFor="product-price">Price (৳)</FieldLabel>
+                  <Input
+                    id="product-price"
+                    name="price"
+                    type="number"
+                    min="0.01"
+                    step="0.01"
+                    placeholder="0.01"
+                    defaultValue={editing ? String(editing.price) : ""}
+                    required
+                  />
+                </Field>
+                <Field>
+                  <FieldLabel htmlFor="product-unit">Unit</FieldLabel>
+                  <Input
+                    id="product-unit"
+                    name="unit"
+                    type="text"
+                    maxLength={24}
+                    placeholder="kg, crate, piece…"
+                    defaultValue={editing ? editing.unit : "piece"}
+                    required
+                  />
+                </Field>
+                <Field>
+                  <FieldLabel htmlFor="product-category">Category</FieldLabel>
+                  <Select name="category" defaultValue={editing?.category ?? UNCATEGORIZED}>
+                    <SelectTrigger id="product-category" className="w-full">
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectGroup>
+                        <SelectItem value={UNCATEGORIZED}>Choose a category</SelectItem>
+                        {PRODUCT_CATEGORIES.map((category) => (
+                          <SelectItem value={category} key={category}>
+                            {category}
+                          </SelectItem>
+                        ))}
+                      </SelectGroup>
+                    </SelectContent>
+                  </Select>
+                </Field>
+                <Field>
+                  <FieldLabel htmlFor="product-stock">Stock</FieldLabel>
+                  <Input
+                    id="product-stock"
+                    name="stock"
+                    type="number"
+                    min={isEdit ? "0" : "1"}
+                    step="1"
+                    defaultValue={editing ? String(editing.stock) : "1"}
+                    required
+                  />
+                  {isEdit ? (
+                    <FieldDescription>Set to 0 to mark the product out of stock.</FieldDescription>
+                  ) : null}
+                </Field>
+                <Field className="md:col-span-2">
+                  <FieldLabel htmlFor="product-image">Product image</FieldLabel>
+                  <label
+                    htmlFor="product-image"
+                    hidden={Boolean(displayUrl)}
+                    className="flex min-h-40 cursor-pointer flex-col items-center justify-center gap-2 rounded-lg border border-dashed p-6 text-center"
+                  >
+                    <ImageIcon aria-hidden="true" />
+                    <span className="font-medium">Add a product image</span>
+                    <span className="text-sm text-muted-foreground">PNG or JPG, up to 5 MB</span>
+                    <input
+                      id="product-image"
+                      ref={fileInputRef}
+                      className="sr-only"
+                      type="file"
+                      name="image"
+                      accept="image/png,image/jpeg,image/webp"
+                      onChange={onFileChange}
+                    />
+                  </label>
+                  <div className="flex flex-col items-start gap-3" hidden={!displayUrl}>
+                    <img
+                      className="max-h-96 w-full rounded-lg border object-contain"
+                      src={displayUrl ?? ""}
+                      alt="Product image preview"
+                    />
+                    <Button type="button" variant="outline" onClick={onRemoveImage}>
+                      Choose a different image
+                    </Button>
+                  </div>
+                </Field>
+              </FieldGroup>
+            </FieldSet>
+          </CardContent>
+          <CardFooter className="flex flex-col items-stretch gap-3">
+            <div className="flex flex-wrap justify-end gap-2">
+              <Button asChild variant="secondary">
+                <RouterLink to="/supplier/products">Cancel</RouterLink>
+              </Button>
+              <Button type="submit" disabled={submitting}>
+                {editing ? "Save changes" : "Create product"}
               </Button>
             </div>
-          </div>
-        </div>
-        <div className="sp-form-actions">
-          <Button asChild variant="secondary">
-            <RouterLink to="/supplier/products">Cancel</RouterLink>
-          </Button>
-          <Button type="submit" disabled={submitting}>
-            <span>{editing ? "Save changes" : "Create product"}</span>
-          </Button>
-        </div>
-        <p
-          className={`admin-form-feedback${feedback ? ` is-visible is-${feedback.state}` : ""}`}
-          role="status"
-          aria-live="polite"
-        >
-          {feedback?.message}
-        </p>
+            <div role="status" aria-live="polite">
+              {feedback ? (
+                <Alert variant={feedback.state === "error" ? "destructive" : "default"}>
+                  <AlertTitle>
+                    {feedback.state === "error" ? "Product update" : "Product status"}
+                  </AlertTitle>
+                  <AlertDescription>{feedback.message}</AlertDescription>
+                </Alert>
+              ) : null}
+            </div>
+          </CardFooter>
+        </Card>
       </form>
     </>,
   );

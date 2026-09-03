@@ -7,6 +7,7 @@
  * tickets; payment reconciliation runs separately, after first paint.
  * -------------------------------------------------------------------------- */
 
+import { Check, RefreshCw, ShoppingBag, ShoppingCart, Truck, type LucideIcon } from "lucide-react";
 import {
   DEFAULT_WINDOW_DAYS,
   ageInDays,
@@ -21,7 +22,6 @@ import {
   type MetricDelta,
   type SectionFailure,
 } from "../../components/dashboard/dashboard-model.ts";
-import type { IconName } from "../../components/ui/Icon.tsx";
 import { loadRetailerComplaints, type RetailerComplaint } from "./retailer-complaints-api.ts";
 import { orderTotal, type RetailerOrder } from "./retailer-orders-api.ts";
 import { loadRetailerOverview } from "./retailer-overview-api.ts";
@@ -44,7 +44,7 @@ export type RetailerNextAction = {
   eyebrow: string;
   title: string;
   copy: string;
-  icon: IconName;
+  icon: LucideIcon;
   severity: DashboardSeverity;
   to: string;
   actionLabel: string;
@@ -143,7 +143,7 @@ export function pickNextAction(
       eyebrow: "Next step",
       title: `Check out ${cartUnits} ${cartUnits === 1 ? "item" : "items"} in your cart`,
       copy: "Your basket is still open. Place the order to lock in current stock and pricing.",
-      icon: "cart",
+      icon: ShoppingCart,
       severity: "attention",
       to: "/retailer/cart",
       actionLabel: "Go to cart",
@@ -157,7 +157,7 @@ export function pickNextAction(
       eyebrow: "Needs attention",
       title: "A payment did not go through",
       copy: "This order will not be dispatched until the payment is settled. Retry it or switch to cash on delivery.",
-      icon: "refresh",
+      icon: RefreshCw,
       severity: "critical",
       to: "/retailer/orders",
       actionLabel: "Review order",
@@ -172,7 +172,7 @@ export function pickNextAction(
       eyebrow: "Next step",
       title: "Confirm a delivery you received",
       copy: "Verifying delivery closes the order and releases it from the cancellation window.",
-      icon: "check",
+      icon: Check,
       severity: "attention",
       to: "/retailer/orders",
       actionLabel: "Confirm delivery",
@@ -189,7 +189,7 @@ export function pickNextAction(
       eyebrow: "In progress",
       title: "Track your nearest delivery",
       copy: `Placed ${age === 0 ? "today" : `${age} ${age === 1 ? "day" : "days"} ago`}, currently ${tracking.status}.`,
-      icon: "truck",
+      icon: Truck,
       severity: "neutral",
       to: "/retailer/orders",
       actionLabel: "Track order",
@@ -202,7 +202,7 @@ export function pickNextAction(
     eyebrow: "Next step",
     title: "Build your next order",
     copy: "Nothing needs your attention. Browse supplier catalogs and start a new order.",
-    icon: "bag",
+    icon: ShoppingBag,
     severity: "neutral",
     to: "/retailer/catalog",
     actionLabel: "Browse catalog",

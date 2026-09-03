@@ -1,5 +1,38 @@
-import { useEffect, useState } from "react";
-import { Field, FieldLabel } from "@/components/ui/field";
+import { useEffect, useState, type FormEvent } from "react";
+import { Activity, RefreshCw, Search } from "lucide-react";
+import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
+import { Avatar, AvatarFallback } from "@/components/ui/avatar";
+import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
+import { Field, FieldError, FieldGroup, FieldLabel } from "@/components/ui/field";
+import { Input } from "@/components/ui/input";
+import {
+  Item,
+  ItemActions,
+  ItemContent,
+  ItemDescription,
+  ItemGroup,
+  ItemTitle,
+} from "@/components/ui/item";
 import {
   Select,
   SelectContent,
@@ -16,8 +49,6 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
-import { Button } from "@/components/ui/button";
-import { Icon } from "../../components/ui/Icon.tsx";
 import {
   EmptyState,
   InlineNotice,
@@ -50,12 +81,30 @@ import {
   type ActivityResponse,
   type CancellationCharges,
 } from "./admin-activity-api.ts";
+import { ADMIN_NAV_ITEMS } from "./admin-nav.ts";
 
 type AdminActivityProps = {
   loadActivity?: () => Promise<ActivityResponse>;
 };
 
 type Notice = { message: string; state: NoticeState } | null;
+
+type ChargeDraft = {
+  order: ActivityOrder;
+  status: string;
+  platformCharge: string;
+  deliveryCharge: string;
+};
+
+type PendingStatusChange = {
+  order: ActivityOrder;
+  status: string;
+  charges: CancellationCharges;
+  approved: boolean;
+  rejecting: boolean;
+  refundAmount: number;
+  message: string;
+};
 
 function nextStatuses(order: ActivityOrder): string[] {
   switch (order.status) {
@@ -72,12 +121,18 @@ function nextStatuses(order: ActivityOrder): string[] {
   }
 }
 
-function readCharge(label: string, current: number): number | null {
-  const value = window.prompt(label, current > 0 ? current.toFixed(2) : "");
-  if (value === null) return null;
+function parseCharge(value: string): number {
   if (!value.trim()) return NaN;
   const amount = Number(value);
   return Number.isFinite(amount) && amount >= 0 ? Math.round(amount * 100) / 100 : NaN;
+}
+
+function initialCharge(value: number): string {
+  return value > 0 ? value.toFixed(2) : "";
+}
+
+function OrderFlag({ children }: { children: string }) {
+  return <Badge variant="outline">{children}</Badge>;
 }
 
 export function AdminActivity({ loadActivity = loadAdminActivity }: AdminActivityProps) {
@@ -90,6 +145,10 @@ export function AdminActivity({ loadActivity = loadAdminActivity }: AdminActivit
   const [searchTerm, setSearchTerm] = useState("");
   const [notice, setNotice] = useState<Notice>(null);
   const [busyId, setBusyId] = useState<string | null>(null);
+  const [chargeDraft, setChargeDraft] = useState<ChargeDraft | null>(null);
+  const [chargeError, setChargeError] = useState<string | null>(null);
+  const [pendingStatusChange, setPendingStatusChange] = useState<PendingStatusChange | null>(null);
+  const [refundConfirmation, setRefundConfirmation] = useState<ActivityOrder | null>(null);
 
   useEffect(() => {
     let current = true;
@@ -134,38 +193,13 @@ export function AdminActivity({ loadActivity = loadAdminActivity }: AdminActivit
     );
   }
 
-  const cancellationCharges = (order: ActivityOrder): CancellationCharges | null => {
-    const hasAdvancePayment = order.payment_method === "online" && order.payment_status === "paid";
-    if (!hasAdvancePayment || order.cancellation_initiator === "supplier") {
-      return { platformCharge: 0, deliveryCharge: 0 };
-    }
-
-    const platformCharge = readCharge("Platform charge to deduct (BDT)", order.platform_charge);
-    if (platformCharge === null) return null;
-    const deliveryCharge = readCharge("Delivery charge to deduct (BDT)", order.delivery_charge);
-    if (deliveryCharge === null) return null;
-    if (!Number.isFinite(platformCharge) || !Number.isFinite(deliveryCharge)) {
-      setNotice({ message: "Enter valid non-negative cancellation charges.", state: "error" });
-      return null;
-    }
-    if (platformCharge + deliveryCharge > order.total) {
-      setNotice({
-        message: "Cancellation charges cannot exceed the paid order total.",
-        state: "error",
-      });
-      return null;
-    }
-    return { platformCharge, deliveryCharge };
-  };
-
-  const changeStatus = (order: ActivityOrder, status: string) => {
+  const queueStatusConfirmation = (
+    order: ActivityOrder,
+    status: string,
+    charges: CancellationCharges,
+  ) => {
     const approved = status === "cancelled" && order.status !== "cancelled";
     const rejecting = order.cancel_requested && status === order.status;
-    const charges = approved
-      ? cancellationCharges(order)
-      : { platformCharge: 0, deliveryCharge: 0 };
-    if (!charges) return;
-
     const refundAmount =
       order.payment_method === "online" && order.payment_status === "paid"
         ? order.cancellation_initiator === "supplier"
@@ -177,8 +211,69 @@ export function AdminActivity({ loadActivity = loadAdminActivity }: AdminActivit
       : approved
         ? `Cancel order #${shortId(order.id)} for ${order.retailer_name}?${refundAmount ? ` Record a pending manual refund of ${formatPrice(refundAmount)}.` : ""}`
         : `Set order #${shortId(order.id)} to ${statusLabel(status)}?`;
-    if (!window.confirm(message)) return;
 
+    setPendingStatusChange({
+      order,
+      status,
+      charges,
+      approved,
+      rejecting,
+      refundAmount,
+      message,
+    });
+  };
+
+  const requestStatusChange = (order: ActivityOrder, status: string) => {
+    const approved = status === "cancelled" && order.status !== "cancelled";
+    const needsCharges =
+      approved &&
+      order.payment_method === "online" &&
+      order.payment_status === "paid" &&
+      order.cancellation_initiator !== "supplier";
+
+    if (needsCharges) {
+      setChargeError(null);
+      setChargeDraft({
+        order,
+        status,
+        platformCharge: initialCharge(order.platform_charge),
+        deliveryCharge: initialCharge(order.delivery_charge),
+      });
+      return;
+    }
+
+    queueStatusConfirmation(order, status, { platformCharge: 0, deliveryCharge: 0 });
+  };
+
+  const onSubmitCharges = (event: FormEvent<HTMLFormElement>) => {
+    event.preventDefault();
+    if (!chargeDraft) return;
+
+    const platformCharge = parseCharge(chargeDraft.platformCharge);
+    const deliveryCharge = parseCharge(chargeDraft.deliveryCharge);
+    if (!Number.isFinite(platformCharge) || !Number.isFinite(deliveryCharge)) {
+      const message = "Enter valid non-negative cancellation charges.";
+      setChargeError(message);
+      setNotice({ message, state: "error" });
+      return;
+    }
+    if (platformCharge + deliveryCharge > chargeDraft.order.total) {
+      const message = "Cancellation charges cannot exceed the paid order total.";
+      setChargeError(message);
+      setNotice({ message, state: "error" });
+      return;
+    }
+
+    const { order, status } = chargeDraft;
+    setChargeDraft(null);
+    setChargeError(null);
+    queueStatusConfirmation(order, status, { platformCharge, deliveryCharge });
+  };
+
+  const confirmStatusChange = () => {
+    if (!pendingStatusChange) return;
+    const { order, status, charges, approved, rejecting, refundAmount } = pendingStatusChange;
+    setPendingStatusChange(null);
     setBusyId(order.id);
     void updateOrderStatus(order.id, status, charges)
       .then(() => {
@@ -214,15 +309,10 @@ export function AdminActivity({ loadActivity = loadAdminActivity }: AdminActivit
       .finally(() => setBusyId(null));
   };
 
-  const onCompleteRefund = (order: ActivityOrder) => {
-    if (
-      !window.confirm(
-        `Confirm that the manual refund of ${formatPrice(order.refund_amount)} for order #${shortId(order.id)} has been paid?`,
-      )
-    ) {
-      return;
-    }
-
+  const confirmCompleteRefund = () => {
+    if (!refundConfirmation) return;
+    const order = refundConfirmation;
+    setRefundConfirmation(null);
     setBusyId(order.id);
     void completeManualRefund(order.id)
       .then(() => {
@@ -246,7 +336,7 @@ export function AdminActivity({ loadActivity = loadAdminActivity }: AdminActivit
 
   const onSelectChange = (order: ActivityOrder, value: string) => {
     if (value === order.status && !order.cancel_requested) return;
-    changeStatus(order, value);
+    requestStatusChange(order, value);
   };
 
   const orders = data?.orders ?? null;
@@ -256,13 +346,10 @@ export function AdminActivity({ loadActivity = loadAdminActivity }: AdminActivit
   return (
     <WorkspaceShell
       navigationLabel="Admin navigation"
-      items={[
-        { to: "/admin", icon: "layers", label: "Overview" },
-        { to: "/admin/activity", icon: "activity", label: "Order activity", active: true },
-        { to: "/admin/complaints", icon: "message", label: "Disputes & Claims" },
-        { to: "/admin/verifications", icon: "shield-check", label: "Supplier verifications" },
-        { to: "/admin/users", icon: "person", label: "User directory" },
-      ]}
+      items={ADMIN_NAV_ITEMS.map((item) => ({
+        ...item,
+        active: item.to === "/admin/activity",
+      }))}
       userName={userName}
       userEmail={state.profile.email}
       onLogout={onLogout}
@@ -272,9 +359,9 @@ export function AdminActivity({ loadActivity = loadAdminActivity }: AdminActivit
         title="Every order, end to end."
         copy="Approve cancellations, calculate refundable amounts, and record manual refunds."
         actions={
-          <Button variant="ghost" disabled={loading} onClick={retry}>
-            <Icon name="refresh" />
-            <span>Refresh</span>
+          <Button type="button" variant="ghost" disabled={loading} onClick={retry}>
+            <RefreshCw data-icon="inline-start" />
+            Refresh
           </Button>
         }
       />
@@ -299,7 +386,7 @@ export function AdminActivity({ loadActivity = loadAdminActivity }: AdminActivit
 
           {orders.length ? (
             <TableShell>
-              <Table className="rt-orders-table">
+              <Table className="min-w-[72rem]">
                 <TableHeader>
                   <TableRow>
                     <TableHead>Order</TableHead>
@@ -324,17 +411,21 @@ export function AdminActivity({ loadActivity = loadAdminActivity }: AdminActivit
                         summaryCells={
                           <>
                             <TableCell>
-                              <strong className="rt-order-id">#{shortId(order.id)}</strong>
+                              <strong className="font-medium">#{shortId(order.id)}</strong>
                             </TableCell>
                             <TableCell>{formatDate(order.created_at)}</TableCell>
                             <TableCell>
-                              <div className="admin-user-cell">
-                                <span className="admin-avatar">
-                                  {initials(order.retailer_name)}
-                                </span>
-                                <span>
-                                  <strong>{order.retailer_name}</strong>
-                                  <small>{order.retailer_email}</small>
+                              <div className="flex items-center gap-3">
+                                <Avatar size="sm">
+                                  <AvatarFallback>{initials(order.retailer_name)}</AvatarFallback>
+                                </Avatar>
+                                <span className="flex min-w-0 flex-col gap-1">
+                                  <strong className="truncate font-medium">
+                                    {order.retailer_name}
+                                  </strong>
+                                  <small className="truncate text-xs text-muted-foreground">
+                                    {order.retailer_email}
+                                  </small>
                                 </span>
                               </div>
                             </TableCell>
@@ -342,7 +433,7 @@ export function AdminActivity({ loadActivity = loadAdminActivity }: AdminActivit
                               {order.lines.reduce((sum, line) => sum + line.quantity, 0)}
                             </TableCell>
                             <TableCell>
-                              <strong>{formatPrice(order.total)}</strong>
+                              <strong className="font-medium">{formatPrice(order.total)}</strong>
                             </TableCell>
                             <TableCell>
                               <PaymentBadge
@@ -352,123 +443,153 @@ export function AdminActivity({ loadActivity = loadAdminActivity }: AdminActivit
                               />
                             </TableCell>
                             <TableCell>
-                              <StatusBadge status={order.status} />
-                              {order.cancel_requested ? (
-                                <span className="rt-cancel-flag">
-                                  Cancel requested by {order.cancellation_initiator}
-                                </span>
-                              ) : null}
-                              {order.delivery_verified_at ? (
-                                <span className="rt-cancel-flag">Delivery verified</span>
-                              ) : null}
-                              {order.manual_refund_status === "review_required" ? (
-                                <span className="rt-cancel-flag">Refund review required</span>
-                              ) : null}
-                              {order.manual_refund_status === "pending" ? (
-                                <span className="rt-cancel-flag">Refund pending</span>
-                              ) : null}
-                              {order.manual_refund_status === "completed" ? (
-                                <span className="rt-cancel-flag">Refund completed</span>
-                              ) : null}
+                              <div className="flex min-w-48 flex-col items-start gap-1">
+                                <StatusBadge status={order.status} />
+                                {order.cancel_requested ? (
+                                  <OrderFlag>
+                                    {`Cancel requested by ${order.cancellation_initiator}`}
+                                  </OrderFlag>
+                                ) : null}
+                                {order.delivery_verified_at ? (
+                                  <OrderFlag>Delivery verified</OrderFlag>
+                                ) : null}
+                                {order.manual_refund_status === "review_required" ? (
+                                  <OrderFlag>Refund review required</OrderFlag>
+                                ) : null}
+                                {order.manual_refund_status === "pending" ? (
+                                  <OrderFlag>Refund pending</OrderFlag>
+                                ) : null}
+                                {order.manual_refund_status === "completed" ? (
+                                  <OrderFlag>Refund completed</OrderFlag>
+                                ) : null}
+                              </div>
                             </TableCell>
                           </>
                         }
                         detail={
-                          <>
-                            {order.lines.map((line) => (
-                              <div className="ad-activity-line" key={line.id}>
-                                <span className="ad-activity-product">
-                                  <strong>{line.product_name}</strong>
-                                  <small>
-                                    from {line.supplier_name ?? "an unassigned supplier"}
-                                  </small>
-                                </span>
-                                <span>
-                                  {line.quantity} × {formatPrice(line.unit_price)}
-                                </span>
-                                <strong>{formatPrice(line.amount)}</strong>
-                              </div>
-                            ))}
+                          <div className="flex flex-col gap-4">
+                            <ItemGroup aria-label={`Order lines for #${shortId(order.id)}`}>
+                              {order.lines.map((line) => (
+                                <Item key={line.id} size="sm">
+                                  <ItemContent>
+                                    <ItemTitle>{line.product_name}</ItemTitle>
+                                    <ItemDescription>
+                                      from {line.supplier_name ?? "an unassigned supplier"}
+                                    </ItemDescription>
+                                  </ItemContent>
+                                  <ItemActions className="flex-wrap">
+                                    <span className="text-sm text-muted-foreground">
+                                      {line.quantity} × {formatPrice(line.unit_price)}
+                                    </span>
+                                    <strong className="text-sm font-medium">
+                                      {formatPrice(line.amount)}
+                                    </strong>
+                                  </ItemActions>
+                                </Item>
+                              ))}
+                            </ItemGroup>
                             {order.cancellation_reason ? (
-                              <p className="rt-order-notes">
-                                <strong>Cancellation reason:</strong> {order.cancellation_reason}
-                              </p>
+                              <Alert>
+                                <AlertTitle>Cancellation reason</AlertTitle>
+                                <AlertDescription>{order.cancellation_reason}</AlertDescription>
+                              </Alert>
                             ) : null}
                             {order.manual_refund_status !== "not_required" ? (
-                              <p className="rt-order-notes">
-                                <strong>Manual refund:</strong> {formatPrice(order.refund_amount)} ·
-                                platform charge {formatPrice(order.platform_charge)} · delivery
-                                charge {formatPrice(order.delivery_charge)}
-                              </p>
+                              <Alert>
+                                <AlertTitle>Manual refund</AlertTitle>
+                                <AlertDescription>
+                                  {formatPrice(order.refund_amount)} · platform charge{" "}
+                                  {formatPrice(order.platform_charge)} · delivery charge{" "}
+                                  {formatPrice(order.delivery_charge)}
+                                </AlertDescription>
+                              </Alert>
                             ) : null}
-                            <div className="ad-order-admin">
-                              <Field orientation="horizontal" className="w-auto">
-                                <FieldLabel>Status</FieldLabel>
-                                <Select
-                                  value={order.status}
-                                  disabled={busyId === order.id}
-                                  onValueChange={(value) => onSelectChange(order, value)}
-                                >
-                                  <SelectTrigger
-                                    className="w-auto min-w-32"
-                                    aria-label={`Order status for #${shortId(order.id)}`}
-                                  >
-                                    <SelectValue />
-                                  </SelectTrigger>
-                                  <SelectContent>
-                                    <SelectGroup>
-                                      {nextStatuses(order).map((value) => (
-                                        <SelectItem value={value} key={value}>
-                                          {statusLabel(value)}
-                                        </SelectItem>
-                                      ))}
-                                    </SelectGroup>
-                                  </SelectContent>
-                                </Select>
-                              </Field>
-                              {order.cancel_requested ? (
-                                <div className="ad-cancel-request">
-                                  <span className="rt-cancel-flag">
-                                    Cancellation requested by {order.cancellation_initiator}
-                                  </span>
-                                  <Button
-                                    variant="destructive"
-                                    size="sm"
-                                    type="button"
+                            <Card size="sm">
+                              <CardHeader>
+                                <CardTitle>Admin controls</CardTitle>
+                                <CardDescription>
+                                  Update status, review cancellation requests, and record refunds.
+                                </CardDescription>
+                              </CardHeader>
+                              <CardContent className="flex flex-col gap-4 lg:flex-row lg:items-end lg:justify-between">
+                                <Field className="max-w-xs">
+                                  <FieldLabel htmlFor={`order-status-${order.id}`}>
+                                    Status
+                                  </FieldLabel>
+                                  <Select
+                                    value={order.status}
                                     disabled={busyId === order.id}
-                                    onClick={() => changeStatus(order, "cancelled")}
+                                    onValueChange={(value) => onSelectChange(order, value)}
                                   >
-                                    Approve &amp; cancel
-                                  </Button>
-                                  <Button
-                                    variant="ghost"
-                                    type="button"
-                                    disabled={busyId === order.id}
-                                    onClick={() => changeStatus(order, order.status)}
-                                  >
-                                    <span>Reject request</span>
-                                  </Button>
+                                    <SelectTrigger
+                                      id={`order-status-${order.id}`}
+                                      className="w-full min-w-32"
+                                      aria-label={`Order status for #${shortId(order.id)}`}
+                                    >
+                                      <SelectValue />
+                                    </SelectTrigger>
+                                    <SelectContent>
+                                      <SelectGroup>
+                                        {nextStatuses(order).map((value) => (
+                                          <SelectItem value={value} key={value}>
+                                            {statusLabel(value)}
+                                          </SelectItem>
+                                        ))}
+                                      </SelectGroup>
+                                    </SelectContent>
+                                  </Select>
+                                </Field>
+                                <div className="flex flex-wrap items-center gap-2">
+                                  {order.cancel_requested ? (
+                                    <>
+                                      <OrderFlag>
+                                        {`Cancellation requested by ${order.cancellation_initiator}`}
+                                      </OrderFlag>
+                                      <Button
+                                        variant="destructive"
+                                        size="sm"
+                                        type="button"
+                                        disabled={busyId === order.id}
+                                        onClick={() => requestStatusChange(order, "cancelled")}
+                                      >
+                                        Approve &amp; cancel
+                                      </Button>
+                                      <Button
+                                        variant="ghost"
+                                        size="sm"
+                                        type="button"
+                                        disabled={busyId === order.id}
+                                        onClick={() => requestStatusChange(order, order.status)}
+                                      >
+                                        Reject request
+                                      </Button>
+                                    </>
+                                  ) : null}
+                                  {order.manual_refund_status === "pending" ? (
+                                    <Button
+                                      type="button"
+                                      size="sm"
+                                      disabled={busyId === order.id}
+                                      onClick={() => setRefundConfirmation(order)}
+                                    >
+                                      Mark manual refund completed
+                                    </Button>
+                                  ) : null}
                                 </div>
-                              ) : null}
-                              {order.manual_refund_status === "pending" ? (
-                                <Button
-                                  type="button"
-                                  disabled={busyId === order.id}
-                                  onClick={() => onCompleteRefund(order)}
-                                >
-                                  <span>Mark manual refund completed</span>
-                                </Button>
-                              ) : null}
-                            </div>
-                          </>
+                              </CardContent>
+                            </Card>
+                          </div>
                         }
                       />
                     ))
                   ) : (
                     <TableRow>
-                      <TableCell className="admin-empty" colSpan={8}>
-                        <strong>No matching orders</strong>
-                        <span>Try a different retailer, supplier, or product.</span>
+                      <TableCell className="p-0" colSpan={8}>
+                        <EmptyState
+                          icon={Search}
+                          title="No matching orders"
+                          copy="Try a different retailer, supplier, or product."
+                        />
                       </TableCell>
                     </TableRow>
                   )}
@@ -476,12 +597,135 @@ export function AdminActivity({ loadActivity = loadAdminActivity }: AdminActivit
               </Table>
             </TableShell>
           ) : (
-            <EmptyState icon="activity" title="No orders yet" copy="New orders show up here." />
+            <EmptyState icon={Activity} title="No orders yet" copy="New orders show up here." />
           )}
         </>
       ) : (
         <LoadingState title="Loading order activity…" />
       )}
+
+      <Dialog
+        open={Boolean(chargeDraft)}
+        onOpenChange={(open) => {
+          if (!open) {
+            setChargeDraft(null);
+            setChargeError(null);
+          }
+        }}
+      >
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Cancellation charges</DialogTitle>
+            <DialogDescription>
+              Enter the charges to deduct before calculating the retailer&apos;s manual refund.
+            </DialogDescription>
+          </DialogHeader>
+          <form onSubmit={onSubmitCharges} noValidate>
+            <FieldGroup>
+              <Field data-invalid={Boolean(chargeError) || undefined}>
+                <FieldLabel htmlFor="platform-cancellation-charge">
+                  Platform charge to deduct (BDT)
+                </FieldLabel>
+                <Input
+                  id="platform-cancellation-charge"
+                  type="number"
+                  inputMode="decimal"
+                  min="0"
+                  step="0.01"
+                  value={chargeDraft?.platformCharge ?? ""}
+                  aria-invalid={Boolean(chargeError) || undefined}
+                  onChange={(event) =>
+                    setChargeDraft((current) =>
+                      current ? { ...current, platformCharge: event.target.value } : current,
+                    )
+                  }
+                />
+              </Field>
+              <Field data-invalid={Boolean(chargeError) || undefined}>
+                <FieldLabel htmlFor="delivery-cancellation-charge">
+                  Delivery charge to deduct (BDT)
+                </FieldLabel>
+                <Input
+                  id="delivery-cancellation-charge"
+                  type="number"
+                  inputMode="decimal"
+                  min="0"
+                  step="0.01"
+                  value={chargeDraft?.deliveryCharge ?? ""}
+                  aria-invalid={Boolean(chargeError) || undefined}
+                  onChange={(event) =>
+                    setChargeDraft((current) =>
+                      current ? { ...current, deliveryCharge: event.target.value } : current,
+                    )
+                  }
+                />
+                {chargeError ? <FieldError>{chargeError}</FieldError> : null}
+              </Field>
+            </FieldGroup>
+            <DialogFooter className="mt-6">
+              <Button
+                type="button"
+                variant="outline"
+                onClick={() => {
+                  setChargeDraft(null);
+                  setChargeError(null);
+                }}
+              >
+                Cancel
+              </Button>
+              <Button type="submit">Continue</Button>
+            </DialogFooter>
+          </form>
+        </DialogContent>
+      </Dialog>
+
+      <AlertDialog
+        open={Boolean(pendingStatusChange)}
+        onOpenChange={(open) => {
+          if (!open) setPendingStatusChange(null);
+        }}
+      >
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Confirm order status change</AlertDialogTitle>
+            <AlertDialogDescription>{pendingStatusChange?.message}</AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel type="button">Cancel</AlertDialogCancel>
+            <AlertDialogAction
+              type="button"
+              variant={pendingStatusChange?.approved ? "destructive" : "default"}
+              onClick={confirmStatusChange}
+            >
+              Confirm
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+
+      <AlertDialog
+        open={Boolean(refundConfirmation)}
+        onOpenChange={(open) => {
+          if (!open) setRefundConfirmation(null);
+        }}
+      >
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Confirm manual refund</AlertDialogTitle>
+            <AlertDialogDescription>
+              {refundConfirmation
+                ? `Confirm that the manual refund of ${formatPrice(refundConfirmation.refund_amount)} for order #${shortId(refundConfirmation.id)} has been paid?`
+                : null}
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel type="button">Cancel</AlertDialogCancel>
+            <AlertDialogAction type="button" onClick={confirmCompleteRefund}>
+              Mark completed
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </WorkspaceShell>
   );
 }

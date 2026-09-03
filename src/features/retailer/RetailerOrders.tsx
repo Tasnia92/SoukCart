@@ -1,5 +1,19 @@
 import { useNavigate } from "@tanstack/react-router";
+import {
+  Check,
+  Download,
+  House,
+  MessageSquare,
+  Package,
+  RefreshCw,
+  ShoppingBag,
+  ShoppingCart,
+  Store,
+  Trash2,
+} from "lucide-react";
 import { useEffect, useState } from "react";
+import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
+import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import {
   Table,
@@ -9,7 +23,6 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
-import { Icon } from "../../components/ui/Icon.tsx";
 import {
   EmptyState,
   InlineNotice,
@@ -56,33 +69,43 @@ function CancelAction({
 }) {
   if (order.status === "cancelled") {
     if (order.manual_refund_status === "review_required") {
-      return <span className="admin-muted">Historical refund requires admin review</span>;
+      return (
+        <p className="text-sm text-muted-foreground">Historical refund requires admin review</p>
+      );
     }
     if (order.manual_refund_status === "pending") {
       return (
-        <span className="admin-muted">
+        <p className="text-sm text-muted-foreground">
           Manual refund pending · {formatPrice(order.refund_amount)}
-        </span>
+        </p>
       );
     }
     if (order.manual_refund_status === "completed") {
       return (
-        <span className="admin-muted">Refund completed · {formatPrice(order.refund_amount)}</span>
+        <p className="text-sm text-muted-foreground">
+          Refund completed · {formatPrice(order.refund_amount)}
+        </p>
       );
     }
-    return <span className="admin-muted">Order cancelled · no advance refund required</span>;
+    return (
+      <p className="text-sm text-muted-foreground">Order cancelled · no advance refund required</p>
+    );
   }
 
   if (order.cancel_requested) {
-    return <span className="admin-muted">Cancellation requested · waiting for admin approval</span>;
+    return (
+      <p className="text-sm text-muted-foreground">
+        Cancellation requested · waiting for admin approval
+      </p>
+    );
   }
 
   if (order.status === "delivered" && order.delivery_verified_at) {
     return (
-      <Button asChild variant="link" className="h-auto p-0">
+      <Button asChild variant="outline" size="sm">
         <a href={`/retailer/complaints?order=${encodeURIComponent(order.id)}`}>
-          <Icon name="message" />
-          <span>Contact support for cancellation or refund</span>
+          <MessageSquare data-icon="inline-start" />
+          Contact support for cancellation or refund
         </a>
       </Button>
     );
@@ -92,26 +115,26 @@ function CancelAction({
     <>
       {order.status === "delivered" ? (
         <Button
-          variant="link"
-          className="h-auto p-0"
           type="button"
+          variant="outline"
+          size="sm"
           disabled={disabled}
           onClick={() => onVerifyDelivery(order)}
         >
-          <Icon name="check" />
-          <span>Verify delivery</span>
+          <Check data-icon="inline-start" />
+          Verify delivery
         </Button>
       ) : null}
       {canCancelOrder(order) ? (
         <Button
-          variant="ghost"
-          className="rt-cancel-button h-auto p-0 text-destructive hover:text-destructive"
           type="button"
+          variant="destructive"
+          size="sm"
           disabled={disabled}
           onClick={() => onCancel(order)}
         >
-          <Icon name="trash" />
-          <span>Request cancellation</span>
+          <Trash2 data-icon="inline-start" />
+          Request cancellation
         </Button>
       ) : null}
     </>
@@ -259,16 +282,16 @@ export function RetailerOrders({
     <WorkspaceShell
       navigationLabel="Retailer navigation"
       items={[
-        { to: "/retailer", icon: "home", label: "Overview" },
-        { to: "/retailer/catalog", icon: "bag", label: "Place order" },
+        { to: "/retailer", icon: House, label: "Overview" },
+        { to: "/retailer/catalog", icon: ShoppingBag, label: "Place order" },
         {
           to: "/retailer/cart",
-          icon: "cart",
+          icon: ShoppingCart,
           label: "Cart",
           trailing: cartCount || undefined,
         },
-        { to: "/retailer/orders", icon: "package", label: "My orders", active: true },
-        { to: "/retailer/complaints", icon: "message", label: "Help Center" },
+        { to: "/retailer/orders", icon: Package, label: "My orders", active: true },
+        { to: "/retailer/complaints", icon: MessageSquare, label: "Help Center" },
       ]}
       userName={userName}
       userEmail={state.profile.email}
@@ -281,8 +304,8 @@ export function RetailerOrders({
         actions={
           <Button asChild>
             <RouterLink to="/retailer/catalog">
-              <Icon name="bag" />
-              <span>Place order</span>
+              <ShoppingBag data-icon="inline-start" />
+              Place order
             </RouterLink>
           </Button>
         }
@@ -292,7 +315,7 @@ export function RetailerOrders({
       {orders ? (
         orders.length ? (
           <TableShell>
-            <Table className="rt-orders-table">
+            <Table>
               <TableHeader>
                 <TableRow>
                   <TableHead>Order</TableHead>
@@ -314,7 +337,7 @@ export function RetailerOrders({
                     summaryCells={
                       <>
                         <TableCell>
-                          <strong className="rt-order-id">#{shortId(order.id)}</strong>
+                          <strong className="font-medium">#{shortId(order.id)}</strong>
                         </TableCell>
                         <TableCell>{formatDate(order.created_at)}</TableCell>
                         <TableCell>
@@ -324,62 +347,78 @@ export function RetailerOrders({
                           <strong>{formatPrice(orderTotal(order))}</strong>
                         </TableCell>
                         <TableCell>
-                          <PaymentBadge
-                            paymentStatus={order.payment_status}
-                            paymentMethod={order.payment_method}
-                          />
-                          <StatusBadge status={order.status} />
-                          {order.delivery_verified_at ? (
-                            <span className="rt-cancel-flag">Delivery verified</span>
-                          ) : null}
+                          <div className="flex flex-wrap gap-2">
+                            <PaymentBadge
+                              paymentStatus={order.payment_status}
+                              paymentMethod={order.payment_method}
+                            />
+                            <StatusBadge status={order.status} />
+                            {order.delivery_verified_at ? (
+                              <Badge variant="secondary">Delivery verified</Badge>
+                            ) : null}
+                          </div>
                         </TableCell>
                       </>
                     }
                     detail={
-                      <>
-                        {order.items.map((item) => (
-                          <div className="rt-order-item-row" key={item.id}>
-                            <span>{item.product_name}</span>
-                            <span>
-                              {item.quantity} × {formatPrice(item.unit_price)}
-                            </span>
-                            <strong>{formatPrice(item.unit_price * item.quantity)}</strong>
-                          </div>
-                        ))}
+                      <div className="flex flex-col gap-4">
+                        <ul className="flex flex-col gap-2">
+                          {order.items.map((item) => (
+                            <li
+                              className="grid gap-1 text-sm sm:grid-cols-[1fr_auto_auto] sm:gap-4"
+                              key={item.id}
+                            >
+                              <span className="font-medium">{item.product_name}</span>
+                              <span className="text-muted-foreground">
+                                {item.quantity} × {formatPrice(item.unit_price)}
+                              </span>
+                              <strong className="sm:text-right">
+                                {formatPrice(item.unit_price * item.quantity)}
+                              </strong>
+                            </li>
+                          ))}
+                        </ul>
                         {order.notes ? (
-                          <p className="rt-order-notes">
-                            <strong>Notes:</strong> {order.notes}
-                          </p>
+                          <Alert role="note">
+                            <MessageSquare />
+                            <AlertTitle>Order notes</AlertTitle>
+                            <AlertDescription>{order.notes}</AlertDescription>
+                          </Alert>
                         ) : null}
                         {order.status === "cancelled" &&
                         order.manual_refund_status !== "not_required" ? (
-                          <p className="rt-order-notes">
-                            <strong>Refund:</strong> {formatPrice(order.refund_amount)} · platform
-                            charge {formatPrice(order.platform_charge)} · delivery charge{" "}
-                            {formatPrice(order.delivery_charge)}
-                          </p>
+                          <Alert role="note">
+                            <RefreshCw />
+                            <AlertTitle>Refund details</AlertTitle>
+                            <AlertDescription>
+                              {formatPrice(order.refund_amount)} · platform charge{" "}
+                              {formatPrice(order.platform_charge)} · delivery charge{" "}
+                              {formatPrice(order.delivery_charge)}
+                            </AlertDescription>
+                          </Alert>
                         ) : null}
-                        <div className="rt-order-detail-actions">
+                        <div className="flex flex-wrap items-center gap-2">
                           {order.payment_status === "paid" ? (
-                            <Button asChild variant="link" className="rt-invoice-link h-auto p-0">
+                            <Button asChild variant="outline" size="sm">
                               <RouterLink
                                 to="/retailer/orders/$orderId/invoice"
                                 params={{ orderId: order.id }}
                               >
-                                <Icon name="download" />
-                                <span>Download invoice</span>
+                                <Download data-icon="inline-start" />
+                                Download invoice
                               </RouterLink>
                             </Button>
                           ) : null}
                           {order.payment_status === "unpaid" && order.tran_id ? (
                             <Button
-                              variant="link"
-                              className="rt-invoice-link h-auto p-0"
+                              type="button"
+                              variant="outline"
+                              size="sm"
                               disabled={busyId === order.id}
                               onClick={() => onVerifyPayment(order)}
                             >
-                              <Icon name="refresh" />
-                              <span>Verify payment</span>
+                              <RefreshCw data-icon="inline-start" />
+                              Verify payment
                             </Button>
                           ) : null}
                           <CancelAction
@@ -389,7 +428,7 @@ export function RetailerOrders({
                             onVerifyDelivery={onVerifyDelivery}
                           />
                         </div>
-                      </>
+                      </div>
                     }
                   />
                 ))}
@@ -398,14 +437,12 @@ export function RetailerOrders({
           </TableShell>
         ) : (
           <EmptyState
-            icon="store"
+            icon={Store}
             title="No orders yet"
             copy="Place your first order and it will show up here."
             action={
               <Button asChild>
-                <RouterLink to="/retailer/catalog">
-                  <span>Place order</span>
-                </RouterLink>
+                <RouterLink to="/retailer/catalog">Place order</RouterLink>
               </Button>
             }
           />

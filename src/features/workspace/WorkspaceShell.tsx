@@ -1,5 +1,5 @@
 import type { ReactNode } from "react";
-import { Icon, type IconName } from "../../components/ui/Icon.tsx";
+import type { LucideIcon } from "lucide-react";
 import { RouterLink } from "../../components/ui/RouterLink.tsx";
 import {
   Breadcrumb,
@@ -9,6 +9,7 @@ import {
   BreadcrumbPage,
   BreadcrumbSeparator,
 } from "@/components/ui/breadcrumb";
+import { Separator } from "@/components/ui/separator";
 import {
   Sidebar,
   SidebarContent,
@@ -20,12 +21,12 @@ import {
   SidebarMenuBadge,
   SidebarMenuButton,
   SidebarMenuItem,
+  SidebarRail,
+  SidebarTrigger,
 } from "@/components/ui/sidebar";
 import { AppShell, NavUser } from "../../components/ui/Workspace.tsx";
 import { NotificationsBell } from "../notifications/NotificationsPanel.tsx";
 
-// Re-exported so the many existing `from "../workspace/WorkspaceShell.tsx"` imports keep working
-// while shared UI primitives import the link from the component layer instead.
 export { RouterLink };
 
 export type WorkspacePath =
@@ -47,7 +48,7 @@ export type WorkspacePath =
 
 export type WorkspaceNavItem = {
   to: WorkspacePath;
-  icon: IconName;
+  icon: LucideIcon;
   label: string;
   active?: boolean;
   trailing?: ReactNode;
@@ -84,7 +85,7 @@ export function WorkspaceShell({
   return (
     <AppShell
       sidebar={
-        <Sidebar collapsible="none" className="border-r">
+        <Sidebar collapsible="icon">
           <SidebarHeader>
             <SidebarMenu>
               <SidebarMenuItem>
@@ -97,7 +98,7 @@ export function WorkspaceShell({
                       height="32"
                       className="size-8 object-contain"
                     />
-                    <span className="text-base font-semibold">SoukCart</span>
+                    <span className="font-heading text-base font-semibold">SoukCart</span>
                   </RouterLink>
                 </SidebarMenuButton>
               </SidebarMenuItem>
@@ -108,16 +109,22 @@ export function WorkspaceShell({
               <SidebarGroupLabel>{role.label}</SidebarGroupLabel>
               <nav aria-label={navigationLabel}>
                 <SidebarMenu>
-                  {items.map(({ to, icon, label, active, trailing }) => (
+                  {items.map(({ to, icon: ItemIcon, label, active, trailing }) => (
                     <SidebarMenuItem key={to}>
-                      <SidebarMenuButton asChild isActive={active} tooltip={label}>
-                        <RouterLink to={to} aria-current={active ? "page" : undefined}>
-                          <Icon name={icon} />
+                      <SidebarMenuButton asChild isActive={active}>
+                        <RouterLink
+                          to={to}
+                          aria-current={active ? "page" : undefined}
+                          title={label}
+                        >
+                          <ItemIcon />
                           <span>{label}</span>
                         </RouterLink>
                       </SidebarMenuButton>
                       {trailing ? (
-                        <SidebarMenuBadge className="rt-nav-badge">{trailing}</SidebarMenuBadge>
+                        <SidebarMenuBadge className="bg-primary text-primary-foreground">
+                          {trailing}
+                        </SidebarMenuBadge>
                       ) : null}
                     </SidebarMenuItem>
                   ))}
@@ -128,13 +135,16 @@ export function WorkspaceShell({
           <SidebarFooter>
             <NavUser userName={userName} userEmail={userEmail} onLogout={onLogout} />
           </SidebarFooter>
+          <SidebarRail />
         </Sidebar>
       }
       header={
         <header className="flex h-(--header-height) shrink-0 items-center gap-2 border-b px-4">
+          <SidebarTrigger />
+          <Separator orientation="vertical" className="mr-1 h-4" />
           <Breadcrumb>
             <BreadcrumbList>
-              <BreadcrumbItem className="hidden md:block">
+              <BreadcrumbItem className="hidden sm:block">
                 {current && current.to !== role.home ? (
                   <BreadcrumbLink asChild>
                     <RouterLink to={role.home}>{role.label}</RouterLink>
@@ -143,9 +153,9 @@ export function WorkspaceShell({
                   <BreadcrumbPage>{role.label}</BreadcrumbPage>
                 )}
               </BreadcrumbItem>
-              {current ? (
+              {current && current.to !== role.home ? (
                 <>
-                  <BreadcrumbSeparator className="hidden md:block" />
+                  <BreadcrumbSeparator className="hidden sm:block" />
                   <BreadcrumbItem>
                     <BreadcrumbPage>{current.label}</BreadcrumbPage>
                   </BreadcrumbItem>

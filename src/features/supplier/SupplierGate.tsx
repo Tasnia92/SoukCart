@@ -9,9 +9,22 @@
  * -------------------------------------------------------------------------- */
 
 import { useEffect, useRef, useState, type FormEvent, type ReactNode } from "react";
-import { Brand } from "../../components/ui/Brand.tsx";
+import { Clock, MessageSquare, RefreshCw, ShieldCheck, type LucideIcon } from "lucide-react";
+import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { Button } from "@/components/ui/button";
-import { Icon, type IconName } from "../../components/ui/Icon.tsx";
+import {
+  Card,
+  CardContent,
+  CardDescription,
+  CardFooter,
+  CardHeader,
+  CardTitle,
+} from "@/components/ui/card";
+import { Field, FieldGroup, FieldLabel, FieldLegend, FieldSet } from "@/components/ui/field";
+import { Input } from "@/components/ui/input";
+import { Skeleton } from "@/components/ui/skeleton";
+import { Textarea } from "@/components/ui/textarea";
+import { Brand } from "../../components/ui/Brand.tsx";
 import { useSessionSnapshot, useSessionStore } from "../../session.tsx";
 import { formatDateTime } from "../workspace/format.ts";
 import {
@@ -45,47 +58,45 @@ function GateFrame({
   onLogout?: () => void;
 }) {
   return (
-    <div className="supplier-gate">
-      <div className="supplier-gate-inner">
-        <Brand />
-        {children}
+    <main className="min-h-svh bg-muted/40 px-4 py-8 sm:py-12">
+      <Card className="mx-auto w-full max-w-2xl">
+        <CardHeader>
+          <Brand />
+        </CardHeader>
+        <CardContent className="flex flex-col gap-6">{children}</CardContent>
         {onLogout ? (
-          <div className="supplier-gate-foot">
-            <span className="supplier-gate-user">
-              <strong>Signed in</strong>
-              <small>{email}</small>
-            </span>
-            <Button variant="secondary" size="sm" onClick={onLogout}>
+          <CardFooter className="flex items-center justify-between gap-4 border-t">
+            <div className="flex min-w-0 flex-col">
+              <span className="text-sm font-medium">Signed in</span>
+              <span className="truncate text-sm text-muted-foreground">{email}</span>
+            </div>
+            <Button type="button" variant="secondary" size="sm" onClick={onLogout}>
               Log out
             </Button>
-          </div>
+          </CardFooter>
         ) : null}
-      </div>
-    </div>
+      </Card>
+    </main>
   );
 }
 
 function StatusPanel({
-  icon,
+  icon: StatusIcon,
   tone,
   title,
   children,
 }: {
-  icon: IconName;
+  icon: LucideIcon;
   tone: "pending" | "rejected";
   title: string;
   children: ReactNode;
 }) {
   return (
-    <div className={`supplier-gate-status is-${tone}`}>
-      <span className="supplier-gate-status-icon">
-        <Icon name={icon} />
-      </span>
-      <div>
-        <strong>{title}</strong>
-        {children}
-      </div>
-    </div>
+    <Alert variant={tone === "rejected" ? "destructive" : "default"}>
+      <StatusIcon />
+      <AlertTitle>{title}</AlertTitle>
+      <AlertDescription className="flex flex-col gap-2">{children}</AlertDescription>
+    </Alert>
   );
 }
 
@@ -152,19 +163,19 @@ function OnboardingForm({
 
   return (
     <>
-      <header className="supplier-gate-head">
-        <p className="eyebrow">Supplier verification</p>
-        <h1 className="display-lg">
+      <header className="flex flex-col gap-2">
+        <p className="text-sm font-medium text-muted-foreground">Supplier verification</p>
+        <h1 className="text-3xl font-semibold tracking-tight sm:text-4xl">
           {isResubmit ? "Update your application." : "Tell us about your shop."}
         </h1>
-        <p>
+        <p className="text-muted-foreground">
           Add your shop details and trade licence. Our team reviews every supplier before your
           storefront goes live.
         </p>
       </header>
 
       {isResubmit ? (
-        <StatusPanel icon="message" tone="rejected" title="Rejected">
+        <StatusPanel icon={MessageSquare} tone="rejected" title="Rejected">
           {verification?.review_note ? (
             <p>
               <strong>Reason:</strong> {verification.review_note}
@@ -175,74 +186,99 @@ function OnboardingForm({
         </StatusPanel>
       ) : null}
 
-      <form className="sp-form-card" onSubmit={onSubmit} noValidate>
-        <div className="sp-form-grid">
-          <label className="admin-field sp-field-full">
-            <span>Shop name</span>
-            <input
-              name="shopName"
-              type="text"
-              maxLength={120}
-              placeholder="e.g. Rahman Traders"
-              defaultValue={verification?.shop_name ?? ""}
-              required
-            />
-          </label>
-          <label className="admin-field sp-field-full">
-            <span>Shop details</span>
-            <textarea
-              name="shopDetails"
-              rows={4}
-              maxLength={2000}
-              placeholder="What do you sell, who do you supply, how long have you traded?"
-              defaultValue={verification?.shop_details ?? ""}
-              required
-            />
-          </label>
-          <label className="admin-field sp-field-full">
-            <span>Location</span>
-            <input
-              name="location"
-              type="text"
-              maxLength={200}
-              placeholder="Shop address or market, city"
-              defaultValue={verification?.location ?? ""}
-              required
-            />
-          </label>
-          <div className="sp-image-picker admin-field sp-field-full">
-            <span>Trade licence</span>
-            <label className="sp-image-drop supplier-license-drop">
-              <Icon name="shield-check" />
-              <strong>{fileName ?? "Upload your trade licence"}</strong>
-              <small>
-                {isResubmit && verification?.trade_license_path
-                  ? "PDF or image up to 5 MB — leave empty to keep your current file"
-                  : "PDF or image (PNG, JPG, WebP), up to 5 MB"}
-              </small>
-              <input
-                ref={fileInputRef}
-                className="sr-only"
-                type="file"
-                name="tradeLicense"
-                accept="application/pdf,image/png,image/jpeg,image/webp"
-                onChange={onFileChange}
-              />
-            </label>
-          </div>
-        </div>
-        <div className="sp-form-actions">
-          <Button type="submit" disabled={submitting}>
-            <span>{isResubmit ? "Resubmit for review" : "Submit for review"}</span>
-          </Button>
-        </div>
-        <p
-          className={`admin-form-feedback${feedback ? ` is-visible is-${feedback.state}` : ""}`}
-          role="status"
-          aria-live="polite"
-        >
-          {feedback?.message}
-        </p>
+      <form onSubmit={onSubmit} noValidate>
+        <Card>
+          <CardHeader>
+            <CardTitle>Shop details</CardTitle>
+            <CardDescription>
+              Tell retailers who you are and provide a valid trade licence for review.
+            </CardDescription>
+          </CardHeader>
+          <CardContent>
+            <FieldSet>
+              <FieldLegend className="sr-only">Supplier application</FieldLegend>
+              <FieldGroup>
+                <Field>
+                  <FieldLabel htmlFor="supplier-shop-name">Shop name</FieldLabel>
+                  <Input
+                    id="supplier-shop-name"
+                    name="shopName"
+                    type="text"
+                    maxLength={120}
+                    placeholder="e.g. Rahman Traders"
+                    defaultValue={verification?.shop_name ?? ""}
+                    required
+                  />
+                </Field>
+                <Field>
+                  <FieldLabel htmlFor="supplier-shop-details">Shop details</FieldLabel>
+                  <Textarea
+                    id="supplier-shop-details"
+                    name="shopDetails"
+                    rows={4}
+                    maxLength={2000}
+                    placeholder="What do you sell, who do you supply, how long have you traded?"
+                    defaultValue={verification?.shop_details ?? ""}
+                    required
+                  />
+                </Field>
+                <Field>
+                  <FieldLabel htmlFor="supplier-location">Location</FieldLabel>
+                  <Input
+                    id="supplier-location"
+                    name="location"
+                    type="text"
+                    maxLength={200}
+                    placeholder="Shop address or market, city"
+                    defaultValue={verification?.location ?? ""}
+                    required
+                  />
+                </Field>
+                <Field>
+                  <FieldLabel htmlFor="supplier-trade-license">Trade licence</FieldLabel>
+                  <label
+                    htmlFor="supplier-trade-license"
+                    className="flex cursor-pointer flex-col items-center justify-center gap-2 rounded-lg border border-dashed p-6 text-center"
+                  >
+                    <ShieldCheck aria-hidden="true" />
+                    <span className="font-medium">{fileName ?? "Upload your trade licence"}</span>
+                    <span className="text-sm text-muted-foreground">
+                      {isResubmit && verification?.trade_license_path
+                        ? "PDF or image up to 5 MB — leave empty to keep your current file"
+                        : "PDF or image (PNG, JPG, WebP), up to 5 MB"}
+                    </span>
+                  </label>
+                  <input
+                    id="supplier-trade-license"
+                    ref={fileInputRef}
+                    className="sr-only"
+                    type="file"
+                    name="tradeLicense"
+                    accept="application/pdf,image/png,image/jpeg,image/webp"
+                    onChange={onFileChange}
+                  />
+                </Field>
+              </FieldGroup>
+            </FieldSet>
+          </CardContent>
+          <CardFooter className="flex flex-col items-stretch gap-3">
+            <div className="flex justify-end">
+              <Button type="submit" disabled={submitting}>
+                {isResubmit ? "Resubmit for review" : "Submit for review"}
+              </Button>
+            </div>
+            <div role="status" aria-live="polite">
+              {feedback ? (
+                <Alert variant={feedback.state === "error" ? "destructive" : "default"}>
+                  <AlertTitle>
+                    {feedback.state === "error" ? "Application update" : "Application status"}
+                  </AlertTitle>
+                  <AlertDescription>{feedback.message}</AlertDescription>
+                </Alert>
+              ) : null}
+            </div>
+          </CardFooter>
+        </Card>
       </form>
     </>
   );
@@ -257,34 +293,50 @@ function PendingScreen({
 }) {
   return (
     <>
-      <header className="supplier-gate-head">
-        <p className="eyebrow">Supplier verification</p>
-        <h1 className="display-lg">Your application is under review.</h1>
-        <p>
+      <header className="flex flex-col gap-2">
+        <p className="text-sm font-medium text-muted-foreground">Supplier verification</p>
+        <h1 className="text-3xl font-semibold tracking-tight sm:text-4xl">
+          Your application is under review.
+        </h1>
+        <p className="text-muted-foreground">
           Thanks, {verification.shop_name}. An admin is reviewing your shop details and trade
           licence. We&apos;ll unlock your supplier workspace as soon as you&apos;re approved.
         </p>
       </header>
 
-      <StatusPanel icon="clock" tone="pending" title="Waiting for admin approval">
+      <StatusPanel icon={Clock} tone="pending" title="Waiting for admin approval">
         <p>Submitted {formatDateTime(verification.created_at)}.</p>
       </StatusPanel>
 
-      <div className="sp-form-actions">
-        <Button variant="secondary" onClick={onRefresh}>
-          <Icon name="refresh" />
-          <span>Check status</span>
+      <div className="flex justify-end">
+        <Button type="button" variant="secondary" onClick={onRefresh}>
+          <RefreshCw data-icon="inline-start" />
+          Check status
         </Button>
       </div>
     </>
   );
 }
 
-function CenteredMessage({ title, copy }: { title: string; copy: string }) {
+function CenteredMessage({
+  title,
+  copy,
+  loading = false,
+}: {
+  title: string;
+  copy: string;
+  loading?: boolean;
+}) {
   return (
-    <header className="supplier-gate-head">
-      <h1 className="display-lg">{title}</h1>
-      <p>{copy}</p>
+    <header className="flex flex-col gap-3">
+      <h1 className="text-3xl font-semibold tracking-tight sm:text-4xl">{title}</h1>
+      <p className="text-muted-foreground">{copy}</p>
+      {loading ? (
+        <div className="flex flex-col gap-2" aria-hidden="true">
+          <Skeleton className="h-4 w-full" />
+          <Skeleton className="h-4 w-2/3" />
+        </div>
+      ) : null}
     </header>
   );
 }
@@ -332,8 +384,10 @@ export function SupplierGate({ children, load = loadSupplierVerification }: Supp
     return (
       <GateFrame email={email} onLogout={onLogout}>
         <CenteredMessage title="We could not load your verification." copy={error} />
-        <div className="sp-form-actions">
-          <Button onClick={reload}>Try again</Button>
+        <div className="flex justify-end">
+          <Button type="button" onClick={reload}>
+            Try again
+          </Button>
         </div>
       </GateFrame>
     );
@@ -342,7 +396,7 @@ export function SupplierGate({ children, load = loadSupplierVerification }: Supp
   if (verification === undefined) {
     return (
       <GateFrame>
-        <CenteredMessage title="Loading…" copy="Fetching your supplier application." />
+        <CenteredMessage title="Loading…" copy="Fetching your supplier application." loading />
       </GateFrame>
     );
   }

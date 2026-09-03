@@ -1,8 +1,19 @@
 import { useNavigate } from "@tanstack/react-router";
 import { useCallback, useEffect, useState } from "react";
+import {
+  Activity,
+  ArrowRight,
+  Check,
+  Clock,
+  Layers,
+  Package,
+  Plus,
+  ShoppingBag,
+  Store,
+} from "lucide-react";
+import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import {
-  DashboardBadge,
   DashboardCard,
   DashboardLink,
   DashboardRow,
@@ -20,7 +31,6 @@ import type {
   DashboardBucket,
   DashboardSeverity,
 } from "../../components/dashboard/dashboard-model.ts";
-import { Icon } from "../../components/ui/Icon.tsx";
 import { InlineNotice, PageHeader, WorkspaceError } from "../../components/ui/Workspace.tsx";
 import { useProductChanges } from "../../product-realtime.ts";
 import { useSessionSnapshot, useSessionStore } from "../../session.tsx";
@@ -63,15 +73,15 @@ const queueColumns: DashboardColumn<SupplierQueueOrder>[] = [
   {
     key: "order",
     header: "Order",
-    cell: (order) => <span className="db-cell-strong">#{shortId(order.id)}</span>,
+    cell: (order) => <span className="font-medium">#{shortId(order.id)}</span>,
   },
   {
     key: "retailer",
     header: "Retailer",
     cell: (order) => (
-      <span className="db-cell-stack">
-        <span className="db-cell-strong">{order.retailerName}</span>
-        <small>{order.retailerEmail}</small>
+      <span className="flex min-w-0 flex-col">
+        <span className="truncate font-medium">{order.retailerName}</span>
+        <span className="truncate text-xs text-muted-foreground">{order.retailerEmail}</span>
       </span>
     ),
   },
@@ -80,37 +90,36 @@ const queueColumns: DashboardColumn<SupplierQueueOrder>[] = [
     key: "value",
     header: "Your value",
     numeric: true,
-    cell: (order) => <span className="db-cell-strong">{formatPrice(order.total)}</span>,
+    cell: (order) => <span className="font-medium">{formatPrice(order.total)}</span>,
   },
   {
     key: "status",
     header: "Status",
     cell: (order) => (
-      <>
+      <div className="flex flex-wrap items-center gap-1">
         <StatusBadge status={order.status} />
-        {order.cancelRequested ? (
-          <DashboardBadge severity="critical">Cancel requested</DashboardBadge>
-        ) : null}
+        {order.cancelRequested ? <Badge variant="destructive">Cancel requested</Badge> : null}
         <PaymentBadge paymentStatus={order.paymentStatus} paymentMethod={order.paymentMethod} />
-      </>
+      </div>
     ),
   },
   {
     key: "age",
     header: "Waiting",
-    cell: (order) => (
-      <span className={order.ageDays >= 1 ? "db-cell-strong" : undefined}>
-        {ageLabel(order.ageDays)}
-      </span>
-    ),
+    cell: (order) =>
+      order.ageDays >= 1 ? (
+        <strong>{ageLabel(order.ageDays)}</strong>
+      ) : (
+        <span>{ageLabel(order.ageDays)}</span>
+      ),
   },
   {
     key: "action",
     header: "Action",
     cell: (order) => (
-      <RouterLink className="db-queue-action" to="/supplier/orders">
+      <RouterLink className="inline-flex items-center gap-1 font-medium" to="/supplier/orders">
         <span>{order.cancelRequested ? "Review" : "Process order"}</span>
-        <Icon name="arrow-right" />
+        <ArrowRight aria-hidden="true" />
       </RouterLink>
     ),
   },
@@ -207,13 +216,13 @@ export function SupplierOverview({ loadDashboard = loadSupplierDashboard }: Supp
           <>
             <Button asChild>
               <RouterLink to="/supplier/orders">
-                <Icon name="package" />
+                <Package data-icon="inline-start" />
                 Process orders
               </RouterLink>
             </Button>
             <Button asChild variant="outline">
               <RouterLink to="/supplier/products/new">
-                <Icon name="plus" />
+                <Plus data-icon="inline-start" />
                 Add product
               </RouterLink>
             </Button>
@@ -226,7 +235,7 @@ export function SupplierOverview({ loadDashboard = loadSupplierDashboard }: Supp
         <>
           <MetricRow label="Sales, fulfillment and inventory health">
             <MetricCard
-              icon="activity"
+              icon={Activity}
               label="Sales"
               value={formatPrice(summary.sales)}
               period={period}
@@ -236,7 +245,7 @@ export function SupplierOverview({ loadDashboard = loadSupplierDashboard }: Supp
               linkLabel="Open orders"
             />
             <MetricCard
-              icon="clock"
+              icon={Clock}
               label="Awaiting fulfillment"
               value={summary.awaitingFulfillment}
               period="Open right now"
@@ -250,7 +259,7 @@ export function SupplierOverview({ loadDashboard = loadSupplierDashboard }: Supp
               linkLabel="Accept orders"
             />
             <MetricCard
-              icon="layers"
+              icon={Layers}
               label="Stock at risk"
               value={summary.stockAtRisk}
               period="Active listings"
@@ -260,7 +269,7 @@ export function SupplierOverview({ loadDashboard = loadSupplierDashboard }: Supp
               linkLabel="Manage stock"
             />
             <MetricCard
-              icon="bag"
+              icon={ShoppingBag}
               label="Active listings"
               value={summary.activeListings}
               period="Visible to retailers"
@@ -332,7 +341,7 @@ export function SupplierOverview({ loadDashboard = loadSupplierDashboard }: Supp
                 />
               ) : (
                 <SectionEmpty
-                  icon="check"
+                  icon={Check}
                   title="Nothing waiting on you"
                   copy="Every incoming order has been accepted. New ones will land here."
                 />
@@ -364,27 +373,30 @@ export function SupplierOverview({ loadDashboard = loadSupplierDashboard }: Supp
               action={<DashboardLink to="/supplier/products">All products</DashboardLink>}
             >
               {dashboard.recentListings.length ? (
-                <ul className="db-listings">
+                <ul className="flex flex-col divide-y">
                   {dashboard.recentListings.map((product) => (
-                    <li className="db-listing" key={product.id}>
-                      <span className="db-listing-art">
+                    <li
+                      className="flex items-center gap-3 py-3 first:pt-0 last:pb-0"
+                      key={product.id}
+                    >
+                      <span className="flex size-12 shrink-0 items-center justify-center overflow-hidden rounded-md bg-muted text-muted-foreground">
                         <ProductThumb product={product} />
                       </span>
-                      <span className="db-listing-body">
-                        <strong>{product.name}</strong>
-                        <small>
+                      <span className="flex min-w-0 flex-1 flex-col gap-1">
+                        <strong className="truncate">{product.name}</strong>
+                        <span className="truncate text-xs text-muted-foreground">
                           {formatPrice(product.price)} per {product.unit} ·{" "}
                           {formatDate(product.created_at)}
-                        </small>
+                        </span>
                       </span>
-                      <span className="db-listing-end">
+                      <span className="shrink-0">
                         <RouterLink
-                          className="db-queue-action"
+                          className="inline-flex items-center gap-1 text-sm font-medium"
                           to="/supplier/products/$productId/edit"
                           params={{ productId: product.id }}
                         >
                           <span>{product.stock} in stock</span>
-                          <Icon name="arrow-right" />
+                          <ArrowRight aria-hidden="true" />
                         </RouterLink>
                       </span>
                     </li>
@@ -392,14 +404,12 @@ export function SupplierOverview({ loadDashboard = loadSupplierDashboard }: Supp
                 </ul>
               ) : (
                 <SectionEmpty
-                  icon="store"
+                  icon={Store}
                   title="No products yet"
                   copy="Add your first product and retailers will see it in the catalog."
                   action={
                     <Button asChild>
-                      <RouterLink to="/supplier/products/new">
-                        <span>Add product</span>
-                      </RouterLink>
+                      <RouterLink to="/supplier/products/new">Add product</RouterLink>
                     </Button>
                   }
                 />

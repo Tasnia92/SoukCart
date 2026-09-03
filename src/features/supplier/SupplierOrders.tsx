@@ -1,6 +1,6 @@
 import { useNavigate } from "@tanstack/react-router";
-import { useMemo, useState, useEffect } from "react";
-import { Check, Layers } from "lucide-react";
+import { useEffect, useMemo, useState } from "react";
+import { Check, Layers, Package, Search } from "lucide-react";
 import {
   AlertDialog,
   AlertDialogAction,
@@ -308,12 +308,12 @@ export function SupplierOrders({ loadOrders = loadSupplierOrders }: SupplierOrde
       <InlineNotice message={notice?.message} state={notice?.state} />
       {orders ? (
         orders.length ? (
-          <Card className="py-0">
-            <CardHeader className="border-b">
+          <Card>
+            <CardHeader>
               <CardTitle>Fulfillment</CardTitle>
               <CardDescription>Orders that include your products</CardDescription>
             </CardHeader>
-            <CardContent className="flex flex-col gap-4 py-4">
+            <CardContent className="flex flex-col gap-4">
               <Tabs value={filter} onValueChange={(value) => setFilter(value as OrderFilter)}>
                 <TabsList>
                   <TabsTrigger value="all">All ({counts.all})</TabsTrigger>
@@ -329,128 +329,136 @@ export function SupplierOrders({ loadOrders = loadSupplierOrders }: SupplierOrde
                 onChange={(event) => setSearchTerm(event.target.value)}
                 result={`${filtered.length} of ${orders.length} orders`}
               />
-            </CardContent>
-            {filtered.length ? (
-              <Table>
-                <TableHeader>
-                  <TableRow>
-                    <TableHead>Order</TableHead>
-                    <TableHead>Placed</TableHead>
-                    <TableHead>Retailer</TableHead>
-                    <TableHead>Units</TableHead>
-                    <TableHead>Total</TableHead>
-                    <TableHead>Payment</TableHead>
-                    <TableHead>Status</TableHead>
-                    <TableHead>
-                      <span className="sr-only">Order lines</span>
-                    </TableHead>
-                  </TableRow>
-                </TableHeader>
-                <TableBody>
-                  {filtered.map((order) => (
-                    <OrderRow
-                      key={order.id}
-                      colSpan={8}
-                      toggleLabel={`Toggle lines for order #${shortId(order.id)}`}
-                      summaryCells={
-                        <>
-                          <TableCell>
-                            <span className="font-medium">#{shortId(order.id)}</span>
-                          </TableCell>
-                          <TableCell>{formatDate(order.created_at)}</TableCell>
-                          <TableCell>
-                            <div className="flex items-center gap-2">
-                              <Avatar size="sm">
-                                <AvatarFallback>{initials(order.retailer_name)}</AvatarFallback>
-                              </Avatar>
-                              <span className="flex min-w-0 flex-col">
-                                <span className="truncate font-medium">{order.retailer_name}</span>
-                                <span className="truncate text-xs text-muted-foreground">
-                                  {order.retailer_email}
+              {filtered.length ? (
+                <Table>
+                  <TableHeader>
+                    <TableRow>
+                      <TableHead>Order</TableHead>
+                      <TableHead>Placed</TableHead>
+                      <TableHead>Retailer</TableHead>
+                      <TableHead>Units</TableHead>
+                      <TableHead>Total</TableHead>
+                      <TableHead>Payment</TableHead>
+                      <TableHead>Status</TableHead>
+                      <TableHead>
+                        <span className="sr-only">Order lines</span>
+                      </TableHead>
+                    </TableRow>
+                  </TableHeader>
+                  <TableBody>
+                    {filtered.map((order) => (
+                      <OrderRow
+                        key={order.id}
+                        colSpan={8}
+                        toggleLabel={`Toggle lines for order #${shortId(order.id)}`}
+                        summaryCells={
+                          <>
+                            <TableCell>
+                              <span className="font-medium">#{shortId(order.id)}</span>
+                            </TableCell>
+                            <TableCell>{formatDate(order.created_at)}</TableCell>
+                            <TableCell>
+                              <div className="flex items-center gap-2">
+                                <Avatar size="sm">
+                                  <AvatarFallback>{initials(order.retailer_name)}</AvatarFallback>
+                                </Avatar>
+                                <span className="flex min-w-0 flex-col">
+                                  <span className="truncate font-medium">
+                                    {order.retailer_name}
+                                  </span>
+                                  <span className="truncate text-xs text-muted-foreground">
+                                    {order.retailer_email}
+                                  </span>
                                 </span>
-                              </span>
-                            </div>
-                          </TableCell>
-                          <TableCell>
-                            {order.items.reduce((sum, item) => sum + item.quantity, 0)}
-                          </TableCell>
-                          <TableCell>
-                            <span className="font-medium">{formatPrice(order.supplier_total)}</span>
-                          </TableCell>
-                          <TableCell>
-                            <PaymentBadge
-                              paymentStatus={order.payment_status}
-                              paymentMethod={order.payment_method}
-                            />
-                          </TableCell>
-                          <TableCell>
-                            <div className="flex flex-wrap items-center gap-1">
-                              <StatusBadge status={order.status} />
-                              {order.accepted_at ? <Badge variant="outline">Accepted</Badge> : null}
-                              {order.cancel_requested ? (
-                                <Badge variant="destructive">
-                                  Cancel requested by {order.cancellation_initiator}
-                                </Badge>
-                              ) : null}
-                            </div>
-                          </TableCell>
-                        </>
-                      }
-                      detail={
-                        <div className="flex flex-col gap-4">
-                          <div className="flex flex-col gap-2">
-                            {order.items.map((item) => (
-                              <div
-                                className="flex items-center justify-between gap-4 text-sm"
-                                key={item.id}
-                              >
-                                <span className="font-medium">{item.product_name}</span>
-                                <span className="text-muted-foreground">
-                                  {item.quantity} × {formatPrice(item.unit_price)}
-                                </span>
-                                <span className="font-medium">{formatPrice(item.line_total)}</span>
                               </div>
-                            ))}
+                            </TableCell>
+                            <TableCell>
+                              {order.items.reduce((sum, item) => sum + item.quantity, 0)}
+                            </TableCell>
+                            <TableCell>
+                              <span className="font-medium">
+                                {formatPrice(order.supplier_total)}
+                              </span>
+                            </TableCell>
+                            <TableCell>
+                              <PaymentBadge
+                                paymentStatus={order.payment_status}
+                                paymentMethod={order.payment_method}
+                              />
+                            </TableCell>
+                            <TableCell>
+                              <div className="flex flex-wrap items-center gap-1">
+                                <StatusBadge status={order.status} />
+                                {order.accepted_at ? (
+                                  <Badge variant="outline">Accepted</Badge>
+                                ) : null}
+                                {order.cancel_requested ? (
+                                  <Badge variant="destructive">
+                                    Cancel requested by {order.cancellation_initiator}
+                                  </Badge>
+                                ) : null}
+                              </div>
+                            </TableCell>
+                          </>
+                        }
+                        detail={
+                          <div className="flex flex-col gap-4">
+                            <div className="flex flex-col gap-2">
+                              {order.items.map((item) => (
+                                <div
+                                  className="flex items-center justify-between gap-4 text-sm"
+                                  key={item.id}
+                                >
+                                  <span className="font-medium">{item.product_name}</span>
+                                  <span className="text-muted-foreground">
+                                    {item.quantity} × {formatPrice(item.unit_price)}
+                                  </span>
+                                  <span className="font-medium">
+                                    {formatPrice(item.line_total)}
+                                  </span>
+                                </div>
+                              ))}
+                            </div>
+                            {order.notes ? (
+                              <p className="text-sm">
+                                <span className="font-medium">Notes: </span>
+                                {order.notes}
+                              </p>
+                            ) : null}
+                            {order.cancellation_reason ? (
+                              <p className="text-sm">
+                                <span className="font-medium">Cancellation reason: </span>
+                                {order.cancellation_reason}
+                              </p>
+                            ) : null}
+                            <OrderActions
+                              order={order}
+                              disabled={busyId === order.id}
+                              onAccept={setAcceptTarget}
+                              onCancel={(next) => {
+                                setCancelReason("");
+                                setCancelInvalid(false);
+                                setCancelTarget(next);
+                              }}
+                            />
                           </div>
-                          {order.notes ? (
-                            <p className="text-sm">
-                              <span className="font-medium">Notes: </span>
-                              {order.notes}
-                            </p>
-                          ) : null}
-                          {order.cancellation_reason ? (
-                            <p className="text-sm">
-                              <span className="font-medium">Cancellation reason: </span>
-                              {order.cancellation_reason}
-                            </p>
-                          ) : null}
-                          <OrderActions
-                            order={order}
-                            disabled={busyId === order.id}
-                            onAccept={setAcceptTarget}
-                            onCancel={(next) => {
-                              setCancelReason("");
-                              setCancelInvalid(false);
-                              setCancelTarget(next);
-                            }}
-                          />
-                        </div>
-                      }
-                    />
-                  ))}
-                </TableBody>
-              </Table>
-            ) : (
-              <EmptyState
-                icon="search"
-                title="No matching orders"
-                copy="Try a different order number, retailer, or product."
-              />
-            )}
+                        }
+                      />
+                    ))}
+                  </TableBody>
+                </Table>
+              ) : (
+                <EmptyState
+                  icon={Search}
+                  title="No matching orders"
+                  copy="Try a different order number, retailer, or product."
+                />
+              )}
+            </CardContent>
           </Card>
         ) : (
           <EmptyState
-            icon="package"
+            icon={Package}
             title="No orders yet"
             copy="Orders that include your products will show up here."
           />
@@ -477,8 +485,10 @@ export function SupplierOrders({ loadOrders = loadSupplierOrders }: SupplierOrde
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
-            <AlertDialogCancel>Cancel</AlertDialogCancel>
-            <AlertDialogAction onClick={confirmAccept}>Accept order</AlertDialogAction>
+            <AlertDialogCancel type="button">Cancel</AlertDialogCancel>
+            <AlertDialogAction type="button" onClick={confirmAccept}>
+              Accept order
+            </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>

@@ -1,3 +1,4 @@
+import { Check, Clock, Minus, ShoppingBag, type LucideIcon } from "lucide-react";
 import { useEffect, useState } from "react";
 import { Button } from "@/components/ui/button";
 import {
@@ -9,7 +10,6 @@ import {
   EmptyTitle,
 } from "@/components/ui/empty";
 import { Brand } from "../../components/ui/Brand.tsx";
-import { Icon, type IconName } from "../../components/ui/Icon.tsx";
 import {
   clearCart,
   completePayment,
@@ -149,10 +149,14 @@ export function PaymentReturn() {
   }, []);
 
   return (
-    <div className="plain-screen">
-      <Brand />
-      <PaymentResultCard outcome={outcome} />
-    </div>
+    <main className="min-h-svh bg-muted/30 p-4 sm:p-8">
+      <div className="mx-auto flex min-h-[calc(100svh-2rem)] max-w-2xl flex-col gap-8 sm:min-h-[calc(100svh-4rem)]">
+        <Brand />
+        <div className="flex flex-1 items-center justify-center">
+          <PaymentResultCard outcome={outcome} />
+        </div>
+      </div>
+    </main>
   );
 }
 
@@ -167,14 +171,14 @@ function resultAction(outcome: Outcome): { href: string; label: string } {
 
 function PaymentResultCard({ outcome }: { outcome: Outcome }) {
   const { state } = outcome;
-  const icon: IconName =
+  const ResultIcon: LucideIcon =
     state === "paid"
-      ? "check"
+      ? Check
       : state === "failed"
-        ? "minus"
+        ? Minus
         : state === "cancelled"
-          ? "clock"
-          : "bag";
+          ? Clock
+          : ShoppingBag;
   const title =
     state === "paid"
       ? "Payment received"
@@ -199,16 +203,14 @@ function PaymentResultCard({ outcome }: { outcome: Outcome }) {
     <Empty role="status" aria-live="polite" data-payment-result>
       <EmptyHeader>
         <EmptyMedia variant="icon">
-          <Icon name={icon} />
+          <ResultIcon />
         </EmptyMedia>
         <EmptyTitle>{title}</EmptyTitle>
         <EmptyDescription>{copy}</EmptyDescription>
       </EmptyHeader>
       <EmptyContent>
         <Button asChild>
-          <a href={action.href}>
-            <span>{action.label}</span>
-          </a>
+          <a href={action.href}>{action.label}</a>
         </Button>
       </EmptyContent>
     </Empty>

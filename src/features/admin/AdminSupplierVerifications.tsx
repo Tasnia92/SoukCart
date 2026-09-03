@@ -1,6 +1,15 @@
 import { useEffect, useState } from "react";
+import { ArrowRight, Clock3, FileText, ImageIcon, Search, ShieldCheck, Store } from "lucide-react";
+import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { Badge } from "@/components/ui/badge";
-import { Icon } from "../../components/ui/Icon.tsx";
+import {
+  Card,
+  CardAction,
+  CardContent,
+  CardFooter,
+  CardHeader,
+  CardTitle,
+} from "@/components/ui/card";
 import {
   EmptyState,
   LoadingState,
@@ -38,64 +47,80 @@ function LicenceThumb({ verification }: { verification: AdminSupplierVerificatio
 
   if (kind === "image" && verification.trade_license_url) {
     return (
-      <span className="sv-thumb">
-        <img src={verification.trade_license_url} alt={`${verification.shop_name} trade licence`} />
-      </span>
+      <div className="aspect-video overflow-hidden rounded-xl border">
+        <img
+          className="size-full object-cover"
+          src={verification.trade_license_url}
+          alt={`${verification.shop_name} trade licence`}
+        />
+      </div>
     );
   }
 
+  const PlaceholderIcon = kind === "pdf" ? FileText : ImageIcon;
   return (
-    <span className={`sv-thumb is-placeholder is-${kind}`}>
-      <Icon name={kind === "pdf" ? "package" : "image"} />
-      <small>{kind === "pdf" ? "PDF" : "Licence"}</small>
-    </span>
+    <div className="flex aspect-video flex-col items-center justify-center gap-2 rounded-xl border bg-muted text-muted-foreground">
+      <PlaceholderIcon className="size-8" aria-hidden="true" />
+      <small className="text-xs font-medium">{kind === "pdf" ? "PDF" : "Licence"}</small>
+    </div>
   );
 }
 
 function VerificationCard({ verification }: { verification: AdminSupplierVerification }) {
   return (
     <RouterLink
-      className="sv-card"
+      className="block h-full rounded-2xl outline-none focus-visible:ring-2 focus-visible:ring-ring"
       to="/admin/verifications/$userId"
       params={{ userId: verification.user_id }}
     >
-      <LicenceThumb verification={verification} />
-      <span className="sv-card-body">
-        <span className="sv-card-head">
-          <strong>{verification.shop_name}</strong>
-          <Badge
-            variant={
-              verification.status === "rejected"
-                ? "destructive"
-                : verification.status === "approved"
-                  ? "default"
-                  : "outline"
-            }
-          >
-            {STATUS_LABELS[verification.status]}
-          </Badge>
-        </span>
-        <span className="sv-card-supplier">
-          <span className="admin-avatar">{initials(verification.supplier_name)}</span>
-          <span>
-            <strong>{verification.supplier_name || "Unnamed supplier"}</strong>
-            <small>{verification.supplier_email}</small>
-          </span>
-        </span>
-        <span className="sv-card-meta">
-          <span>
-            <Icon name="store" />
-            {verification.location}
-          </span>
-          <span>
-            <Icon name="clock" />
-            {formatDateTime(verification.created_at)}
-          </span>
-        </span>
-      </span>
-      <span className="sv-card-go" aria-hidden="true">
-        <Icon name="arrow-right" />
-      </span>
+      <Card className="h-full">
+        <CardHeader>
+          <CardTitle>{verification.shop_name}</CardTitle>
+          <CardAction>
+            <Badge
+              variant={
+                verification.status === "rejected"
+                  ? "destructive"
+                  : verification.status === "approved"
+                    ? "default"
+                    : "outline"
+              }
+            >
+              {STATUS_LABELS[verification.status]}
+            </Badge>
+          </CardAction>
+        </CardHeader>
+        <CardContent className="flex flex-col gap-4">
+          <LicenceThumb verification={verification} />
+          <div className="flex items-center gap-3">
+            <Avatar size="sm">
+              <AvatarFallback>{initials(verification.supplier_name)}</AvatarFallback>
+            </Avatar>
+            <span className="flex min-w-0 flex-col gap-1">
+              <strong className="truncate font-medium">
+                {verification.supplier_name || "Unnamed supplier"}
+              </strong>
+              <small className="truncate text-xs text-muted-foreground">
+                {verification.supplier_email}
+              </small>
+            </span>
+          </div>
+          <div className="flex flex-col gap-2 text-sm text-muted-foreground">
+            <span className="flex items-center gap-2">
+              <Store className="size-4 shrink-0" aria-hidden="true" />
+              {verification.location}
+            </span>
+            <span className="flex items-center gap-2">
+              <Clock3 className="size-4 shrink-0" aria-hidden="true" />
+              {formatDateTime(verification.created_at)}
+            </span>
+          </div>
+        </CardContent>
+        <CardFooter className="text-sm font-medium">
+          Review application
+          <ArrowRight className="ml-auto size-4" aria-hidden="true" />
+        </CardFooter>
+      </Card>
     </RouterLink>
   );
 }
@@ -189,21 +214,21 @@ export function AdminSupplierVerifications({
 
           {verifications.length ? (
             filtered.length ? (
-              <div className="sv-grid">
+              <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
                 {filtered.map((verification) => (
                   <VerificationCard key={verification.user_id} verification={verification} />
                 ))}
               </div>
             ) : (
               <EmptyState
-                icon="search"
+                icon={Search}
                 title="No matching applications"
                 copy="Try a different shop, supplier, or location."
               />
             )
           ) : (
             <EmptyState
-              icon="shield-check"
+              icon={ShieldCheck}
               title="No supplier applications yet"
               copy="New supplier submissions will appear here for review."
             />

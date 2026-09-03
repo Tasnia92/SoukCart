@@ -1,6 +1,4 @@
 import "../tailwind.css";
-import "../theme.css";
-import "../style.css";
 import type { Session } from "@supabase/supabase-js";
 import {
   createMemoryHistory,

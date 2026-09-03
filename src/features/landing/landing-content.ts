@@ -8,7 +8,14 @@
  * The section ids are declared in LandingPage.tsx.
  * -------------------------------------------------------------------------- */
 
-import type { IconName } from "../../components/ui/Icon.tsx";
+import {
+  PackageIcon,
+  SearchIcon,
+  ShoppingCartIcon,
+  StoreIcon,
+  TruckIcon,
+  type LucideIcon,
+} from "lucide-react";
 
 export const SECTION_IDS = {
   platform: "platform",
@@ -23,7 +30,6 @@ export const NAV_LINKS = [
   { label: "About", href: `#${SECTION_IDS.platform}` },
 ] as const;
 
-/* Overlay cards on the hero illustration — the four handoffs of one order. */
 export const HANDOFF_STEPS = [
   { step: "01", title: "Supplier Stock", detail: "Ready to fulfill" },
   { step: "02", title: "Picked & Packed", detail: "Order confirmed" },
@@ -32,53 +38,53 @@ export const HANDOFF_STEPS = [
 ] as const;
 
 export const PLATFORM_HIGHLIGHTS: {
-  icon: IconName;
+  icon: LucideIcon;
   title: string;
   copy: string;
 }[] = [
   {
-    icon: "package",
+    icon: PackageIcon,
     title: "Clear product details",
     copy: "Keep product information, quantities, and order expectations easy to understand.",
   },
   {
-    icon: "cart",
+    icon: ShoppingCartIcon,
     title: "Straightforward ordering",
     copy: "Give retailers a simpler way to move from choosing products to placing an order.",
   },
   {
-    icon: "truck",
+    icon: TruckIcon,
     title: "One connected workflow",
     copy: "Keep suppliers and retailers aligned from confirmation through delivery.",
   },
 ];
 
 export const FLOW_STEPS: {
-  icon: IconName;
+  icon: LucideIcon;
   step: string;
   title: string;
   copy: string;
 }[] = [
   {
-    icon: "search",
+    icon: SearchIcon,
     step: "01",
     title: "Discover Products",
     copy: "Browse from a wide range of wholesale essentials.",
   },
   {
-    icon: "cart",
+    icon: ShoppingCartIcon,
     step: "02",
     title: "Place Order",
     copy: "Order against real-time stock with best pricing.",
   },
   {
-    icon: "truck",
+    icon: TruckIcon,
     step: "03",
     title: "Track Every Step",
     copy: "Follow your order from supplier to your shop.",
   },
   {
-    icon: "store",
+    icon: StoreIcon,
     step: "04",
     title: "Receive & Restock",
     copy: "Get delivered on time and restock with ease.",
@@ -124,6 +130,5 @@ export const LEGAL_LINKS = [
   { label: "Cookie Policy", href: `#${SECTION_IDS.join}` },
 ] as const;
 
-/* Mirrors the placeholder feedback pattern already used across auth. */
 export const NEWSLETTER_FEEDBACK =
   "Email updates will be available when the mailing list is connected.";

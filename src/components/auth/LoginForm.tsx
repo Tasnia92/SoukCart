@@ -1,7 +1,8 @@
 import type { FormEvent } from "react";
-import { Button } from "../ui/button.tsx";
-import { Checkbox } from "../ui/checkbox.tsx";
-import { Field as UIField, FieldGroup, FieldLabel } from "../ui/field.tsx";
+import { LockKeyholeIcon, MailIcon } from "lucide-react";
+import { Button } from "@/components/ui/button";
+import { Checkbox } from "@/components/ui/checkbox";
+import { Field as UIField, FieldGroup, FieldLabel } from "@/components/ui/field";
 import { Field } from "./Field.tsx";
 import type { AuthFeedback, AuthFormSubmitHandler, LoginCredentials } from "./types.ts";
 
@@ -42,17 +43,18 @@ export function LoginForm({
     });
   };
 
-  const feedbackClassName = feedback
-    ? `form-feedback is-visible is-${feedback.state ?? "info"}`
-    : "form-feedback";
+  const feedbackClassName =
+    feedback?.state === "error"
+      ? "min-h-5 text-sm font-medium text-destructive"
+      : "min-h-5 text-sm text-muted-foreground";
 
   return (
-    <form className="auth-form" data-auth-form="login" onSubmit={handleSubmit}>
-      <FieldGroup className="field-stack">
+    <form className="flex flex-col gap-5" data-auth-form="login" onSubmit={handleSubmit}>
+      <FieldGroup>
         <Field
           autoComplete="email"
           id="login-email"
-          icon="mail"
+          icon={MailIcon}
           label="Email address"
           name="email"
           placeholder="Enter your email"
@@ -61,7 +63,7 @@ export function LoginForm({
         <Field
           autoComplete="current-password"
           id="login-password"
-          icon="lock"
+          icon={LockKeyholeIcon}
           label="Password"
           name="password"
           placeholder="Enter your password"
@@ -69,14 +71,16 @@ export function LoginForm({
         />
       </FieldGroup>
 
-      <div className="form-options">
+      <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
         <UIField orientation="horizontal">
           <Checkbox id="login-remember" name="remember" />
           <FieldLabel htmlFor="login-remember">Keep me signed in</FieldLabel>
         </UIField>
         {showForgotPassword ? (
           <Button
+            type="button"
             variant="link"
+            size="sm"
             data-forgot-password=""
             disabled={pending}
             onClick={onForgotPassword}
@@ -94,10 +98,12 @@ export function LoginForm({
         {feedback?.message}
       </p>
       {showCreateAccount ? (
-        <p className="auth-switch">
+        <p className="text-center text-sm text-muted-foreground">
           New to SoukCart?{" "}
           <Button
+            type="button"
             variant="link"
+            size="sm"
             data-switch-auth="register"
             disabled={pending}
             onClick={onSwitchToRegister}

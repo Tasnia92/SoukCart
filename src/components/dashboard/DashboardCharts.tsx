@@ -1,12 +1,14 @@
-/* -----------------------------------------------------------------------------
- * Dashboard charts — hand-authored inline SVG on SoukCart's own tokens.
- * -----------------------------------------------------------------------------
- * No vendor chart source is copied and no charting runtime is added; the geometry
- * comes from `dashboard-model.ts`. Every chart carries a written summary and a
- * real data table, so the picture is never the only way to read the numbers.
- * -------------------------------------------------------------------------- */
-
 import type { ReactNode } from "react";
+import { Area, CartesianGrid, ComposedChart, Line, XAxis } from "recharts";
+import {
+  ChartContainer,
+  ChartLegend,
+  ChartLegendContent,
+  ChartTooltip,
+  ChartTooltipContent,
+  type ChartConfig,
+} from "@/components/ui/chart";
+import { Progress } from "@/components/ui/progress";
 import {
   Table,
   TableBody,
@@ -16,7 +18,8 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
-import { areaGeometry, barShare } from "./dashboard-model.ts";
+import { Activity, Layers } from "lucide-react";
+import { barShare } from "./dashboard-model.ts";
 import { DashboardCard, SectionEmpty } from "./Dashboard.tsx";
 
 export type TrendSeries = {
@@ -24,22 +27,8 @@ export type TrendSeries = {
   label: string;
   values: readonly number[];
   format: (value: number) => string;
-  /** `area` fills under the line; `line` is the dashed comparison series. */
   kind?: "area" | "line";
 };
-
-const VIEW_WIDTH = 600;
-const VIEW_HEIGHT = 160;
-
-function axisTicks(labels: readonly string[]): string[] {
-  if (labels.length <= 3) return [...labels];
-  const middle = Math.floor((labels.length - 1) / 2);
-  return [labels[0] ?? "", labels[middle] ?? "", labels[labels.length - 1] ?? ""];
-}
-
-function seriesPath(series: TrendSeries) {
-  return areaGeometry(series.values, VIEW_WIDTH, VIEW_HEIGHT);
-}
 
 function peakOf(series: TrendSeries, labels: readonly string[]): { label: string; value: number } {
   let bestIndex = 0;
@@ -52,20 +41,14 @@ function peakOf(series: TrendSeries, labels: readonly string[]): { label: string
 type TrendChartCardProps = {
   eyebrow: string;
   title: ReactNode;
-  /** The period the chart covers, e.g. "01 Aug – 30 Aug · daily". */
   rangeLabel: string;
   labels: readonly string[];
   series: readonly TrendSeries[];
-  /** One sentence stating what the trend means for a decision. */
   summary: ReactNode;
   action?: ReactNode;
   emptyCopy: string;
 };
 
-/**
- * Trend card: header, range, legend, plot, written summary, and a collapsible table.
- * The plot is `aria-hidden` because the summary and table already carry every value.
- */
 export function TrendChartCard({
   eyebrow,
   title,
@@ -77,83 +60,82 @@ export function TrendChartCard({
   emptyCopy,
 }: TrendChartCardProps) {
   const hasData = series.some((entry) => entry.values.some((value) => value > 0));
-  const primary = series[0];
+  const chartData = labels.map((label, index) => {
+    const point: Record<string, string | number> = { label };
+    for (const entry of series) point[entry.key] = entry.values[index] ?? 0;
+    return point;
+  });
+  const config: ChartConfig = Object.fromEntries(
+    series.map((entry, index) => [
+      entry.key,
+      { label: entry.label, color: `var(--chart-${(index % 5) + 1})` },
+    ]),
+  );
 
   return (
     <DashboardCard eyebrow={eyebrow} title={title} meta={rangeLabel} action={action}>
-      {primary && hasData ? (
-        <figure className="db-chart">
-          <ul className="db-legend">
-            {series.map((entry) => (
-              <li key={entry.key}>
-                <span className={`db-legend-mark is-${entry.kind ?? "area"}`} />
-                <span>{entry.label}</span>
-                <strong>{entry.format(peakOf(entry, labels).value)}</strong>
-                <small>peak</small>
-              </li>
-            ))}
-          </ul>
-
-          <svg
-            className="db-plot"
-            viewBox={`0 0 ${VIEW_WIDTH} ${VIEW_HEIGHT}`}
-            preserveAspectRatio="none"
-            aria-hidden="true"
-            focusable="false"
-          >
-            {[0.25, 0.5, 0.75].map((fraction) => (
-              <line
-                className="db-plot-grid"
-                key={fraction}
-                x1="0"
-                x2={VIEW_WIDTH}
-                y1={VIEW_HEIGHT * fraction}
-                y2={VIEW_HEIGHT * fraction}
-                vectorEffect="non-scaling-stroke"
-              />
-            ))}
+      {hasData ? (
+        <figure className="flex flex-col gap-4">
+          <div className="flex flex-wrap gap-2">
             {series.map((entry) => {
-              const geometry = seriesPath(entry);
-              const kind = entry.kind ?? "area";
+              const peak = peakOf(entry, labels);
               return (
-                <g key={entry.key}>
-                  {kind === "area" ? <path className="db-plot-fill" d={geometry.areaPath} /> : null}
-                  <path
-                    className={`db-plot-line is-${kind}`}
-                    d={geometry.linePath}
-                    vectorEffect="non-scaling-stroke"
-                  />
-                </g>
+                <div className="rounded-xl bg-muted px-3 py-2 text-xs" key={entry.key}>
+                  <span className="text-muted-foreground">{entry.label} peak</span>{" "}
+                  <strong>{entry.format(peak.value)}</strong>
+                </div>
               );
             })}
-            <line
-              className="db-plot-axis"
-              x1="0"
-              x2={VIEW_WIDTH}
-              y1={VIEW_HEIGHT}
-              y2={VIEW_HEIGHT}
-              vectorEffect="non-scaling-stroke"
-            />
-          </svg>
-
-          <ul className="db-plot-ticks" aria-hidden="true">
-            {axisTicks(labels).map((tick, index) => (
-              <li key={`${tick}-${index}`}>{tick}</li>
-            ))}
-          </ul>
-
-          <figcaption className="db-chart-summary">{summary}</figcaption>
-
-          <details className="db-chart-data">
-            <summary>View the {labels.length}-day figures</summary>
-            <div className="db-table-wrap">
-              <Table className="db-table">
+          </div>
+          <ChartContainer config={config} className="h-64 w-full">
+            <ComposedChart accessibilityLayer data={chartData} margin={{ left: 4, right: 4 }}>
+              <CartesianGrid vertical={false} />
+              <XAxis
+                dataKey="label"
+                axisLine={false}
+                tickLine={false}
+                tickMargin={10}
+                minTickGap={24}
+              />
+              <ChartTooltip content={<ChartTooltipContent indicator="line" />} />
+              <ChartLegend content={<ChartLegendContent />} />
+              {series.map((entry) =>
+                entry.kind === "line" ? (
+                  <Line
+                    key={entry.key}
+                    dataKey={entry.key}
+                    type="monotone"
+                    stroke={`var(--color-${entry.key})`}
+                    strokeWidth={2}
+                    dot={false}
+                  />
+                ) : (
+                  <Area
+                    key={entry.key}
+                    dataKey={entry.key}
+                    type="monotone"
+                    fill={`var(--color-${entry.key})`}
+                    fillOpacity={0.16}
+                    stroke={`var(--color-${entry.key})`}
+                    strokeWidth={2}
+                  />
+                ),
+              )}
+            </ComposedChart>
+          </ChartContainer>
+          <figcaption className="text-sm text-muted-foreground">{summary}</figcaption>
+          <details className="rounded-xl border p-3">
+            <summary className="cursor-pointer text-sm font-medium">
+              View the {labels.length}-day figures
+            </summary>
+            <div className="mt-3 overflow-x-auto">
+              <Table>
                 <TableCaption className="sr-only">{rangeLabel}</TableCaption>
                 <TableHeader>
                   <TableRow>
                     <TableHead scope="col">Day</TableHead>
                     {series.map((entry) => (
-                      <TableHead className="is-numeric" key={entry.key} scope="col">
+                      <TableHead className="text-right" key={entry.key} scope="col">
                         {entry.label}
                       </TableHead>
                     ))}
@@ -162,9 +144,9 @@ export function TrendChartCard({
                 <TableBody>
                   {labels.map((dayLabel, index) => (
                     <TableRow key={`${dayLabel}-${index}`}>
-                      <TableCell data-label="Day">{dayLabel}</TableCell>
+                      <TableCell>{dayLabel}</TableCell>
                       {series.map((entry) => (
-                        <TableCell className="is-numeric" data-label={entry.label} key={entry.key}>
+                        <TableCell className="text-right tabular-nums" key={entry.key}>
                           {entry.format(entry.values[index] ?? 0)}
                         </TableCell>
                       ))}
@@ -176,7 +158,7 @@ export function TrendChartCard({
           </details>
         </figure>
       ) : (
-        <SectionEmpty icon="activity" title="No activity in this period" copy={emptyCopy} />
+        <SectionEmpty icon={Activity} title="No activity in this period" copy={emptyCopy} />
       )}
     </DashboardCard>
   );
@@ -189,10 +171,6 @@ export type RankedBar = {
   meta?: string;
 };
 
-/**
- * Ranked comparison. The bars are decoration over a plain list: every label, value
- * and rank is readable text, so no separate text equivalent is needed.
- */
 export function RankedBarCard({
   eyebrow,
   title,
@@ -217,22 +195,25 @@ export function RankedBarCard({
   return (
     <DashboardCard eyebrow={eyebrow} title={title} meta={rangeLabel} action={action}>
       {items.length && max > 0 ? (
-        <ol className="db-bars" aria-label={`Ranked by ${valueLabel}`}>
+        <ol className="flex flex-col gap-4" aria-label={`Ranked by ${valueLabel}`}>
           {items.map((item) => (
-            <li className="db-bar" key={item.id}>
-              <span className="db-bar-head">
-                <strong className="db-bar-label">{item.label}</strong>
-                <span className="db-bar-value">{format(item.value)}</span>
-              </span>
-              <span className="db-bar-track">
-                <span className="db-bar-fill" style={{ width: `${barShare(item.value, max)}%` }} />
-              </span>
-              {item.meta ? <small className="db-bar-meta">{item.meta}</small> : null}
+            <li className="flex flex-col gap-2" key={item.id}>
+              <div className="flex items-baseline justify-between gap-3">
+                <strong className="truncate text-sm font-medium">{item.label}</strong>
+                <span className="font-mono text-sm tabular-nums">{format(item.value)}</span>
+              </div>
+              <Progress
+                value={barShare(item.value, max)}
+                aria-label={`${item.label}: ${format(item.value)}`}
+              />
+              {item.meta ? (
+                <small className="text-xs text-muted-foreground">{item.meta}</small>
+              ) : null}
             </li>
           ))}
         </ol>
       ) : (
-        <SectionEmpty icon="layers" title="Nothing to rank yet" copy={emptyCopy} />
+        <SectionEmpty icon={Layers} title="Nothing to rank yet" copy={emptyCopy} />
       )}
     </DashboardCard>
   );

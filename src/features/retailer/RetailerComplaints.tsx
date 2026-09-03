@@ -1,8 +1,29 @@
 import { useNavigate } from "@tanstack/react-router";
+import {
+  Download,
+  House,
+  MessageSquare,
+  Package,
+  ShoppingBag,
+  ShoppingCart,
+  Store,
+} from "lucide-react";
 import { useEffect, useRef, useState, type FormEvent } from "react";
+import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { Icon } from "../../components/ui/Icon.tsx";
+import {
+  Card,
+  CardAction,
+  CardContent,
+  CardDescription,
+  CardFooter,
+  CardHeader,
+  CardTitle,
+} from "@/components/ui/card";
+import { Field, FieldGroup, FieldLabel } from "@/components/ui/field";
+import { Input } from "@/components/ui/input";
+import { Textarea } from "@/components/ui/textarea";
 import {
   EmptyState,
   InlineNotice,
@@ -44,26 +65,40 @@ function linkedOrderFromLocation(): string | null {
 
 function ComplaintCard({ complaint }: { complaint: RetailerComplaint }) {
   return (
-    <article className="cp-card">
-      <div className="cp-card-top">
-        <strong>{complaint.subject}</strong>
-        <Badge variant={complaint.status === "open" ? "outline" : "secondary"}>
-          {complaint.status === "open" ? "Open" : "Resolved"}
-        </Badge>
-      </div>
-      {complaint.order_id ? (
-        <small>Order #{shortId(complaint.order_id)} · cancellation/refund support</small>
-      ) : null}
-      <p>{complaint.description}</p>
-      {complaint.attachment_url ? (
-        <Button asChild variant="link" className="h-auto p-0">
-          <a href={complaint.attachment_url} target="_blank" rel="noopener noreferrer">
-            <Icon name="download" />
-            <span>View attachment</span>
-          </a>
-        </Button>
-      ) : null}
-      <small>Filed {formatDateTime(complaint.created_at)}</small>
+    <article>
+      <Card size="sm">
+        <CardHeader>
+          <CardTitle>{complaint.subject}</CardTitle>
+          <CardDescription>
+            {complaint.order_id
+              ? `Order #${shortId(complaint.order_id)} · cancellation/refund support`
+              : `Filed ${formatDateTime(complaint.created_at)}`}
+          </CardDescription>
+          <CardAction>
+            <Badge variant={complaint.status === "open" ? "outline" : "secondary"}>
+              {complaint.status === "open" ? "Open" : "Resolved"}
+            </Badge>
+          </CardAction>
+        </CardHeader>
+        <CardContent>
+          <p className="whitespace-pre-wrap text-sm text-muted-foreground">
+            {complaint.description}
+          </p>
+        </CardContent>
+        <CardFooter className="justify-between gap-3">
+          <small className="text-muted-foreground">
+            Filed {formatDateTime(complaint.created_at)}
+          </small>
+          {complaint.attachment_url ? (
+            <Button asChild variant="outline" size="sm">
+              <a href={complaint.attachment_url} target="_blank" rel="noopener noreferrer">
+                <Download data-icon="inline-start" />
+                View attachment
+              </a>
+            </Button>
+          ) : null}
+        </CardFooter>
+      </Card>
     </article>
   );
 }
@@ -189,16 +224,16 @@ export function RetailerComplaints({
     <WorkspaceShell
       navigationLabel="Retailer navigation"
       items={[
-        { to: "/retailer", icon: "home", label: "Overview" },
-        { to: "/retailer/catalog", icon: "bag", label: "Place order" },
+        { to: "/retailer", icon: House, label: "Overview" },
+        { to: "/retailer/catalog", icon: ShoppingBag, label: "Place order" },
         {
           to: "/retailer/cart",
-          icon: "cart",
+          icon: ShoppingCart,
           label: "Cart",
           trailing: cartCount || undefined,
         },
-        { to: "/retailer/orders", icon: "package", label: "My orders" },
-        { to: "/retailer/complaints", icon: "message", label: "Help Center", active: true },
+        { to: "/retailer/orders", icon: Package, label: "My orders" },
+        { to: "/retailer/complaints", icon: MessageSquare, label: "Help Center", active: true },
       ]}
       userName={userName}
       userEmail={state.profile.email}
@@ -215,91 +250,102 @@ export function RetailerComplaints({
       />
       <InlineNotice message={notice?.message} state={notice?.state} />
 
-      <div className="cp-layout">
-        <section className="cp-list" aria-label="Your complaints">
-          <div className="rt-section-heading">
+      <div className="grid items-start gap-6 xl:grid-cols-[minmax(0,1fr)_minmax(20rem,26rem)]">
+        <section className="flex flex-col gap-4" aria-label="Your complaints">
+          <div className="flex flex-wrap items-end justify-between gap-3">
             <div>
-              <p className="eyebrow">Your reports</p>
-              <h2 className="display-sm">Filed complaints</h2>
+              <p className="text-sm font-medium text-muted-foreground">Your reports</p>
+              <h2 className="text-xl font-semibold tracking-tight">Filed complaints</h2>
             </div>
-            <span className="admin-result-count">{complaints?.length ?? 0} filed</span>
+            <Badge variant="secondary">{complaints?.length ?? 0} filed</Badge>
           </div>
           {complaints && complaints.length ? (
-            <div className="cp-list-cards">
+            <div className="flex flex-col gap-4">
               {complaints.map((complaint) => (
                 <ComplaintCard key={complaint.id} complaint={complaint} />
               ))}
             </div>
           ) : (
             <EmptyState
-              icon="store"
+              icon={Store}
               title="No complaints yet"
               copy="Complaints you file will show up here."
               action={
                 <Button asChild>
-                  <RouterLink to="/retailer/complaints">
-                    <span>File a complaint</span>
-                  </RouterLink>
+                  <RouterLink to="/retailer/complaints">File a complaint</RouterLink>
                 </Button>
               }
             />
           )}
         </section>
 
-        <form className="cp-form-card" ref={formRef} onSubmit={onSubmit} noValidate>
-          <div className="cp-form-heading">
-            <p className="eyebrow">New report</p>
-            <h2 className="display-sm">
-              {linkedOrderId ? "Contact support about this order" : "File a complaint"}
-            </h2>
-          </div>
-          {linkedOrderId ? (
-            <p className="admin-muted">
-              This request is linked to order #{shortId(linkedOrderId)}. Only the admin can cancel a
-              verified delivery and record its manual refund.
-            </p>
-          ) : null}
-          <label className="admin-field">
-            <span>Subject</span>
-            <input
-              name="subject"
-              type="text"
-              maxLength={120}
-              defaultValue={linkedOrderId ? "Cancellation and refund request" : ""}
-              placeholder="What is this about?"
-              required
-            />
-          </label>
-          <label className="admin-field">
-            <span>Details</span>
-            <textarea
-              name="description"
-              rows={4}
-              maxLength={2000}
-              placeholder="What happened, and what would fix it?"
-              required
-            />
-          </label>
-          <label className="admin-field">
-            <span>Attachment (optional)</span>
-            <input
-              name="attachment"
-              type="file"
-              accept="image/png,image/jpeg,image/webp,application/pdf"
-            />
-          </label>
-          <div className="cp-form-actions">
-            <Button type="submit" disabled={submitting}>
-              <span>{linkedOrderId ? "Submit support request" : "Submit complaint"}</span>
-            </Button>
-          </div>
-          <p
-            className={`admin-form-feedback${feedback ? ` is-visible is-${feedback.state}` : ""}`}
-            role="status"
-            aria-live="polite"
-          >
-            {feedback?.message}
-          </p>
+        <form ref={formRef} onSubmit={onSubmit} noValidate>
+          <Card>
+            <CardHeader>
+              <CardTitle>
+                <h2>{linkedOrderId ? "Contact support about this order" : "File a complaint"}</h2>
+              </CardTitle>
+              <CardDescription>
+                {linkedOrderId
+                  ? `This request is linked to order #${shortId(linkedOrderId)}. Only the admin can cancel a verified delivery and record its manual refund.`
+                  : "Share the details our support team needs to investigate."}
+              </CardDescription>
+            </CardHeader>
+            <CardContent>
+              <FieldGroup>
+                <Field>
+                  <FieldLabel htmlFor="retailer-complaint-subject">Subject</FieldLabel>
+                  <Input
+                    id="retailer-complaint-subject"
+                    name="subject"
+                    type="text"
+                    maxLength={120}
+                    defaultValue={linkedOrderId ? "Cancellation and refund request" : ""}
+                    placeholder="What is this about?"
+                    required
+                  />
+                </Field>
+                <Field>
+                  <FieldLabel htmlFor="retailer-complaint-description">Details</FieldLabel>
+                  <Textarea
+                    id="retailer-complaint-description"
+                    name="description"
+                    rows={4}
+                    maxLength={2000}
+                    placeholder="What happened, and what would fix it?"
+                    required
+                  />
+                </Field>
+                <Field>
+                  <FieldLabel htmlFor="retailer-complaint-attachment">
+                    Attachment (optional)
+                  </FieldLabel>
+                  <Input
+                    id="retailer-complaint-attachment"
+                    name="attachment"
+                    type="file"
+                    accept="image/png,image/jpeg,image/webp,application/pdf"
+                  />
+                </Field>
+              </FieldGroup>
+              <div className="mt-5 min-h-0" role="status" aria-live="polite">
+                {feedback ? (
+                  <Alert
+                    variant={feedback.state === "error" ? "destructive" : "default"}
+                    role="status"
+                  >
+                    <MessageSquare />
+                    <AlertDescription>{feedback.message}</AlertDescription>
+                  </Alert>
+                ) : null}
+              </div>
+            </CardContent>
+            <CardFooter className="justify-end">
+              <Button type="submit" disabled={submitting}>
+                {linkedOrderId ? "Submit support request" : "Submit complaint"}
+              </Button>
+            </CardFooter>
+          </Card>
         </form>
       </div>
     </WorkspaceShell>

@@ -1,7 +1,8 @@
 import type { FormEvent } from "react";
-import { Button } from "../ui/button.tsx";
-import { Checkbox } from "../ui/checkbox.tsx";
-import { Field as UIField, FieldGroup, FieldLabel } from "../ui/field.tsx";
+import { LockKeyholeIcon, MailIcon, UserRoundIcon } from "lucide-react";
+import { Button } from "@/components/ui/button";
+import { Checkbox } from "@/components/ui/checkbox";
+import { Field as UIField, FieldGroup, FieldLabel } from "@/components/ui/field";
 import { Field } from "./Field.tsx";
 import type { AuthFeedback, AuthFormSubmitHandler, RegistrationDetails } from "./types.ts";
 
@@ -64,22 +65,23 @@ export function RegisterForm({
     }
   };
 
-  const feedbackClassName = feedback
-    ? `form-feedback is-visible is-${feedback.state ?? "info"}`
-    : "form-feedback";
+  const feedbackClassName =
+    feedback?.state === "error"
+      ? "min-h-5 text-sm font-medium text-destructive"
+      : "min-h-5 text-sm text-muted-foreground";
 
   return (
     <form
-      className="auth-form"
+      className="flex flex-col gap-5"
       data-auth-form="register"
       onInput={handleInput}
       onSubmit={handleSubmit}
     >
-      <FieldGroup className="field-stack">
+      <FieldGroup>
         <Field
           autoComplete="name"
           id="register-name"
-          icon="person"
+          icon={UserRoundIcon}
           label="Full name"
           name="name"
           placeholder="Your full name"
@@ -88,7 +90,7 @@ export function RegisterForm({
         <Field
           autoComplete="email"
           id="register-email"
-          icon="mail"
+          icon={MailIcon}
           label="Email address"
           name="email"
           placeholder="Enter your email address"
@@ -97,7 +99,7 @@ export function RegisterForm({
         <Field
           autoComplete="new-password"
           id="register-password"
-          icon="lock"
+          icon={LockKeyholeIcon}
           label="Password"
           name="password"
           placeholder="Create a password"
@@ -106,7 +108,7 @@ export function RegisterForm({
         <Field
           autoComplete="new-password"
           id="register-confirm-password"
-          icon="lock"
+          icon={LockKeyholeIcon}
           label="Confirm password"
           name="confirm-password"
           placeholder="Repeat your password"
@@ -118,7 +120,14 @@ export function RegisterForm({
         <Checkbox id="register-terms" name="terms" required />
         <FieldLabel htmlFor="register-terms">
           I agree to the{" "}
-          <Button variant="link" data-terms="" disabled={pending} onClick={onTerms}>
+          <Button
+            type="button"
+            variant="link"
+            size="sm"
+            data-terms=""
+            disabled={pending}
+            onClick={onTerms}
+          >
             terms of service
           </Button>
           .
@@ -132,10 +141,12 @@ export function RegisterForm({
       <p className={feedbackClassName} data-form-feedback role="status" aria-live="polite">
         {feedback?.message}
       </p>
-      <p className="auth-switch">
+      <p className="text-center text-sm text-muted-foreground">
         Already have an account?{" "}
         <Button
+          type="button"
           variant="link"
+          size="sm"
           data-switch-auth="login"
           disabled={pending}
           onClick={onSwitchToLogin}

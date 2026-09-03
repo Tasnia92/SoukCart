@@ -1,48 +1,36 @@
+import { Home } from "lucide-react";
 import { renderToStaticMarkup } from "react-dom/server";
 import { describe, expect, it } from "vite-plus/test";
 import { Brand } from "./components/ui/Brand.tsx";
 import { Button, buttonVariants } from "./components/ui/button.tsx";
-import { Icon, ICON_NAMES, iconPaths } from "./components/ui/Icon.tsx";
 import { SidebarProvider } from "./components/ui/sidebar.tsx";
 import { SidebarNav } from "./components/ui/Workspace.tsx";
 
-function svgBody(markup: string): string {
-  return markup.slice(markup.indexOf(">") + 1, markup.lastIndexOf("</svg>"));
-}
-
-describe("Phase 2 design contract", () => {
-  it("renders every registered icon with the hand-authored SVG registry", () => {
-    expect(ICON_NAMES).toHaveLength(31);
-    expect(new Set(ICON_NAMES)).toEqual(new Set(Object.keys(iconPaths)));
-
-    for (const name of ICON_NAMES) {
-      const reactIcon = renderToStaticMarkup(<Icon name={name} />);
-      expect(reactIcon).toContain('viewBox="0 0 24 24"');
-      expect(reactIcon).toContain('aria-hidden="true"');
-      expect(reactIcon).toContain('focusable="false"');
-      expect(svgBody(reactIcon)).toBe(iconPaths[name]);
-    }
-  });
-
-  it("preserves the brand contract", () => {
+describe("shadcn design contract", () => {
+  it("preserves the brand contract with Tailwind theme variants", () => {
     const brand = renderToStaticMarkup(<Brand variant="dark" />);
-    expect(brand).toContain('class="brand brand-dark"');
+
     expect(brand).toContain('href="/"');
+    expect(brand).toContain('aria-label="SoukCart home"');
     expect(brand).toContain('src="/soukcart-logo.png"');
     expect(brand).toContain('alt=""');
+    expect(brand).toContain("text-primary-foreground");
     expect(brand).toContain("SoukCart");
   });
 
-  it("uses the official Button data-slot/variant contract and defaults real buttons to type=button", () => {
-    const primary = renderToStaticMarkup(<Button>Save</Button>);
+  it("uses the official Button data-slot and variant contract", () => {
+    const primary = renderToStaticMarkup(<Button type="button">Save</Button>);
     expect(primary).toContain('data-slot="button"');
     expect(primary).toContain('data-variant="default"');
     expect(primary).toContain('type="button"');
 
-    const destructive = renderToStaticMarkup(<Button variant="destructive">Delete</Button>);
+    const destructive = renderToStaticMarkup(
+      <Button type="button" variant="destructive">
+        Delete
+      </Button>,
+    );
     expect(destructive).toContain('data-variant="destructive"');
 
-    // asChild composes onto the child (e.g. an anchor) and must not leak a `type` attribute.
     const link = renderToStaticMarkup(
       <Button asChild variant="link">
         <a href="/somewhere">Go</a>
@@ -52,8 +40,7 @@ describe("Phase 2 design contract", () => {
     expect(link).toContain('href="/somewhere"');
     expect(link).not.toContain("type=");
 
-    // buttonVariants still expresses the variant styling for composed, non-button controls.
-    expect(buttonVariants({ variant: "ghost" })).toContain("hover:bg-accent");
+    expect(buttonVariants({ variant: "ghost" })).toContain("hover:bg-muted");
     expect(buttonVariants({ size: "sm" })).toContain("h-8");
   });
 
@@ -62,18 +49,18 @@ describe("Phase 2 design contract", () => {
       <SidebarProvider>
         <SidebarNav
           label="Test navigation"
-          items={[{ href: "/supplier", icon: "home", label: "Overview", active: true }]}
+          items={[{ href: "/supplier", icon: Home, label: "Overview", active: true }]}
           userName="Supplier"
           userEmail="supplier@example.com"
           onLogout={() => undefined}
         />
       </SidebarProvider>,
     );
+
     expect(sidebar).toContain('aria-label="Test navigation"');
     expect(sidebar).toContain('data-slot="sidebar-menu-button"');
     expect(sidebar).toContain('data-active="true"');
     expect(sidebar).toContain('aria-current="page"');
-    // Legacy admin-tab class contract is gone; navigation state is now data/aria driven.
-    expect(sidebar).not.toContain("admin-tab");
+    expect(sidebar).toContain("lucide-house");
   });
 });

@@ -1,5 +1,30 @@
 import { useEffect, useRef, useState, type FormEvent } from "react";
-import { Field, FieldLabel } from "@/components/ui/field";
+import { Plus, Search, Users, X } from "lucide-react";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
+import { Avatar, AvatarFallback } from "@/components/ui/avatar";
+import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
+import {
+  Dialog,
+  DialogClose,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+  DialogTrigger,
+} from "@/components/ui/dialog";
+import { Field, FieldGroup, FieldLabel } from "@/components/ui/field";
+import { Input } from "@/components/ui/input";
 import {
   Select,
   SelectContent,
@@ -16,8 +41,8 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
-import { Button } from "@/components/ui/button";
 import {
+  EmptyState,
   InlineNotice,
   LoadingState,
   PageHeader,
@@ -37,6 +62,7 @@ import {
   updateAdminUser,
   type AdminUser,
 } from "./admin-users-api.ts";
+import { ADMIN_NAV_ITEMS } from "./admin-nav.ts";
 
 type AdminUsersProps = {
   loadUsers?: () => Promise<AdminUser[]>;
@@ -86,45 +112,54 @@ function UserRow({
   return (
     <TableRow>
       <TableCell>
-        <div className="admin-user-cell">
-          <span className="admin-avatar">{initials(user.name || user.email)}</span>
-          <span>
-            <strong>{user.name || "Unnamed user"}</strong>
-            <small>{status}</small>
+        <div className="flex items-center gap-3">
+          <Avatar size="sm">
+            <AvatarFallback>{initials(user.name || user.email)}</AvatarFallback>
+          </Avatar>
+          <span className="flex min-w-0 flex-col gap-1">
+            <strong className="truncate font-medium">{user.name || "Unnamed user"}</strong>
+            <small className="text-xs text-muted-foreground">{status}</small>
           </span>
         </div>
       </TableCell>
       <TableCell>{user.email}</TableCell>
       <TableCell>
-        <code className="admin-user-id" title={user.id}>
+        <code className="block max-w-44 truncate font-mono text-xs" title={user.id}>
           {user.id}
         </code>
       </TableCell>
       <TableCell>
-        <span className="admin-role">{user.role || "Needs setup"}</span>
+        <Badge variant="outline">{user.role || "Needs setup"}</Badge>
       </TableCell>
       <TableCell>{formatDate(user.created_at)}</TableCell>
       <TableCell>
         {user.last_sign_in_at ? (
           formatDate(user.last_sign_in_at)
         ) : (
-          <span className="admin-muted">Never</span>
+          <span className="text-muted-foreground">Never</span>
         )}
       </TableCell>
-      <TableCell className="admin-action-cell">
-        <div className="admin-create-actions">
+      <TableCell className="text-right">
+        <div className="flex items-center justify-end gap-2">
           <Button
-            variant="link"
-            className="h-auto p-0"
+            type="button"
+            variant="ghost"
+            size="sm"
             disabled={busy}
             onClick={() => onEdit(user)}
           >
             Edit
           </Button>
           {user.id === currentAdminId ? (
-            <span className="admin-current-user">You</span>
+            <Badge variant="secondary">You</Badge>
           ) : (
-            <Button variant="destructive" size="sm" disabled={busy} onClick={() => onDelete(user)}>
+            <Button
+              type="button"
+              variant="destructive"
+              size="sm"
+              disabled={busy}
+              onClick={() => onDelete(user)}
+            >
               Delete
             </Button>
           )}
@@ -148,6 +183,7 @@ export function AdminUsers({ loadUsers = loadAdminUsers }: AdminUsersProps) {
   const [editingUser, setEditingUser] = useState<AdminUser | null>(null);
   const [updating, setUpdating] = useState(false);
   const [editFeedback, setEditFeedback] = useState<Notice>(null);
+  const [deleteTarget, setDeleteTarget] = useState<AdminUser | null>(null);
   const [deletingId, setDeletingId] = useState<string | null>(null);
 
   const createFormRef = useRef<HTMLFormElement>(null);
@@ -217,6 +253,11 @@ export function AdminUsers({ loadUsers = loadAdminUsers }: AdminUsersProps) {
     setCreateFeedback(null);
     createFormRef.current?.reset();
     triggerRef.current?.focus();
+  };
+
+  const onCreateOpenChange = (open: boolean) => {
+    if (open) openCreate();
+    else closeCreate();
   };
 
   const openEdit = (user: AdminUser) => {
@@ -295,9 +336,11 @@ export function AdminUsers({ loadUsers = loadAdminUsers }: AdminUsersProps) {
     }
   };
 
-  const onDelete = (user: AdminUser) => {
+  const onConfirmDelete = () => {
+    if (!deleteTarget) return;
+    const user = deleteTarget;
     const displayName = user.name || user.email;
-    if (!window.confirm(`Delete ${displayName}'s account? This cannot be undone.`)) return;
+    setDeleteTarget(null);
     setDeletingId(user.id);
     void deleteAdminUser(user.id)
       .then(() => {
@@ -319,13 +362,7 @@ export function AdminUsers({ loadUsers = loadAdminUsers }: AdminUsersProps) {
   return (
     <WorkspaceShell
       navigationLabel="Admin navigation"
-      items={[
-        { to: "/admin", icon: "layers", label: "Overview" },
-        { to: "/admin/activity", icon: "activity", label: "Order activity" },
-        { to: "/admin/complaints", icon: "message", label: "Disputes & Claims" },
-        { to: "/admin/verifications", icon: "shield-check", label: "Supplier verifications" },
-        { to: "/admin/users", icon: "person", label: "User directory", active: true },
-      ]}
+      items={ADMIN_NAV_ITEMS.map((item) => ({ ...item, active: item.to === "/admin/users" }))}
       userName={userName}
       userEmail={state.profile.email}
       onLogout={onLogout}
@@ -335,162 +372,174 @@ export function AdminUsers({ loadUsers = loadAdminUsers }: AdminUsersProps) {
         title="User directory"
         copy="Search by ID number and create, edit, or remove user accounts."
         actions={
-          <Button
-            ref={triggerRef}
-            onClick={openCreate}
-            aria-expanded={createOpen}
-            aria-controls={CREATE_PANEL_ID}
-          >
-            <span>+ New user</span>
-          </Button>
+          <Dialog open={createOpen} onOpenChange={onCreateOpenChange}>
+            <DialogTrigger asChild>
+              <Button
+                ref={triggerRef}
+                type="button"
+                aria-expanded={createOpen}
+                aria-controls={CREATE_PANEL_ID}
+              >
+                <Plus data-icon="inline-start" />
+                New user
+              </Button>
+            </DialogTrigger>
+            {users ? (
+              <DialogContent id={CREATE_PANEL_ID} showCloseButton={false}>
+                <DialogHeader>
+                  <DialogTitle>Create a user</DialogTitle>
+                  <DialogDescription>Add a new account to the workspace.</DialogDescription>
+                </DialogHeader>
+                <DialogClose asChild>
+                  <Button
+                    type="button"
+                    variant="ghost"
+                    size="icon-sm"
+                    className="absolute top-4 right-4"
+                    aria-label="Close create user form"
+                  >
+                    <X />
+                  </Button>
+                </DialogClose>
+                <form ref={createFormRef} onSubmit={onCreate} noValidate>
+                  <FieldGroup>
+                    <Field>
+                      <FieldLabel htmlFor="create-user-name">Full name</FieldLabel>
+                      <Input
+                        id="create-user-name"
+                        ref={createNameRef}
+                        name="name"
+                        type="text"
+                        autoComplete="name"
+                        maxLength={100}
+                        required
+                      />
+                    </Field>
+                    <Field>
+                      <FieldLabel htmlFor="create-user-email">Email address</FieldLabel>
+                      <Input
+                        id="create-user-email"
+                        name="email"
+                        type="email"
+                        autoComplete="email"
+                        required
+                      />
+                    </Field>
+                    <Field>
+                      <FieldLabel htmlFor="create-user-password">Temporary password</FieldLabel>
+                      <Input
+                        id="create-user-password"
+                        name="password"
+                        type="password"
+                        minLength={8}
+                        autoComplete="new-password"
+                        required
+                      />
+                    </Field>
+                    <Field>
+                      <FieldLabel htmlFor="create-user-role">Account type</FieldLabel>
+                      <Select name="role" defaultValue={UNASSIGNED_ROLE}>
+                        <SelectTrigger id="create-user-role" className="w-full">
+                          <SelectValue />
+                        </SelectTrigger>
+                        <SelectContent>
+                          <RoleOptions />
+                        </SelectContent>
+                      </Select>
+                    </Field>
+                  </FieldGroup>
+                  <InlineNotice message={createFeedback?.message} state={createFeedback?.state} />
+                  <DialogFooter className="mt-6">
+                    <Button type="button" variant="outline" onClick={closeCreate}>
+                      Cancel
+                    </Button>
+                    <Button type="submit" disabled={creating}>
+                      Create user
+                    </Button>
+                  </DialogFooter>
+                </form>
+              </DialogContent>
+            ) : null}
+          </Dialog>
         }
       />
       <InlineNotice message={notice?.message} state={notice?.state} />
       {users ? (
         <>
-          <div className="admin-create-panel" id={CREATE_PANEL_ID} hidden={!createOpen}>
-            <div className="admin-create-heading">
-              <div>
-                <p className="eyebrow">Add to workspace</p>
-                <h3 className="display-sm">Create a user</h3>
-              </div>
-              <Button
-                variant="ghost"
-                size="icon-sm"
-                onClick={closeCreate}
-                aria-label="Close create user form"
-              >
-                ×
-              </Button>
-            </div>
-            <form className="admin-create-form" ref={createFormRef} onSubmit={onCreate} noValidate>
-              <label className="admin-field">
-                <span>Full name</span>
-                <input
-                  ref={createNameRef}
-                  name="name"
-                  type="text"
-                  autoComplete="name"
-                  maxLength={100}
-                  required
-                />
-              </label>
-              <label className="admin-field">
-                <span>Email address</span>
-                <input name="email" type="email" autoComplete="email" required />
-              </label>
-              <label className="admin-field">
-                <span>Temporary password</span>
-                <input
-                  name="password"
-                  type="password"
-                  minLength={8}
-                  autoComplete="new-password"
-                  required
-                />
-              </label>
-              <Field>
-                <FieldLabel htmlFor="create-user-role">Account type</FieldLabel>
-                <Select name="role" defaultValue={UNASSIGNED_ROLE}>
-                  <SelectTrigger id="create-user-role" className="w-full">
-                    <SelectValue />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <RoleOptions />
-                  </SelectContent>
-                </Select>
-              </Field>
-              <div className="admin-create-actions">
-                <Button variant="secondary" onClick={closeCreate}>
-                  Cancel
-                </Button>
-                <Button type="submit" disabled={creating}>
-                  <span>Create user</span>
-                </Button>
-              </div>
-              <p
-                className={`admin-form-feedback${createFeedback ? ` is-visible is-${createFeedback.state}` : ""}`}
-                role="status"
-                aria-live="polite"
-              >
-                {createFeedback?.message}
-              </p>
-            </form>
-          </div>
-
-          {editingUser ? (
-            <div className="admin-create-panel" id={EDIT_PANEL_ID}>
-              <div className="admin-create-heading">
-                <div>
-                  <p className="eyebrow">Account details</p>
-                  <h3 className="display-sm">Edit user</h3>
-                </div>
-                <Button
-                  variant="ghost"
-                  size="icon-sm"
-                  onClick={closeEdit}
-                  aria-label="Close edit user form"
-                >
-                  ×
-                </Button>
-              </div>
-              <form
-                className="admin-create-form"
-                key={editingUser.id}
-                onSubmit={onUpdate}
-                noValidate
-              >
-                <label className="admin-field">
-                  <span>Full name</span>
-                  <input
-                    ref={editNameRef}
-                    name="name"
-                    type="text"
-                    autoComplete="name"
-                    maxLength={100}
-                    defaultValue={editingUser.name}
-                    required
-                  />
-                </label>
-                <label className="admin-field">
-                  <span>Email address</span>
-                  <input
-                    name="email"
-                    type="email"
-                    autoComplete="email"
-                    defaultValue={editingUser.email}
-                    required
-                  />
-                </label>
-                <Field>
-                  <FieldLabel htmlFor="edit-user-role">Account type</FieldLabel>
-                  <Select name="role" defaultValue={editingUser.role ?? UNASSIGNED_ROLE}>
-                    <SelectTrigger id="edit-user-role" className="w-full">
-                      <SelectValue />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <RoleOptions />
-                    </SelectContent>
-                  </Select>
-                </Field>
-                <div className="admin-create-actions">
-                  <Button variant="secondary" onClick={closeEdit}>
-                    Cancel
+          <Dialog
+            open={Boolean(editingUser)}
+            onOpenChange={(open) => {
+              if (!open) closeEdit();
+            }}
+          >
+            {editingUser ? (
+              <DialogContent id={EDIT_PANEL_ID} key={editingUser.id} showCloseButton={false}>
+                <DialogHeader>
+                  <DialogTitle>Edit user</DialogTitle>
+                  <DialogDescription>Update account details and access type.</DialogDescription>
+                </DialogHeader>
+                <DialogClose asChild>
+                  <Button
+                    type="button"
+                    variant="ghost"
+                    size="icon-sm"
+                    className="absolute top-4 right-4"
+                    aria-label="Close edit user form"
+                  >
+                    <X />
                   </Button>
-                  <Button type="submit" disabled={updating}>
-                    <span>Save changes</span>
-                  </Button>
-                </div>
-                <p
-                  className={`admin-form-feedback${editFeedback ? ` is-visible is-${editFeedback.state}` : ""}`}
-                  role="status"
-                  aria-live="polite"
-                >
-                  {editFeedback?.message}
-                </p>
-              </form>
-            </div>
-          ) : null}
+                </DialogClose>
+                <form onSubmit={onUpdate} noValidate>
+                  <FieldGroup>
+                    <Field>
+                      <FieldLabel htmlFor="edit-user-name">Full name</FieldLabel>
+                      <Input
+                        id="edit-user-name"
+                        ref={editNameRef}
+                        name="name"
+                        type="text"
+                        autoComplete="name"
+                        maxLength={100}
+                        defaultValue={editingUser.name}
+                        required
+                      />
+                    </Field>
+                    <Field>
+                      <FieldLabel htmlFor="edit-user-email">Email address</FieldLabel>
+                      <Input
+                        id="edit-user-email"
+                        name="email"
+                        type="email"
+                        autoComplete="email"
+                        defaultValue={editingUser.email}
+                        required
+                      />
+                    </Field>
+                    <Field>
+                      <FieldLabel htmlFor="edit-user-role">Account type</FieldLabel>
+                      <Select name="role" defaultValue={editingUser.role ?? UNASSIGNED_ROLE}>
+                        <SelectTrigger id="edit-user-role" className="w-full">
+                          <SelectValue />
+                        </SelectTrigger>
+                        <SelectContent>
+                          <RoleOptions />
+                        </SelectContent>
+                      </Select>
+                    </Field>
+                  </FieldGroup>
+                  <InlineNotice message={editFeedback?.message} state={editFeedback?.state} />
+                  <DialogFooter className="mt-6">
+                    <Button type="button" variant="outline" onClick={closeEdit}>
+                      Cancel
+                    </Button>
+                    <Button type="submit" disabled={updating}>
+                      Save changes
+                    </Button>
+                  </DialogFooter>
+                </form>
+              </DialogContent>
+            ) : null}
+          </Dialog>
 
           <SearchToolbar
             label="Search users"
@@ -524,21 +573,27 @@ export function AdminUsers({ loadUsers = loadAdminUsers }: AdminUsersProps) {
                       currentAdminId={currentAdminId}
                       busy={deletingId === user.id || (updating && editingUser?.id === user.id)}
                       onEdit={openEdit}
-                      onDelete={onDelete}
+                      onDelete={setDeleteTarget}
                     />
                   ))
                 ) : users.length ? (
                   <TableRow>
-                    <TableCell className="admin-empty" colSpan={7}>
-                      <strong>No matching users</strong>
-                      <span>Try a different ID, email, or name.</span>
+                    <TableCell className="p-0" colSpan={7}>
+                      <EmptyState
+                        icon={Search}
+                        title="No matching users"
+                        copy="Try a different ID, email, or name."
+                      />
                     </TableCell>
                   </TableRow>
                 ) : (
                   <TableRow>
-                    <TableCell className="admin-empty" colSpan={7}>
-                      <strong>No users yet</strong>
-                      <span>New registrations will appear here automatically.</span>
+                    <TableCell className="p-0" colSpan={7}>
+                      <EmptyState
+                        icon={Users}
+                        title="No users yet"
+                        copy="New registrations will appear here automatically."
+                      />
                     </TableCell>
                   </TableRow>
                 )}
@@ -549,6 +604,30 @@ export function AdminUsers({ loadUsers = loadAdminUsers }: AdminUsersProps) {
       ) : (
         <LoadingState title="Loading the admin workspace…" />
       )}
+
+      <AlertDialog
+        open={Boolean(deleteTarget)}
+        onOpenChange={(open) => {
+          if (!open) setDeleteTarget(null);
+        }}
+      >
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Delete this user account?</AlertDialogTitle>
+            <AlertDialogDescription>
+              {deleteTarget
+                ? `Delete ${deleteTarget.name || deleteTarget.email}'s account? This cannot be undone.`
+                : "This cannot be undone."}
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel type="button">Cancel</AlertDialogCancel>
+            <AlertDialogAction type="button" variant="destructive" onClick={onConfirmDelete}>
+              Delete account
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </WorkspaceShell>
   );
 }

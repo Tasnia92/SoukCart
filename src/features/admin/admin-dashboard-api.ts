@@ -8,7 +8,7 @@
  * supplemental panels (disputes, notifications) instead of failing the page.
  * -------------------------------------------------------------------------- */
 
-import type { IconName } from "../../components/ui/Icon.tsx";
+import { Clock3, MessageSquare, RefreshCw, type LucideIcon } from "lucide-react";
 import {
   DEFAULT_WINDOW_DAYS,
   ageInDays,
@@ -60,7 +60,7 @@ export type AdminQueueKind = "refund" | "cancellation" | "dispute";
 export type AdminQueueItem = {
   id: string;
   kind: AdminQueueKind;
-  icon: IconName;
+  icon: LucideIcon;
   title: string;
   detail: string;
   severity: DashboardSeverity;
@@ -144,7 +144,7 @@ function refundQueueItem(order: ActivityOrder, now: number): AdminQueueItem {
   return {
     id: `refund-${order.id}`,
     kind: "refund",
-    icon: "refresh",
+    icon: RefreshCw,
     title: awaitingReview ? "Refund needs review" : "Refund payout pending",
     detail: `${order.retailer_name} · order #${shortId(order.id)} · ${formatPrice(order.refund_amount)}`,
     severity: "critical",
@@ -159,7 +159,7 @@ function cancellationQueueItem(order: ActivityOrder, now: number): AdminQueueIte
   return {
     id: `cancellation-${order.id}`,
     kind: "cancellation",
-    icon: "clock",
+    icon: Clock3,
     title: `Cancellation requested by ${order.cancellation_initiator ?? "a participant"}`,
     detail: `${order.retailer_name} · order #${shortId(order.id)}${
       order.cancellation_reason ? ` · ${order.cancellation_reason}` : ""
@@ -176,7 +176,7 @@ function disputeQueueItem(complaint: AdminComplaint, now: number): AdminQueueIte
   return {
     id: `dispute-${complaint.id}`,
     kind: "dispute",
-    icon: "message",
+    icon: MessageSquare,
     title: complaint.subject,
     detail: `${complaint.retailer_name} · ${
       complaint.category === "cancellation_refund" ? "Cancellation & refund" : "General"

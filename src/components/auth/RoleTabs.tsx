@@ -1,16 +1,17 @@
-import { Icon, type IconName } from "../ui/Icon.tsx";
+import { PackageIcon, StoreIcon, type LucideIcon } from "lucide-react";
+import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import type { AuthRole } from "./types.ts";
 
 type RoleTab = {
   role: AuthRole;
   label: string;
   hint: string;
-  icon: IconName;
+  icon: LucideIcon;
 };
 
 const ROLE_TABS: readonly RoleTab[] = [
-  { role: "retailer", label: "Retailer", hint: "Buy for my shop", icon: "store" },
-  { role: "seller", label: "Supplier", hint: "Sell on SoukCart", icon: "package" },
+  { role: "retailer", label: "Retailer", hint: "Buy for my shop", icon: StoreIcon },
+  { role: "seller", label: "Supplier", hint: "Sell on SoukCart", icon: PackageIcon },
 ] as const;
 
 export type RoleTabsProps = {
@@ -19,38 +20,39 @@ export type RoleTabsProps = {
   disabled?: boolean;
 };
 
-/**
- * Segmented control that switches the auth screen between the retailer and
- * supplier paths. Built on the SoukCart design system (flat, sharp geometry)
- * rather than a raw radio group so it reads as a pair of tabs.
- */
 export function RoleTabs({ value, onChange, disabled = false }: RoleTabsProps) {
   return (
-    <div className="role-tabs" role="tablist" aria-label="Choose account type" data-role-tabs>
-      {ROLE_TABS.map((tab) => {
-        const selected = tab.role === value;
-        return (
-          <button
-            key={tab.role}
-            type="button"
-            role="tab"
-            className="role-tab"
-            data-role-tab={tab.role}
-            aria-selected={selected}
-            tabIndex={selected ? 0 : -1}
-            disabled={disabled}
-            onClick={() => onChange?.(tab.role)}
-          >
-            <span className="role-tab-icon">
-              <Icon name={tab.icon} />
-            </span>
-            <span className="role-tab-text">
-              <span className="role-tab-label">{tab.label}</span>
-              <span className="role-tab-hint">{tab.hint}</span>
-            </span>
-          </button>
-        );
-      })}
-    </div>
+    <Tabs
+      className="w-full"
+      value={value}
+      onValueChange={(nextValue) => onChange?.(nextValue as AuthRole)}
+    >
+      <TabsList
+        className="grid h-auto w-full grid-cols-2"
+        aria-label="Choose account type"
+        data-role-tabs="true"
+      >
+        {ROLE_TABS.map((tab) => {
+          const TabIcon = tab.icon;
+          return (
+            <TabsTrigger
+              key={tab.role}
+              className="h-auto min-w-0 justify-start rounded-2xl px-3 py-3 text-left whitespace-normal sm:px-4"
+              type="button"
+              value={tab.role}
+              data-role-tab={tab.role}
+              disabled={disabled}
+              onClick={tab.role === value ? () => onChange?.(tab.role) : undefined}
+            >
+              <TabIcon data-icon="inline-start" aria-hidden="true" />
+              <span className="flex min-w-0 flex-col items-start gap-0.5">
+                <span>{tab.label}</span>
+                <span className="text-xs font-normal text-muted-foreground">{tab.hint}</span>
+              </span>
+            </TabsTrigger>
+          );
+        })}
+      </TabsList>
+    </Tabs>
   );
 }

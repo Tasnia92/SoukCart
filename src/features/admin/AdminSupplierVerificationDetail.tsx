@@ -1,8 +1,39 @@
 import { useEffect, useState, type ReactNode } from "react";
 import { useNavigate } from "@tanstack/react-router";
+import {
+  ArrowLeft,
+  Check,
+  Download,
+  ExternalLink,
+  FileText,
+  ImageIcon,
+  LockKeyhole,
+  X,
+  type LucideIcon,
+} from "lucide-react";
+import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
+import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { Icon } from "../../components/ui/Icon.tsx";
+import {
+  Card,
+  CardAction,
+  CardContent,
+  CardDescription,
+  CardFooter,
+  CardHeader,
+  CardTitle,
+} from "@/components/ui/card";
+import {
+  Empty,
+  EmptyContent,
+  EmptyDescription,
+  EmptyHeader,
+  EmptyMedia,
+  EmptyTitle,
+} from "@/components/ui/empty";
+import { Field, FieldDescription, FieldGroup, FieldLabel } from "@/components/ui/field";
+import { Textarea } from "@/components/ui/textarea";
 import {
   InlineNotice,
   LoadingState,
@@ -37,69 +68,109 @@ const STATUS_LABELS: Record<AdminSupplierVerification["status"], string> = {
   rejected: "Rejected",
 };
 
+function LicenceEmpty({
+  icon: EmptyIcon,
+  title,
+  copy,
+  action,
+}: {
+  icon: LucideIcon;
+  title: string;
+  copy?: string;
+  action?: ReactNode;
+}) {
+  return (
+    <Empty className="min-h-80 border">
+      <EmptyHeader>
+        <EmptyMedia variant="icon">
+          <EmptyIcon />
+        </EmptyMedia>
+        <EmptyTitle>{title}</EmptyTitle>
+        {copy ? <EmptyDescription>{copy}</EmptyDescription> : null}
+      </EmptyHeader>
+      {action ? <EmptyContent>{action}</EmptyContent> : null}
+    </Empty>
+  );
+}
+
 function LicencePreview({ verification }: { verification: AdminSupplierVerification }) {
   const url = verification.trade_license_url;
   const kind = tradeLicenseKind(url);
-
-  if (!url) {
-    return (
-      <div className="sv-licence-empty">
-        <Icon name="image" />
-        <strong>Trade licence unavailable</strong>
-        <span>The uploaded file could not be loaded. Ask the supplier to resubmit.</span>
-      </div>
-    );
-  }
+  const openOriginal = url ? (
+    <Button asChild variant="outline" size="sm">
+      <a href={url} target="_blank" rel="noopener noreferrer">
+        <ExternalLink data-icon="inline-start" />
+        Open original
+      </a>
+    </Button>
+  ) : null;
 
   return (
-    <figure className="sv-licence">
-      <figcaption>
-        <span>Trade licence</span>
-        <Button asChild variant="link" className="h-auto p-0">
-          <a href={url} target="_blank" rel="noopener noreferrer">
-            <Icon name="arrow-up-right" />
-            <span>Open original</span>
+    <Card>
+      <CardHeader>
+        <CardTitle>Trade licence</CardTitle>
+        <CardDescription>Review the supplier&apos;s uploaded document.</CardDescription>
+        {openOriginal ? <CardAction>{openOriginal}</CardAction> : null}
+      </CardHeader>
+      <CardContent>
+        {!url ? (
+          <LicenceEmpty
+            icon={ImageIcon}
+            title="Trade licence unavailable"
+            copy="The uploaded file could not be loaded. Ask the supplier to resubmit."
+          />
+        ) : kind === "image" ? (
+          <a
+            href={url}
+            target="_blank"
+            rel="noopener noreferrer"
+            className="block overflow-hidden rounded-xl border"
+          >
+            <img
+              className="max-h-[48rem] w-full object-contain"
+              src={url}
+              alt={`${verification.shop_name} trade licence`}
+            />
           </a>
-        </Button>
-      </figcaption>
-      {kind === "image" ? (
-        <a href={url} target="_blank" rel="noopener noreferrer" className="sv-licence-image">
-          <img src={url} alt={`${verification.shop_name} trade licence`} />
-        </a>
-      ) : kind === "pdf" ? (
-        <object className="sv-licence-pdf" data={url} type="application/pdf">
-          <div className="sv-licence-empty">
-            <Icon name="package" />
-            <strong>PDF preview unavailable</strong>
-            <Button asChild variant="secondary" size="sm">
-              <a href={url} target="_blank" rel="noopener noreferrer">
-                <Icon name="download" />
-                <span>Download licence</span>
-              </a>
-            </Button>
-          </div>
-        </object>
-      ) : (
-        <div className="sv-licence-empty">
-          <Icon name="download" />
-          <strong>Downloadable file</strong>
-          <Button asChild variant="secondary" size="sm">
-            <a href={url} target="_blank" rel="noopener noreferrer">
-              <Icon name="download" />
-              <span>Download licence</span>
-            </a>
-          </Button>
-        </div>
-      )}
-    </figure>
+        ) : kind === "pdf" ? (
+          <object className="h-[48rem] w-full rounded-xl border" data={url} type="application/pdf">
+            <LicenceEmpty
+              icon={FileText}
+              title="PDF preview unavailable"
+              action={
+                <Button asChild variant="secondary" size="sm">
+                  <a href={url} target="_blank" rel="noopener noreferrer">
+                    <Download data-icon="inline-start" />
+                    Download licence
+                  </a>
+                </Button>
+              }
+            />
+          </object>
+        ) : (
+          <LicenceEmpty
+            icon={Download}
+            title="Downloadable file"
+            action={
+              <Button asChild variant="secondary" size="sm">
+                <a href={url} target="_blank" rel="noopener noreferrer">
+                  <Download data-icon="inline-start" />
+                  Download licence
+                </a>
+              </Button>
+            }
+          />
+        )}
+      </CardContent>
+    </Card>
   );
 }
 
 function DetailRow({ label, value }: { label: string; value: string }) {
   return (
-    <div className="sv-detail-row">
-      <span className="sv-detail-label">{label}</span>
-      <span className="sv-detail-value">{value}</span>
+    <div className="grid gap-1 sm:grid-cols-[8rem_minmax(0,1fr)] sm:gap-4">
+      <dt className="text-sm text-muted-foreground">{label}</dt>
+      <dd className="text-sm font-medium sm:text-right">{value}</dd>
     </div>
   );
 }
@@ -188,10 +259,10 @@ export function AdminSupplierVerificationDetail({
   if (verification === null) {
     return shell(
       <>
-        <Button asChild variant="link" className="sv-back h-auto p-0">
+        <Button asChild variant="ghost" size="sm">
           <RouterLink to="/admin/verifications">
-            <Icon name="arrow-right" />
-            <span>Back to verifications</span>
+            <ArrowLeft data-icon="inline-start" />
+            Back to verifications
           </RouterLink>
         </Button>
         <PageHeader
@@ -230,13 +301,14 @@ export function AdminSupplierVerificationDetail({
   };
 
   const decided = verification.status !== "pending";
+  const noteInvalid = notice?.message === "Add a reason so the supplier knows what to fix.";
 
   return shell(
     <>
-      <Button asChild variant="link" className="sv-back h-auto p-0">
+      <Button asChild variant="ghost" size="sm">
         <RouterLink to="/admin/verifications">
-          <Icon name="arrow-right" />
-          <span>Back to verifications</span>
+          <ArrowLeft data-icon="inline-start" />
+          Back to verifications
         </RouterLink>
       </Button>
       <PageHeader
@@ -259,96 +331,125 @@ export function AdminSupplierVerificationDetail({
       />
       <InlineNotice message={notice?.message} state={notice?.state} />
 
-      <div className="sv-detail">
-        <div className="sv-detail-main">
-          <LicencePreview verification={verification} />
-        </div>
+      <div className="grid gap-6 xl:grid-cols-[minmax(0,2fr)_minmax(20rem,1fr)]">
+        <LicencePreview verification={verification} />
 
-        <div className="sv-detail-side">
-          <section className="sv-panel">
-            <h2 className="sv-panel-title">Supplier</h2>
-            <div className="sv-card-supplier">
-              <span className="admin-avatar">{initials(verification.supplier_name)}</span>
-              <span>
-                <strong>{verification.supplier_name || "Unnamed supplier"}</strong>
-                <small>{verification.supplier_email}</small>
-              </span>
-            </div>
-          </section>
+        <div className="flex flex-col gap-6">
+          <Card>
+            <CardHeader>
+              <CardTitle>Supplier</CardTitle>
+            </CardHeader>
+            <CardContent>
+              <div className="flex items-center gap-3">
+                <Avatar>
+                  <AvatarFallback>{initials(verification.supplier_name)}</AvatarFallback>
+                </Avatar>
+                <span className="flex min-w-0 flex-col gap-1">
+                  <strong className="truncate font-medium">
+                    {verification.supplier_name || "Unnamed supplier"}
+                  </strong>
+                  <small className="truncate text-xs text-muted-foreground">
+                    {verification.supplier_email}
+                  </small>
+                </span>
+              </div>
+            </CardContent>
+          </Card>
 
-          <section className="sv-panel">
-            <h2 className="sv-panel-title">Shop details</h2>
-            <DetailRow label="Location" value={verification.location} />
-            <DetailRow label="Submitted" value={formatDateTime(verification.created_at)} />
-            {decided && verification.reviewed_at ? (
-              <DetailRow label="Last reviewed" value={formatDateTime(verification.reviewed_at)} />
-            ) : null}
-            <div className="sv-detail-row is-block">
-              <span className="sv-detail-label">About the shop</span>
-              <p className="sv-detail-text">{verification.shop_details}</p>
-            </div>
-          </section>
+          <Card>
+            <CardHeader>
+              <CardTitle>Shop details</CardTitle>
+            </CardHeader>
+            <CardContent className="flex flex-col gap-4">
+              <dl className="flex flex-col gap-3">
+                <DetailRow label="Location" value={verification.location} />
+                <DetailRow label="Submitted" value={formatDateTime(verification.created_at)} />
+                {decided && verification.reviewed_at ? (
+                  <DetailRow
+                    label="Last reviewed"
+                    value={formatDateTime(verification.reviewed_at)}
+                  />
+                ) : null}
+              </dl>
+              <div className="flex flex-col gap-1">
+                <span className="text-sm text-muted-foreground">About the shop</span>
+                <p className="text-sm leading-relaxed">{verification.shop_details}</p>
+              </div>
+            </CardContent>
+          </Card>
 
-          <section className="sv-panel">
-            <h2 className="sv-panel-title">Review</h2>
-            {decided ? (
-              <div className={`sv-decided is-${verification.status}`}>
-                <p className="sv-decided-head">
-                  <Icon name="lock" />
-                  <span>
+          <Card>
+            <CardHeader>
+              <CardTitle>Review</CardTitle>
+              <CardDescription>
+                {decided
+                  ? "This application has already been reviewed."
+                  : "Approve the application or explain what the supplier needs to fix."}
+              </CardDescription>
+            </CardHeader>
+            <CardContent>
+              {decided ? (
+                <Alert variant={verification.status === "rejected" ? "destructive" : "default"}>
+                  <LockKeyhole />
+                  <AlertTitle>
                     Already {verification.status}
                     {verification.reviewed_at
                       ? ` on ${formatDateTime(verification.reviewed_at)}`
                       : ""}
                     .
-                  </span>
-                </p>
-                {verification.status === "rejected" && verification.review_note ? (
-                  <p className="sv-current-note">
-                    <strong>Reason:</strong> {verification.review_note}
-                  </p>
-                ) : verification.review_note ? (
-                  <p className="sv-current-note">
-                    <strong>Note:</strong> {verification.review_note}
-                  </p>
-                ) : null}
-                <p className="sv-decided-hint">
-                  This application is locked. The supplier must edit and resubmit before it can be
-                  reviewed again.
-                </p>
-              </div>
-            ) : (
-              <>
-                <label className="admin-field">
-                  <span>
-                    Review note{" "}
-                    <em className="sv-field-hint">(required to reject, optional to approve)</em>
-                  </span>
-                  <textarea
-                    rows={4}
-                    maxLength={1000}
-                    placeholder="Explain what looks good or what the supplier needs to fix."
-                    value={note}
-                    onChange={(event) => setNote(event.target.value)}
-                  />
-                </label>
-                <div className="sv-review-actions">
-                  <Button onClick={() => runReview("approve")} disabled={busy}>
-                    <Icon name="check" />
-                    <span>Approve supplier</span>
-                  </Button>
-                  <Button
-                    variant="secondary"
-                    onClick={() => runReview("reject")}
-                    disabled={busy || note.trim().length === 0}
-                  >
-                    <Icon name="trash" />
-                    <span>Reject supplier</span>
-                  </Button>
-                </div>
-              </>
+                  </AlertTitle>
+                  <AlertDescription className="flex flex-col gap-2">
+                    {verification.status === "rejected" && verification.review_note ? (
+                      <p>
+                        <strong>Reason:</strong> {verification.review_note}
+                      </p>
+                    ) : verification.review_note ? (
+                      <p>
+                        <strong>Note:</strong> {verification.review_note}
+                      </p>
+                    ) : null}
+                    <p>
+                      This application is locked. The supplier must edit and resubmit before it can
+                      be reviewed again.
+                    </p>
+                  </AlertDescription>
+                </Alert>
+              ) : (
+                <FieldGroup>
+                  <Field data-invalid={noteInvalid || undefined}>
+                    <FieldLabel htmlFor="supplier-review-note">Review note</FieldLabel>
+                    <FieldDescription>Required to reject and optional to approve.</FieldDescription>
+                    <Textarea
+                      id="supplier-review-note"
+                      rows={4}
+                      maxLength={1000}
+                      placeholder="Explain what looks good or what the supplier needs to fix."
+                      value={note}
+                      aria-invalid={noteInvalid || undefined}
+                      onChange={(event) => setNote(event.target.value)}
+                    />
+                  </Field>
+                </FieldGroup>
+              )}
+            </CardContent>
+            {decided ? null : (
+              <CardFooter className="flex-wrap gap-2">
+                <Button type="button" onClick={() => runReview("approve")} disabled={busy}>
+                  <Check data-icon="inline-start" />
+                  Approve supplier
+                </Button>
+                <Button
+                  type="button"
+                  variant="secondary"
+                  onClick={() => runReview("reject")}
+                  disabled={busy || note.trim().length === 0}
+                >
+                  <X data-icon="inline-start" />
+                  Reject supplier
+                </Button>
+              </CardFooter>
             )}
-          </section>
+          </Card>
         </div>
       </div>
     </>,

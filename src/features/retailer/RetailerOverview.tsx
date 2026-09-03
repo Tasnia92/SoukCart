@@ -1,6 +1,28 @@
 import { useNavigate } from "@tanstack/react-router";
+import {
+  Activity,
+  ArrowRight,
+  Check,
+  House,
+  MessageSquare,
+  Package,
+  ShoppingBag,
+  ShoppingCart,
+  Store,
+  Truck,
+} from "lucide-react";
 import { useEffect, useMemo, useState } from "react";
+import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
+import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
+import {
+  Card,
+  CardAction,
+  CardDescription,
+  CardFooter,
+  CardHeader,
+  CardTitle,
+} from "@/components/ui/card";
 import {
   DashboardBadge,
   DashboardCard,
@@ -20,7 +42,6 @@ import {
   type DashboardBucket,
   type DashboardSeverity,
 } from "../../components/dashboard/dashboard-model.ts";
-import { Icon } from "../../components/ui/Icon.tsx";
 import { InlineNotice, PageHeader, WorkspaceError } from "../../components/ui/Workspace.tsx";
 import { useSessionSnapshot, useSessionStore } from "../../session.tsx";
 import { PaymentBadge, shortId, StatusBadge } from "../orders/order-presentation.tsx";
@@ -64,11 +85,20 @@ function severityFor(count: number, escalated = false): DashboardSeverity {
   return escalated ? "critical" : "attention";
 }
 
+function severityVariant(
+  severity: DashboardSeverity,
+): "default" | "secondary" | "destructive" | "outline" {
+  if (severity === "critical") return "destructive";
+  if (severity === "attention") return "secondary";
+  if (severity === "positive") return "default";
+  return "outline";
+}
+
 const recentColumns: DashboardColumn<RetailerRecentOrder>[] = [
   {
     key: "order",
     header: "Order",
-    cell: (order) => <span className="db-cell-strong">#{shortId(order.id)}</span>,
+    cell: (order) => <span className="font-medium">#{shortId(order.id)}</span>,
   },
   { key: "placed", header: "Placed", cell: (order) => formatDate(order.createdAt) },
   { key: "units", header: "Units", numeric: true, cell: (order) => order.units },
@@ -76,7 +106,7 @@ const recentColumns: DashboardColumn<RetailerRecentOrder>[] = [
     key: "total",
     header: "Total",
     numeric: true,
-    cell: (order) => <span className="db-cell-strong">{formatPrice(order.total)}</span>,
+    cell: (order) => <span className="font-medium">{formatPrice(order.total)}</span>,
   },
   {
     key: "payment",
@@ -93,51 +123,53 @@ const recentColumns: DashboardColumn<RetailerRecentOrder>[] = [
     key: "status",
     header: "Fulfillment",
     cell: (order) => (
-      <>
+      <div className="flex flex-wrap gap-2">
         <StatusBadge status={order.status} />
         {order.cancelRequested ? (
           <DashboardBadge severity="attention">Cancellation requested</DashboardBadge>
         ) : null}
-      </>
+      </div>
     ),
   },
   {
     key: "action",
     header: "Action",
     cell: (order) => (
-      <RouterLink className="db-queue-action" to="/retailer/orders">
-        <span>{order.needsDeliveryConfirmation ? "Confirm delivery" : "View order"}</span>
-        <Icon name="arrow-right" />
-      </RouterLink>
+      <Button asChild variant="link" size="sm" className="h-auto p-0">
+        <RouterLink to="/retailer/orders">
+          {order.needsDeliveryConfirmation ? "Confirm delivery" : "View order"}
+          <ArrowRight data-icon="inline-end" />
+        </RouterLink>
+      </Button>
     ),
   },
 ];
 
 /** The single most useful move, stated before any number on the page. */
 function NextActionWidget({ action }: { action: RetailerNextAction }) {
+  const ActionIcon = action.icon;
+
   return (
-    <section
-      className={`db-next is-${action.severity}`}
-      aria-label="Your next step"
-      aria-live="polite"
-    >
-      <span className="db-next-icon">
-        <Icon name={action.icon} />
-      </span>
-      <div className="db-next-body">
-        <p className="eyebrow">{action.eyebrow}</p>
-        <strong>{action.title}</strong>
-        <p>{action.copy}</p>
-      </div>
-      <div className="db-next-actions">
+    <Card aria-label="Your next step" aria-live="polite">
+      <CardHeader>
+        <CardTitle className="flex items-center gap-2">
+          <ActionIcon className="size-5" aria-hidden="true" />
+          {action.title}
+        </CardTitle>
+        <CardDescription>{action.copy}</CardDescription>
+        <CardAction>
+          <Badge variant={severityVariant(action.severity)}>{action.eyebrow}</Badge>
+        </CardAction>
+      </CardHeader>
+      <CardFooter className="justify-end">
         <Button asChild>
           <RouterLink to={action.to}>
-            <Icon name={action.icon} />
-            <span>{action.actionLabel}</span>
+            <ActionIcon data-icon="inline-start" />
+            {action.actionLabel}
           </RouterLink>
         </Button>
-      </div>
-    </section>
+      </CardFooter>
+    </Card>
   );
 }
 
@@ -228,16 +260,16 @@ export function RetailerOverview({
     <WorkspaceShell
       navigationLabel="Retailer navigation"
       items={[
-        { to: "/retailer", icon: "home", label: "Overview", active: true },
-        { to: "/retailer/catalog", icon: "bag", label: "Place order" },
+        { to: "/retailer", icon: House, label: "Overview", active: true },
+        { to: "/retailer/catalog", icon: ShoppingBag, label: "Place order" },
         {
           to: "/retailer/cart",
-          icon: "cart",
+          icon: ShoppingCart,
           label: "Cart",
           trailing: cartUnits || undefined,
         },
-        { to: "/retailer/orders", icon: "package", label: "My orders" },
-        { to: "/retailer/complaints", icon: "message", label: "Help Center" },
+        { to: "/retailer/orders", icon: Package, label: "My orders" },
+        { to: "/retailer/complaints", icon: MessageSquare, label: "Help Center" },
       ]}
       userName={userName}
       userEmail={state.profile.email}
@@ -251,14 +283,14 @@ export function RetailerOverview({
           <>
             <Button asChild>
               <RouterLink to="/retailer/catalog">
-                <Icon name="bag" />
-                <span>Place order</span>
+                <ShoppingBag data-icon="inline-start" />
+                Place order
               </RouterLink>
             </Button>
             <Button asChild variant="ghost">
               <RouterLink to="/retailer/orders">
-                <Icon name="package" />
-                <span>My orders</span>
+                <Package data-icon="inline-start" />
+                My orders
               </RouterLink>
             </Button>
           </>
@@ -272,7 +304,7 @@ export function RetailerOverview({
 
           <MetricRow label="Spend and delivery status">
             <MetricCard
-              icon="activity"
+              icon={Activity}
               label="Spend"
               value={formatPrice(summary.spend)}
               period={period}
@@ -282,7 +314,7 @@ export function RetailerOverview({
               linkLabel="Open my orders"
             />
             <MetricCard
-              icon="truck"
+              icon={Truck}
               label="Active orders"
               value={summary.activeOrders}
               period="In flight right now"
@@ -292,7 +324,7 @@ export function RetailerOverview({
               linkLabel="Track deliveries"
             />
             <MetricCard
-              icon="check"
+              icon={Check}
               label="Delivered"
               value={summary.delivered}
               period={period}
@@ -302,7 +334,7 @@ export function RetailerOverview({
               linkLabel="See delivered orders"
             />
             <MetricCard
-              icon="cart"
+              icon={ShoppingCart}
               label="In your cart"
               value={summary.cartUnits}
               period="Not ordered yet"
@@ -320,22 +352,32 @@ export function RetailerOverview({
               meta="Every order you have placed"
               action={<DashboardLink to="/retailer/orders">My orders</DashboardLink>}
             >
-              <ul className="db-stages">
+              <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-5">
                 {dashboard.stages.map((stage) => (
-                  <li
-                    className={`db-stage${stage.count ? ` is-${stage.severity}` : ""}`}
-                    key={stage.key}
-                  >
-                    <span className="db-stage-count">{stage.count}</span>
-                    <span className="db-stage-label">{stage.label}</span>
-                  </li>
+                  <Card size="sm" key={stage.key}>
+                    <CardHeader>
+                      <CardTitle className="text-2xl tabular-nums">{stage.count}</CardTitle>
+                      <CardDescription>{stage.label}</CardDescription>
+                      <CardAction>
+                        <Badge variant={severityVariant(stage.count ? stage.severity : "neutral")}>
+                          {stage.count ? "Active" : "None"}
+                        </Badge>
+                      </CardAction>
+                    </CardHeader>
+                  </Card>
                 ))}
-              </ul>
-              <p className="db-note db-stages-note">
-                {summary.activeOrders
-                  ? `${summary.activeOrders} order${summary.activeOrders === 1 ? "" : "s"} still moving. Confirm each delivery when it arrives to close it out.`
-                  : "Nothing is in transit. Your next order will show its progress here."}
-              </p>
+              </div>
+              <Alert role="note">
+                <Truck />
+                <AlertTitle>
+                  {summary.activeOrders ? "Deliveries in progress" : "No active deliveries"}
+                </AlertTitle>
+                <AlertDescription>
+                  {summary.activeOrders
+                    ? `${summary.activeOrders} order${summary.activeOrders === 1 ? "" : "s"} still moving. Confirm each delivery when it arrives to close it out.`
+                    : "Nothing is in transit. Your next order will show its progress here."}
+                </AlertDescription>
+              </Alert>
             </DashboardCard>
 
             <TrendChartCard
@@ -380,14 +422,12 @@ export function RetailerOverview({
                 />
               ) : (
                 <SectionEmpty
-                  icon="store"
+                  icon={Store}
                   title="No orders yet"
                   copy="Start with the catalog and place your first order."
                   action={
                     <Button asChild>
-                      <RouterLink to="/retailer/catalog">
-                        <span>Place order</span>
-                      </RouterLink>
+                      <RouterLink to="/retailer/catalog">Place order</RouterLink>
                     </Button>
                   }
                 />
@@ -405,21 +445,35 @@ export function RetailerOverview({
                 <SectionError message={helpFailure.message} onRetry={retry} />
               ) : (
                 <>
-                  <ul className="db-figures">
-                    <li>
-                      <strong>{dashboard.help.open}</strong>
-                      <span>Open</span>
-                    </li>
-                    <li>
-                      <strong>{dashboard.help.resolved}</strong>
-                      <span>Resolved</span>
-                    </li>
-                  </ul>
-                  <p className="db-note">
-                    {dashboard.help.total
-                      ? "Our team replies inside the Help Center. File a new ticket there if something is wrong with an order."
-                      : "Nothing filed yet. Open a ticket from the Help Center if an order needs attention."}
-                  </p>
+                  <div className="grid grid-cols-2 gap-3">
+                    <Card size="sm">
+                      <CardHeader>
+                        <CardTitle className="text-2xl tabular-nums">
+                          {dashboard.help.open}
+                        </CardTitle>
+                        <CardDescription>Open</CardDescription>
+                      </CardHeader>
+                    </Card>
+                    <Card size="sm">
+                      <CardHeader>
+                        <CardTitle className="text-2xl tabular-nums">
+                          {dashboard.help.resolved}
+                        </CardTitle>
+                        <CardDescription>Resolved</CardDescription>
+                      </CardHeader>
+                    </Card>
+                  </div>
+                  <Alert role="note">
+                    <MessageSquare />
+                    <AlertTitle>
+                      {dashboard.help.total ? "Support history available" : "No tickets filed"}
+                    </AlertTitle>
+                    <AlertDescription>
+                      {dashboard.help.total
+                        ? "Our team replies inside the Help Center. File a new ticket there if something is wrong with an order."
+                        : "Open a ticket from the Help Center if an order needs attention."}
+                    </AlertDescription>
+                  </Alert>
                 </>
               )}
             </DashboardCard>

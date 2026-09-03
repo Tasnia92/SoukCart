@@ -1,5 +1,5 @@
+import { Home, Layers, Package, ShoppingBag } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
-import { Icon } from "../../components/ui/Icon.tsx";
 import type { WorkspaceNavItem } from "../workspace/WorkspaceShell.tsx";
 import type { SupplierProduct } from "./supplier-overview-api.ts";
 
@@ -25,7 +25,7 @@ export function ProductThumb({ product }: { product: Pick<SupplierProduct, "imag
   return product.image_url ? (
     <img src={product.image_url} alt="" loading="lazy" className="size-full object-cover" />
   ) : (
-    <Icon name="bag" />
+    <ShoppingBag aria-hidden="true" />
   );
 }
 
@@ -33,9 +33,14 @@ type SupplierSection = "overview" | "orders" | "products" | "stock";
 
 export function supplierNavItems(active: SupplierSection): WorkspaceNavItem[] {
   return [
-    { to: "/supplier", icon: "home", label: "Overview", active: active === "overview" },
-    { to: "/supplier/orders", icon: "package", label: "Orders", active: active === "orders" },
-    { to: "/supplier/products", icon: "bag", label: "My products", active: active === "products" },
-    { to: "/supplier/stock", icon: "layers", label: "Stock", active: active === "stock" },
+    { to: "/supplier", icon: Home, label: "Overview", active: active === "overview" },
+    { to: "/supplier/orders", icon: Package, label: "Orders", active: active === "orders" },
+    {
+      to: "/supplier/products",
+      icon: ShoppingBag,
+      label: "My products",
+      active: active === "products",
+    },
+    { to: "/supplier/stock", icon: Layers, label: "Stock", active: active === "stock" },
   ];
 }

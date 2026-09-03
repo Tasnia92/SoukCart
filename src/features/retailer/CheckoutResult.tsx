@@ -1,4 +1,15 @@
 import { useRouterState } from "@tanstack/react-router";
+import {
+  Check,
+  Clock,
+  House,
+  MessageSquare,
+  Minus,
+  Package,
+  ShoppingBag,
+  ShoppingCart,
+  type LucideIcon,
+} from "lucide-react";
 import { useEffect, useState, type ReactNode } from "react";
 import { Button } from "@/components/ui/button";
 import {
@@ -11,7 +22,6 @@ import {
 } from "@/components/ui/empty";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Brand } from "../../components/ui/Brand.tsx";
-import { Icon, type IconName } from "../../components/ui/Icon.tsx";
 import { PageHeader } from "../../components/ui/Workspace.tsx";
 import { useSessionSnapshot, useSessionStore } from "../../session.tsx";
 import { WorkspaceShell } from "../workspace/WorkspaceShell.tsx";
@@ -101,11 +111,11 @@ export function CheckoutResult() {
       <WorkspaceShell
         navigationLabel="Retailer navigation"
         items={[
-          { to: "/retailer", icon: "home", label: "Overview", active: true },
-          { to: "/retailer/catalog", icon: "bag", label: "Place order" },
-          { to: "/retailer/cart", icon: "cart", label: "Cart" },
-          { to: "/retailer/orders", icon: "package", label: "My orders" },
-          { to: "/retailer/complaints", icon: "message", label: "Help Center" },
+          { to: "/retailer", icon: House, label: "Overview", active: true },
+          { to: "/retailer/catalog", icon: ShoppingBag, label: "Place order" },
+          { to: "/retailer/cart", icon: ShoppingCart, label: "Cart" },
+          { to: "/retailer/orders", icon: Package, label: "My orders" },
+          { to: "/retailer/complaints", icon: MessageSquare, label: "Help Center" },
         ]}
         userName={state.profile.name || state.profile.email}
         userEmail={state.profile.email}
@@ -117,10 +127,14 @@ export function CheckoutResult() {
   }
 
   return (
-    <div className="plain-screen">
-      <Brand />
-      <ResultCard card={card} />
-    </div>
+    <main className="min-h-svh bg-muted/30 p-4 sm:p-8">
+      <div className="mx-auto flex min-h-[calc(100svh-2rem)] max-w-2xl flex-col gap-8 sm:min-h-[calc(100svh-4rem)]">
+        <Brand />
+        <div className="flex flex-1 items-center justify-center">
+          <ResultCard card={card} />
+        </div>
+      </div>
+    </main>
   );
 }
 
@@ -140,7 +154,7 @@ function ResultCard({ card }: { card: Card }): ReactNode {
   }
 
   const { ok, kind, hasSession } = card;
-  const icon: IconName = ok ? "check" : kind === "failed" ? "minus" : "clock";
+  const ResultIcon: LucideIcon = ok ? Check : kind === "failed" ? Minus : Clock;
   const title = ok
     ? "Payment received"
     : kind === "failed"
@@ -156,16 +170,14 @@ function ResultCard({ card }: { card: Card }): ReactNode {
     <Empty role="status" aria-live="polite">
       <EmptyHeader>
         <EmptyMedia variant="icon">
-          <Icon name={icon} />
+          <ResultIcon />
         </EmptyMedia>
         <EmptyTitle>{title}</EmptyTitle>
         <EmptyDescription>{copy}</EmptyDescription>
       </EmptyHeader>
       <EmptyContent>
         <Button asChild>
-          <a href={href}>
-            <span>{label}</span>
-          </a>
+          <a href={href}>{label}</a>
         </Button>
       </EmptyContent>
     </Empty>

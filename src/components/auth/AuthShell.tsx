@@ -1,6 +1,14 @@
 import type { Ref } from "react";
-import { Brand } from "../ui/Brand.tsx";
+import { Brand } from "@/components/ui/Brand";
 import { Button } from "@/components/ui/button";
+import {
+  Card,
+  CardContent,
+  CardDescription,
+  CardFooter,
+  CardHeader,
+  CardTitle,
+} from "@/components/ui/card";
 import { AuthStory } from "./AuthStory.tsx";
 import { LoginForm } from "./LoginForm.tsx";
 import { RegisterForm } from "./RegisterForm.tsx";
@@ -63,59 +71,78 @@ export function AuthShell({
         } SoukCart.`;
 
   const shell = (
-    <div className="auth-layout" data-auth-mode={resolvedMode} data-auth-role={role}>
-      <main className="auth-main">
-        <div className="auth-content">
+    <div
+      className="grid min-h-svh bg-background lg:grid-cols-[minmax(0,1fr)_minmax(22rem,0.85fr)]"
+      data-auth-mode={resolvedMode}
+      data-auth-role={role}
+    >
+      <main className="flex min-w-0 items-center justify-center px-4 py-8 sm:px-6 lg:px-10">
+        <div className="flex w-full max-w-xl flex-col gap-6">
           <Brand />
-          <section className="auth-section" aria-labelledby="auth-title">
-            {!isAdmin ? <RoleTabs value={role} onChange={onRoleChange} disabled={pending} /> : null}
-            <div className="auth-intro">
-              {!isAdmin ? <p className="eyebrow">{eyebrow}</p> : null}
-              <h1 id="auth-title" className="display-xl" tabIndex={-1} ref={headingRef}>
-                {title}
-              </h1>
-              {subtitle ? <p className="body-copy">{subtitle}</p> : null}
-            </div>
-            {isLogin ? (
-              <LoginForm
-                feedback={feedback}
-                onForgotPassword={onForgotPassword}
-                onSubmit={onLogin}
-                onSwitchToRegister={() => onSwitchMode?.("register")}
-                pending={pending}
-                showCreateAccount={!isAdmin}
-                showForgotPassword={!isAdmin}
-              />
-            ) : (
-              <RegisterForm
-                feedback={feedback}
-                onSubmit={onRegister}
-                onSwitchToLogin={() => onSwitchMode?.("login")}
-                onTerms={onTerms}
-                pending={pending}
-              />
-            )}
+          <section aria-labelledby="auth-title">
+            <Card>
+              <CardHeader className="gap-5">
+                {!isAdmin ? (
+                  <RoleTabs value={role} onChange={onRoleChange} disabled={pending} />
+                ) : null}
+                <div className="flex flex-col gap-2">
+                  {!isAdmin ? <p className="text-sm font-medium text-primary">{eyebrow}</p> : null}
+                  <CardTitle>
+                    <h1
+                      id="auth-title"
+                      className="text-balance text-3xl font-semibold tracking-tight sm:text-4xl"
+                      tabIndex={-1}
+                      ref={headingRef}
+                    >
+                      {title}
+                    </h1>
+                  </CardTitle>
+                  {subtitle ? <CardDescription>{subtitle}</CardDescription> : null}
+                </div>
+              </CardHeader>
+              <CardContent>
+                {isLogin ? (
+                  <LoginForm
+                    feedback={feedback}
+                    onForgotPassword={onForgotPassword}
+                    onSubmit={onLogin}
+                    onSwitchToRegister={() => onSwitchMode?.("register")}
+                    pending={pending}
+                    showCreateAccount={!isAdmin}
+                    showForgotPassword={!isAdmin}
+                  />
+                ) : (
+                  <RegisterForm
+                    feedback={feedback}
+                    onSubmit={onRegister}
+                    onSwitchToLogin={() => onSwitchMode?.("login")}
+                    onTerms={onTerms}
+                    pending={pending}
+                  />
+                )}
+              </CardContent>
+              {isLogin && !isAdmin ? (
+                <CardFooter className="flex-col justify-center gap-1 border-t text-center text-sm text-muted-foreground sm:flex-row">
+                  <span>By continuing, you agree to SoukCart&apos;s</span>
+                  <Button
+                    variant="link"
+                    size="sm"
+                    type="button"
+                    data-terms=""
+                    disabled={pending}
+                    onClick={onTerms}
+                  >
+                    Terms &amp; Privacy.
+                  </Button>
+                </CardFooter>
+              ) : null}
+            </Card>
           </section>
-          {isLogin && !isAdmin ? (
-            <p className="auth-legal">
-              By continuing, you agree to SoukCart&apos;s{" "}
-              <Button
-                variant="link"
-                className="h-auto p-0"
-                type="button"
-                data-terms=""
-                disabled={pending}
-                onClick={onTerms}
-              >
-                Terms &amp; Privacy.
-              </Button>
-            </p>
-          ) : null}
         </div>
       </main>
       <AuthStory />
     </div>
   );
 
-  return isAdmin ? <div className="admin-login">{shell}</div> : shell;
+  return shell;
 }

@@ -1,7 +1,43 @@
 import { useNavigate } from "@tanstack/react-router";
+import {
+  House,
+  LockKeyhole,
+  MessageSquare,
+  Minus,
+  Package,
+  Plus,
+  ShoppingBag,
+  ShoppingCart,
+  Store,
+  Trash2,
+  Truck,
+} from "lucide-react";
 import { useEffect, useState } from "react";
+import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { Icon } from "../../components/ui/Icon.tsx";
+import {
+  Card,
+  CardAction,
+  CardContent,
+  CardDescription,
+  CardFooter,
+  CardHeader,
+  CardTitle,
+} from "@/components/ui/card";
+import {
+  Field,
+  FieldContent,
+  FieldDescription,
+  FieldGroup,
+  FieldLabel,
+  FieldLegend,
+  FieldSet,
+  FieldTitle,
+} from "@/components/ui/field";
+import { Input } from "@/components/ui/input";
+import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
+import { Separator } from "@/components/ui/separator";
+import { Textarea } from "@/components/ui/textarea";
 import {
   EmptyState,
   InlineNotice,
@@ -200,22 +236,23 @@ export function RetailerCart({
   const cartCount = lines ? cartItemCount(lines) : 0;
   const subtotal = lines ? cartSubtotal(lines) : 0;
   const cod = paymentMethod === "cod";
+  const CheckoutIcon = cod ? Truck : LockKeyhole;
 
   return (
     <WorkspaceShell
       navigationLabel="Retailer navigation"
       items={[
-        { to: "/retailer", icon: "home", label: "Overview" },
-        { to: "/retailer/catalog", icon: "bag", label: "Place order" },
+        { to: "/retailer", icon: House, label: "Overview" },
+        { to: "/retailer/catalog", icon: ShoppingBag, label: "Place order" },
         {
           to: "/retailer/cart",
-          icon: "cart",
+          icon: ShoppingCart,
           label: "Cart",
           active: true,
           trailing: cartCount || undefined,
         },
-        { to: "/retailer/orders", icon: "package", label: "My orders" },
-        { to: "/retailer/complaints", icon: "message", label: "Help Center" },
+        { to: "/retailer/orders", icon: Package, label: "My orders" },
+        { to: "/retailer/complaints", icon: MessageSquare, label: "Help Center" },
       ]}
       userName={userName}
       userEmail={state.profile.email}
@@ -229,8 +266,8 @@ export function RetailerCart({
       <InlineNotice message={notice?.message} state={notice?.state} />
       {lines ? (
         lines.length ? (
-          <div className="rt-cart-layout">
-            <section className="rt-cart-list" aria-label="Order items">
+          <div className="grid items-start gap-6 xl:grid-cols-[minmax(0,1fr)_minmax(20rem,26rem)]">
+            <section className="flex flex-col gap-4" aria-label="Order items">
               {lines.map((line) => (
                 <CartLineRow
                   key={line.product.id}
@@ -241,142 +278,152 @@ export function RetailerCart({
                 />
               ))}
             </section>
-            <aside className="rt-summary-card" aria-label="Order summary">
-              <p className="eyebrow">Order summary</p>
-              <div className="rt-summary-row">
-                <span>Items</span>
-                <strong>{cartCount}</strong>
-              </div>
-              <div className="rt-summary-row">
-                <span>Subtotal</span>
-                <strong>{formatPrice(subtotal)}</strong>
-              </div>
-              <label className="admin-field">
-                <span>Phone number</span>
-                <input
-                  name="phone"
-                  type="tel"
-                  inputMode="tel"
-                  autoComplete="tel"
-                  placeholder="01XXXXXXXXX"
-                  required
-                  value={form.phone}
-                  onChange={(event) => setField("phone", event.target.value)}
-                />
-              </label>
-              <label className="admin-field">
-                <span>Delivery address</span>
-                <input
-                  name="address"
-                  type="text"
-                  autoComplete="street-address"
-                  placeholder="House, road, area"
-                  required
-                  value={form.address}
-                  onChange={(event) => setField("address", event.target.value)}
-                />
-              </label>
-              <div className="rt-checkout-grid">
-                <label className="admin-field">
-                  <span>City</span>
-                  <input
-                    name="city"
-                    type="text"
-                    autoComplete="address-level2"
-                    placeholder="Dhaka"
-                    required
-                    value={form.city}
-                    onChange={(event) => setField("city", event.target.value)}
-                  />
-                </label>
-                <label className="admin-field">
-                  <span>Postcode</span>
-                  <input
-                    name="postcode"
-                    type="text"
-                    autoComplete="postal-code"
-                    placeholder="1205"
-                    required
-                    value={form.postcode}
-                    onChange={(event) => setField("postcode", event.target.value)}
-                  />
-                </label>
-              </div>
-              <label className="admin-field">
-                <span>Notes for the supplier</span>
-                <textarea
-                  name="notes"
-                  rows={2}
-                  placeholder="Delivery instructions, packaging, etc."
-                  value={form.notes}
-                  onChange={(event) => setField("notes", event.target.value)}
-                />
-              </label>
-              <fieldset className="rt-payment-methods">
-                <legend className="sr-only">Payment method</legend>
-                <label className="rt-payment-method">
-                  <input
-                    type="radio"
-                    name="payment-method"
-                    value="online"
-                    checked={paymentMethod === "online"}
-                    onChange={() => setPaymentMethod("online")}
-                  />
-                  <span className="rt-payment-icon">
-                    <Icon name="lock" />
-                  </span>
-                  <span className="rt-payment-body">
-                    <strong>Pay online</strong>
-                    <small>Card or mobile banking via SSLCommerz</small>
-                  </span>
-                </label>
-                <label className="rt-payment-method">
-                  <input
-                    type="radio"
-                    name="payment-method"
-                    value="cod"
-                    checked={paymentMethod === "cod"}
-                    onChange={() => setPaymentMethod("cod")}
-                  />
-                  <span className="rt-payment-icon">
-                    <Icon name="truck" />
-                  </span>
-                  <span className="rt-payment-body">
-                    <strong>Cash on delivery</strong>
-                    <small>Pay in cash when your order arrives</small>
-                  </span>
-                </label>
-              </fieldset>
-              <Button
-                className="w-full"
-                type="button"
-                disabled={checkingOut}
-                onClick={() => void onCheckout()}
-              >
-                <span>
-                  <Icon name={cod ? "truck" : "lock"} />
-                </span>
-                <span>
-                  {cod ? `Place order · ${formatPrice(subtotal)}` : `Pay ${formatPrice(subtotal)}`}
-                </span>
-              </Button>
-              <p className="rt-summary-hint">
-                {cod
-                  ? "Pay in cash when your order arrives."
-                  : "You will be redirected to SSLCommerz to complete the payment securely."}
-              </p>
+            <aside aria-label="Order summary">
+              <Card>
+                <CardHeader>
+                  <CardTitle>Order summary</CardTitle>
+                  <CardDescription>Delivery and payment details for this order.</CardDescription>
+                  <CardAction>
+                    <Badge variant="secondary">{cartCount} items</Badge>
+                  </CardAction>
+                </CardHeader>
+                <CardContent className="flex flex-col gap-6">
+                  <dl className="grid grid-cols-2 gap-3 text-sm">
+                    <dt className="text-muted-foreground">Items</dt>
+                    <dd className="text-right font-medium tabular-nums">{cartCount}</dd>
+                    <dt className="text-muted-foreground">Subtotal</dt>
+                    <dd className="text-right font-medium tabular-nums">{formatPrice(subtotal)}</dd>
+                  </dl>
+                  <Separator />
+                  <FieldGroup>
+                    <Field>
+                      <FieldLabel htmlFor="retailer-checkout-phone">Phone number</FieldLabel>
+                      <Input
+                        id="retailer-checkout-phone"
+                        name="phone"
+                        type="tel"
+                        inputMode="tel"
+                        autoComplete="tel"
+                        placeholder="01XXXXXXXXX"
+                        required
+                        value={form.phone}
+                        onChange={(event) => setField("phone", event.target.value)}
+                      />
+                    </Field>
+                    <Field>
+                      <FieldLabel htmlFor="retailer-checkout-address">Delivery address</FieldLabel>
+                      <Input
+                        id="retailer-checkout-address"
+                        name="address"
+                        type="text"
+                        autoComplete="street-address"
+                        placeholder="House, road, area"
+                        required
+                        value={form.address}
+                        onChange={(event) => setField("address", event.target.value)}
+                      />
+                    </Field>
+                    <div className="grid gap-4 sm:grid-cols-2">
+                      <Field>
+                        <FieldLabel htmlFor="retailer-checkout-city">City</FieldLabel>
+                        <Input
+                          id="retailer-checkout-city"
+                          name="city"
+                          type="text"
+                          autoComplete="address-level2"
+                          placeholder="Dhaka"
+                          required
+                          value={form.city}
+                          onChange={(event) => setField("city", event.target.value)}
+                        />
+                      </Field>
+                      <Field>
+                        <FieldLabel htmlFor="retailer-checkout-postcode">Postcode</FieldLabel>
+                        <Input
+                          id="retailer-checkout-postcode"
+                          name="postcode"
+                          type="text"
+                          autoComplete="postal-code"
+                          placeholder="1205"
+                          required
+                          value={form.postcode}
+                          onChange={(event) => setField("postcode", event.target.value)}
+                        />
+                      </Field>
+                    </div>
+                    <Field>
+                      <FieldLabel htmlFor="retailer-checkout-notes">
+                        Notes for the supplier
+                      </FieldLabel>
+                      <Textarea
+                        id="retailer-checkout-notes"
+                        name="notes"
+                        rows={2}
+                        placeholder="Delivery instructions, packaging, etc."
+                        value={form.notes}
+                        onChange={(event) => setField("notes", event.target.value)}
+                      />
+                    </Field>
+                  </FieldGroup>
+                  <FieldSet>
+                    <FieldLegend>Payment method</FieldLegend>
+                    <RadioGroup
+                      name="payment-method"
+                      value={paymentMethod}
+                      onValueChange={(value) => setPaymentMethod(value as PaymentMethod)}
+                    >
+                      <FieldLabel htmlFor="payment-method-online">
+                        <Field orientation="horizontal">
+                          <RadioGroupItem id="payment-method-online" value="online" />
+                          <LockKeyhole
+                            className="size-5 text-muted-foreground"
+                            aria-hidden="true"
+                          />
+                          <FieldContent>
+                            <FieldTitle>Pay online</FieldTitle>
+                            <FieldDescription>
+                              Card or mobile banking via SSLCommerz
+                            </FieldDescription>
+                          </FieldContent>
+                        </Field>
+                      </FieldLabel>
+                      <FieldLabel htmlFor="payment-method-cod">
+                        <Field orientation="horizontal">
+                          <RadioGroupItem id="payment-method-cod" value="cod" />
+                          <Truck className="size-5 text-muted-foreground" aria-hidden="true" />
+                          <FieldContent>
+                            <FieldTitle>Cash on delivery</FieldTitle>
+                            <FieldDescription>Pay in cash when your order arrives</FieldDescription>
+                          </FieldContent>
+                        </Field>
+                      </FieldLabel>
+                    </RadioGroup>
+                  </FieldSet>
+                </CardContent>
+                <CardFooter className="flex-col items-stretch gap-3">
+                  <Button type="button" disabled={checkingOut} onClick={() => void onCheckout()}>
+                    <CheckoutIcon data-icon="inline-start" />
+                    {cod
+                      ? `Place order · ${formatPrice(subtotal)}`
+                      : `Pay ${formatPrice(subtotal)}`}
+                  </Button>
+                  <p className="text-sm text-muted-foreground">
+                    {cod
+                      ? "Pay in cash when your order arrives."
+                      : "You will be redirected to SSLCommerz to complete the payment securely."}
+                  </p>
+                </CardFooter>
+              </Card>
             </aside>
           </div>
         ) : (
           <EmptyState
-            icon="store"
+            icon={Store}
             title="Your order is empty"
             copy="Browse the catalog and add products to start ordering."
             action={
               <Button asChild>
-                <RouterLink to="/retailer/catalog">
-                  <span>Browse catalog</span>
-                </RouterLink>
+                <RouterLink to="/retailer/catalog">Browse catalog</RouterLink>
               </Button>
             }
           />
@@ -400,55 +447,78 @@ function CartLineRow({
   onRemove: (line: CartLine) => void;
 }) {
   const { product, quantity } = line;
+
   return (
-    <article className="rt-cart-line">
-      <div className="rt-cart-art">
-        {product.image_url ? (
-          <img src={product.image_url} alt="" loading="lazy" />
-        ) : (
-          <Icon name="bag" />
-        )}
-      </div>
-      <div className="rt-cart-line-body">
-        <h3 className="rt-product-name">{product.name}</h3>
-        <p className="rt-product-seller">
-          {product.seller_name || "SoukCart sample"} · {formatPrice(product.price)} per{" "}
-          {product.unit}
-        </p>
-        <div className="rt-stepper" role="group" aria-label={`Quantity for ${product.name}`}>
-          <button
-            className="rt-stepper-button"
+    <article>
+      <Card size="sm">
+        <CardHeader>
+          <CardTitle>
+            <h3>{product.name}</h3>
+          </CardTitle>
+          <CardDescription>
+            {product.seller_name || "SoukCart sample"} · {formatPrice(product.price)} per{" "}
+            {product.unit}
+          </CardDescription>
+          <CardAction>
+            <Badge variant="outline">{formatPrice(product.price * quantity)}</Badge>
+          </CardAction>
+        </CardHeader>
+        <CardContent className="grid items-center gap-4 sm:grid-cols-[5rem_1fr]">
+          <div className="flex aspect-square items-center justify-center overflow-hidden rounded-lg bg-muted">
+            {product.image_url ? (
+              <img
+                className="size-full object-cover"
+                src={product.image_url}
+                alt=""
+                loading="lazy"
+              />
+            ) : (
+              <ShoppingBag className="size-8 text-muted-foreground" aria-hidden="true" />
+            )}
+          </div>
+          <div
+            className="flex items-center gap-2"
+            role="group"
+            aria-label={`Quantity for ${product.name}`}
+          >
+            <Button
+              type="button"
+              variant="outline"
+              size="icon-sm"
+              aria-label="Decrease quantity"
+              disabled={busy}
+              onClick={() => onStep(line, -1)}
+            >
+              <Minus />
+            </Button>
+            <output className="min-w-8 text-center font-medium tabular-nums">{quantity}</output>
+            <Button
+              type="button"
+              variant="outline"
+              size="icon-sm"
+              aria-label="Increase quantity"
+              disabled={busy || quantity >= product.stock}
+              onClick={() => onStep(line, 1)}
+            >
+              <Plus />
+            </Button>
+          </div>
+        </CardContent>
+        <CardFooter className="justify-between">
+          <span className="text-sm text-muted-foreground">{product.stock} available</span>
+          <Button
             type="button"
-            aria-label="Decrease quantity"
+            variant="destructive"
+            size="sm"
+            aria-label={`Remove ${product.name} from order`}
             disabled={busy}
-            onClick={() => onStep(line, -1)}
+            onClick={() => onRemove(line)}
           >
-            <Icon name="minus" />
-          </button>
-          <output className="rt-stepper-value">{quantity}</output>
-          <button
-            className="rt-stepper-button"
-            type="button"
-            aria-label="Increase quantity"
-            disabled={busy || quantity >= product.stock}
-            onClick={() => onStep(line, 1)}
-          >
-            <Icon name="plus" />
-          </button>
-        </div>
-      </div>
-      <div className="rt-cart-line-end">
-        <strong>{formatPrice(product.price * quantity)}</strong>
-        <button
-          className="rt-remove-button"
-          type="button"
-          aria-label={`Remove ${product.name} from order`}
-          disabled={busy}
-          onClick={() => onRemove(line)}
-        >
-          <Icon name="trash" />
-        </button>
-      </div>
+            <Trash2 data-icon="inline-start" />
+            Remove
+          </Button>
+        </CardFooter>
+      </Card>
     </article>
   );
 }

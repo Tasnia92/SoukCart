@@ -1,8 +1,27 @@
 import { useNavigate } from "@tanstack/react-router";
+import {
+  Check,
+  House,
+  MessageSquare,
+  Minus,
+  Package,
+  Plus,
+  ShoppingBag,
+  ShoppingCart,
+} from "lucide-react";
 import { useEffect, useRef, useState } from "react";
+import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { cn } from "@/lib/utils";
-import { Icon } from "../../components/ui/Icon.tsx";
+import {
+  Card,
+  CardAction,
+  CardContent,
+  CardDescription,
+  CardFooter,
+  CardHeader,
+  CardTitle,
+} from "@/components/ui/card";
+import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group";
 import {
   EmptyState,
   InlineNotice,
@@ -36,12 +55,13 @@ type RetailerCatalogProps = {
 type Notice = { message: string; state: NoticeState } | null;
 
 const ADDED_FEEDBACK_MS = 900;
+const ALL_CATEGORIES = "__all_categories__";
 
 function ProductArt({ product }: { product: RetailerProduct }) {
   return product.image_url ? (
-    <img src={product.image_url} alt="" loading="lazy" />
+    <img className="size-full object-cover" src={product.image_url} alt="" loading="lazy" />
   ) : (
-    <Icon name="bag" />
+    <ShoppingBag className="size-10 text-muted-foreground" aria-hidden="true" />
   );
 }
 
@@ -178,11 +198,11 @@ export function RetailerCatalog({
     <WorkspaceShell
       navigationLabel="Retailer navigation"
       items={[
-        { to: "/retailer", icon: "home", label: "Overview" },
-        { to: "/retailer/catalog", icon: "bag", label: "Place order", active: true },
+        { to: "/retailer", icon: House, label: "Overview" },
+        { to: "/retailer/catalog", icon: ShoppingBag, label: "Place order", active: true },
         {
           to: "/retailer/cart",
-          icon: "cart",
+          icon: ShoppingCart,
           label: "Cart",
           trailing: cartCount ? (
             <span className="animate-in zoom-in" key={popKey}>
@@ -190,8 +210,8 @@ export function RetailerCatalog({
             </span>
           ) : undefined,
         },
-        { to: "/retailer/orders", icon: "package", label: "My orders" },
-        { to: "/retailer/complaints", icon: "message", label: "Help Center" },
+        { to: "/retailer/orders", icon: Package, label: "My orders" },
+        { to: "/retailer/complaints", icon: MessageSquare, label: "Help Center" },
       ]}
       userName={userName}
       userEmail={state.profile.email}
@@ -204,15 +224,15 @@ export function RetailerCatalog({
         actions={
           <Button asChild>
             <RouterLink to="/retailer/cart">
-              <Icon name="cart" />
-              <span>Review order{cartCount ? ` (${cartCount})` : ""}</span>
+              <ShoppingCart data-icon="inline-start" />
+              Review order{cartCount ? ` (${cartCount})` : ""}
             </RouterLink>
           </Button>
         }
       />
       <InlineNotice message={notice?.message} state={notice?.state} />
       {products ? (
-        <>
+        <div className="flex flex-col gap-6">
           <SearchToolbar
             label="Search products"
             placeholder="Search products"
@@ -222,56 +242,57 @@ export function RetailerCatalog({
           />
 
           {categories.length ? (
-            <div className="rt-category-filters" role="group" aria-label="Filter by category">
-              <button
-                className={`rt-category-pill${selectedCategory === null ? " is-active" : ""}`}
-                type="button"
-                aria-pressed={selectedCategory === null}
-                onClick={() => setSelectedCategory(null)}
-              >
-                <span>All categories</span>
-                <small>{products.length}</small>
-              </button>
+            <ToggleGroup
+              className="flex-wrap justify-start"
+              type="single"
+              variant="outline"
+              value={selectedCategory ?? ALL_CATEGORIES}
+              onValueChange={(value) => {
+                if (value) setSelectedCategory(value === ALL_CATEGORIES ? null : value);
+              }}
+              aria-label="Filter by category"
+            >
+              <ToggleGroupItem type="button" value={ALL_CATEGORIES} aria-label="All categories">
+                All categories
+                <Badge variant="secondary">{products.length}</Badge>
+              </ToggleGroupItem>
               {categories.map(({ category, count }) => (
-                <button
-                  className={`rt-category-pill${selectedCategory === category ? " is-active" : ""}`}
+                <ToggleGroupItem
                   type="button"
-                  aria-pressed={selectedCategory === category}
-                  onClick={() => setSelectedCategory(category)}
+                  value={category}
+                  aria-label={category}
                   key={category}
                 >
-                  <span>{category}</span>
-                  <small>{count}</small>
-                </button>
+                  {category}
+                  <Badge variant="secondary">{count}</Badge>
+                </ToggleGroupItem>
               ))}
-            </div>
+            </ToggleGroup>
           ) : null}
 
-          <div>
-            {filtered.length ? (
-              <div className="rt-catalog-grid">
-                {filtered.map((product) => (
-                  <ProductCard
-                    key={product.id}
-                    product={product}
-                    quantity={quantities[product.id] ?? 1}
-                    inCart={cart[product.id] ?? 0}
-                    adding={addingId === product.id}
-                    added={addedId === product.id}
-                    onStep={setQuantity}
-                    onAdd={onAdd}
-                  />
-                ))}
-              </div>
-            ) : (
-              <EmptyState
-                icon="bag"
-                title="No matching products"
-                copy="Try a different search term."
-              />
-            )}
-          </div>
-        </>
+          {filtered.length ? (
+            <div className="grid gap-5 sm:grid-cols-2 xl:grid-cols-3">
+              {filtered.map((product) => (
+                <ProductCard
+                  key={product.id}
+                  product={product}
+                  quantity={quantities[product.id] ?? 1}
+                  inCart={cart[product.id] ?? 0}
+                  adding={addingId === product.id}
+                  added={addedId === product.id}
+                  onStep={setQuantity}
+                  onAdd={onAdd}
+                />
+              ))}
+            </div>
+          ) : (
+            <EmptyState
+              icon={ShoppingBag}
+              title="No matching products"
+              copy="Try a different search term."
+            />
+          )}
+        </div>
       ) : (
         <LoadingState title="Loading the catalog…" />
       )}
@@ -298,61 +319,71 @@ function ProductCard({
 }) {
   const outOfStock = product.stock <= 0;
   const atMax = !outOfStock && inCart >= product.stock;
+
   return (
-    <article className="rt-product-card">
-      <div className="rt-product-art">
-        <ProductArt product={product} />
-      </div>
-      <div className="rt-product-body">
-        <div className="rt-product-title-row">
-          <h3 className="rt-product-name">{product.name}</h3>
-          <span className="rt-product-price">{formatPrice(product.price)}</span>
+    <article className="h-full">
+      <Card className="h-full">
+        <div className="flex aspect-[4/3] items-center justify-center overflow-hidden bg-muted">
+          <ProductArt product={product} />
         </div>
-        <p className="rt-product-seller">{product.seller_name || "SoukCart sample"}</p>
-        <p className="rt-product-desc">{product.description}</p>
-        <p className={`rt-product-stock${outOfStock ? " is-out" : ""}`}>
-          {outOfStock
-            ? "Out of stock"
-            : `${product.stock} in stock${inCart ? ` · ${inCart} in your order` : ""} · per ${product.unit}`}
-        </p>
-        <div className="rt-product-actions">
-          <div className="rt-stepper" role="group" aria-label={`Quantity for ${product.name}`}>
-            <button
-              className="rt-stepper-button"
+        <CardHeader>
+          <CardTitle>
+            <h3>{product.name}</h3>
+          </CardTitle>
+          <CardDescription>{product.seller_name || "SoukCart sample"}</CardDescription>
+          <CardAction>
+            <Badge variant="outline">{formatPrice(product.price)}</Badge>
+          </CardAction>
+        </CardHeader>
+        <CardContent className="flex flex-1 flex-col gap-3">
+          <p className="line-clamp-3 text-sm text-muted-foreground">{product.description}</p>
+          <div className="flex flex-wrap gap-2">
+            <Badge variant={outOfStock ? "destructive" : "secondary"}>
+              {outOfStock ? "Out of stock" : `${product.stock} in stock`}
+            </Badge>
+            {inCart ? <Badge variant="outline">{inCart} in your order</Badge> : null}
+            {!outOfStock ? <Badge variant="outline">Per {product.unit}</Badge> : null}
+          </div>
+        </CardContent>
+        <CardFooter className="flex-col items-stretch gap-3 sm:flex-row sm:items-center sm:justify-between">
+          <div
+            className="flex items-center gap-2"
+            role="group"
+            aria-label={`Quantity for ${product.name}`}
+          >
+            <Button
               type="button"
+              variant="outline"
+              size="icon-sm"
               aria-label="Decrease quantity"
               disabled={outOfStock || quantity <= 1}
               onClick={() => onStep(product, -1)}
             >
-              <Icon name="minus" />
-            </button>
-            <output className="rt-stepper-value">{quantity}</output>
-            <button
-              className="rt-stepper-button"
+              <Minus />
+            </Button>
+            <output className="min-w-8 text-center font-medium tabular-nums">{quantity}</output>
+            <Button
               type="button"
+              variant="outline"
+              size="icon-sm"
               aria-label="Increase quantity"
               disabled={outOfStock || quantity >= product.stock}
               onClick={() => onStep(product, 1)}
             >
-              <Icon name="plus" />
-            </button>
+              <Plus />
+            </Button>
           </div>
           <Button
-            className={cn("rt-add-button", added && "is-added")}
+            type="button"
+            variant={added ? "secondary" : "default"}
             disabled={outOfStock || atMax || adding}
             onClick={() => onAdd(product)}
           >
-            {added ? (
-              <>
-                <Icon name="check" />
-                <span>Added</span>
-              </>
-            ) : (
-              <span>{atMax ? "All stock in cart" : "Add to Cart"}</span>
-            )}
+            {added ? <Check data-icon="inline-start" /> : <ShoppingCart data-icon="inline-start" />}
+            {added ? "Added" : atMax ? "All stock in cart" : "Add to Cart"}
           </Button>
-        </div>
-      </div>
+        </CardFooter>
+      </Card>
     </article>
   );
 }

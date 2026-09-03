@@ -1,4 +1,6 @@
 import { useEffect, useState } from "react";
+import { Download, MessageSquare, Search } from "lucide-react";
+import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import {
@@ -9,7 +11,6 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
-import { Icon } from "../../components/ui/Icon.tsx";
 import {
   EmptyState,
   InlineNotice,
@@ -32,6 +33,7 @@ import {
   resolveComplaint,
   type AdminComplaint,
 } from "./admin-complaints-api.ts";
+import { ADMIN_NAV_ITEMS } from "./admin-nav.ts";
 
 type AdminComplaintsProps = {
   loadComplaints?: () => Promise<AdminComplaint[]>;
@@ -52,35 +54,39 @@ function ComplaintRow({
   return (
     <TableRow>
       <TableCell>
-        <div className="cp-cell">
-          <strong>{complaint.subject}</strong>
+        <div className="flex min-w-64 flex-col gap-1">
+          <strong className="font-medium">{complaint.subject}</strong>
           {complaint.order_id ? (
-            <small>
+            <small className="text-xs text-muted-foreground">
               Order #{complaint.order_id.slice(0, 8).toUpperCase()} · cancellation/refund support
             </small>
           ) : null}
-          <small>{complaint.description}</small>
+          <small className="text-sm text-muted-foreground">{complaint.description}</small>
         </div>
       </TableCell>
       <TableCell>
-        <div className="admin-user-cell">
-          <span className="admin-avatar">{initials(complaint.retailer_name)}</span>
-          <span>
-            <strong>{complaint.retailer_name}</strong>
-            <small>{complaint.retailer_email}</small>
+        <div className="flex items-center gap-3">
+          <Avatar size="sm">
+            <AvatarFallback>{initials(complaint.retailer_name)}</AvatarFallback>
+          </Avatar>
+          <span className="flex min-w-0 flex-col gap-1">
+            <strong className="truncate font-medium">{complaint.retailer_name}</strong>
+            <small className="truncate text-xs text-muted-foreground">
+              {complaint.retailer_email}
+            </small>
           </span>
         </div>
       </TableCell>
       <TableCell>
         {complaint.attachment_url ? (
-          <Button asChild variant="link" className="h-auto p-0">
+          <Button asChild variant="link" size="sm">
             <a href={complaint.attachment_url} target="_blank" rel="noopener noreferrer">
-              <Icon name="download" />
-              <span>Attachment</span>
+              <Download data-icon="inline-start" />
+              Attachment
             </a>
           </Button>
         ) : (
-          <span className="admin-muted">None</span>
+          <span className="text-muted-foreground">None</span>
         )}
       </TableCell>
       <TableCell>{formatDate(complaint.created_at)}</TableCell>
@@ -89,7 +95,7 @@ function ComplaintRow({
           {complaint.status === "open" ? "Open" : "Resolved"}
         </Badge>
       </TableCell>
-      <TableCell className="admin-action-cell">
+      <TableCell className="text-right">
         {complaint.status === "open" ? (
           <Button
             variant="destructive"
@@ -189,13 +195,10 @@ export function AdminComplaints({
   return (
     <WorkspaceShell
       navigationLabel="Admin navigation"
-      items={[
-        { to: "/admin", icon: "layers", label: "Overview" },
-        { to: "/admin/activity", icon: "activity", label: "Order activity" },
-        { to: "/admin/complaints", icon: "message", label: "Disputes & Claims", active: true },
-        { to: "/admin/verifications", icon: "shield-check", label: "Supplier verifications" },
-        { to: "/admin/users", icon: "person", label: "User directory" },
-      ]}
+      items={ADMIN_NAV_ITEMS.map((item) => ({
+        ...item,
+        active: item.to === "/admin/complaints",
+      }))}
       userName={userName}
       userEmail={state.profile.email}
       onLogout={onLogout}
@@ -225,7 +228,7 @@ export function AdminComplaints({
 
           {complaints.length ? (
             <TableShell>
-              <Table className="cp-table">
+              <Table className="min-w-5xl">
                 <TableHeader>
                   <TableRow>
                     <TableHead>Complaint</TableHead>
@@ -250,9 +253,12 @@ export function AdminComplaints({
                     ))
                   ) : (
                     <TableRow>
-                      <TableCell className="admin-empty" colSpan={6}>
-                        <strong>No matching complaints</strong>
-                        <span>Try a different retailer or subject.</span>
+                      <TableCell className="p-0" colSpan={6}>
+                        <EmptyState
+                          icon={Search}
+                          title="No matching complaints"
+                          copy="Try a different retailer or subject."
+                        />
                       </TableCell>
                     </TableRow>
                   )}
@@ -260,7 +266,7 @@ export function AdminComplaints({
               </Table>
             </TableShell>
           ) : (
-            <EmptyState icon="message" title="No complaints yet" />
+            <EmptyState icon={MessageSquare} title="No complaints yet" />
           )}
         </>
       ) : (

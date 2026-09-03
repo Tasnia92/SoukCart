@@ -68,7 +68,6 @@ describe("React auth presentation contract", () => {
     expect(publicMarkup).toContain('id="auth-title"');
     expect(publicMarkup).toContain('tabindex="-1"');
     expect(publicMarkup).toContain("Create an account.");
-    expect(adminMarkup).toContain('class="admin-login"');
     expect(adminMarkup).toContain('data-auth-mode="login"');
     expect(adminMarkup).toContain("Admin sign in");
     expect(adminMarkup).not.toContain("Create an account");

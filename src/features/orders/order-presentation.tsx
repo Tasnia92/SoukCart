@@ -1,8 +1,8 @@
 import { useId, useState, type ReactNode } from "react";
+import { Minus, Plus } from "lucide-react";
 import { Badge } from "../../components/ui/badge";
 import { Button } from "../../components/ui/button";
 import { TableCell, TableRow } from "../../components/ui/table";
-import { Icon } from "../../components/ui/Icon.tsx";
 
 export type OrderStatus = "pending" | "confirmed" | "shipped" | "delivered" | "cancelled";
 
@@ -27,7 +27,6 @@ export function shortId(value: string): string {
   return value.replaceAll("-", "").slice(0, 8).toUpperCase();
 }
 
-// Semantic tone per lifecycle state — tone reinforces the label, it is never the only cue.
 type BadgeVariant = "default" | "secondary" | "destructive" | "outline";
 
 function statusVariant(status: string): BadgeVariant {
@@ -62,8 +61,6 @@ export function PaymentBadge({
   return null;
 }
 
-// Accessible disclosure row: keeps the paired detail-row visual design but toggles
-// through a real keyboard-focusable button rather than a clickable <tr>.
 export function OrderRow({
   summaryCells,
   detail,
@@ -77,12 +74,15 @@ export function OrderRow({
 }) {
   const [open, setOpen] = useState(false);
   const detailId = useId();
+  const ToggleIcon = open ? Minus : Plus;
+
   return (
     <>
-      <TableRow className="rt-order-row">
+      <TableRow>
         {summaryCells}
-        <TableCell className="rt-order-toggle">
+        <TableCell className="w-12 text-right">
           <Button
+            type="button"
             variant="ghost"
             size="icon"
             aria-expanded={open}
@@ -90,13 +90,13 @@ export function OrderRow({
             aria-label={toggleLabel}
             onClick={() => setOpen((previous) => !previous)}
           >
-            <Icon name={open ? "minus" : "plus"} />
+            <ToggleIcon />
           </Button>
         </TableCell>
       </TableRow>
-      <TableRow className="rt-order-detail" id={detailId} hidden={!open}>
-        <TableCell colSpan={colSpan}>
-          <div className="rt-order-detail-body">{detail}</div>
+      <TableRow id={detailId} hidden={!open}>
+        <TableCell colSpan={colSpan} className="p-0">
+          <div className="m-3 flex flex-col gap-3 rounded-xl bg-muted/50 p-4">{detail}</div>
         </TableCell>
       </TableRow>
     </>

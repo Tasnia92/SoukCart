@@ -1,37 +1,43 @@
 import { useState } from "react";
-import { Field as UIField, FieldLabel } from "../ui/field.tsx";
+import { EyeIcon, EyeOffIcon, type LucideIcon } from "lucide-react";
+import { Field as UIField, FieldLabel } from "@/components/ui/field";
 import {
   InputGroup,
   InputGroupAddon,
   InputGroupButton,
   InputGroupInput,
-} from "../ui/input-group.tsx";
-import { Icon, type IconName } from "../ui/Icon.tsx";
+} from "@/components/ui/input-group";
 
 export type FieldType = "email" | "password" | "text";
 
 export type FieldProps = {
   autoComplete: string;
   id: string;
-  icon: IconName;
+  icon: LucideIcon;
   label: string;
   name: string;
   placeholder: string;
   type: FieldType;
 };
 
-export function Field({ autoComplete, id, icon, label, name, placeholder, type }: FieldProps) {
+export function Field({
+  autoComplete,
+  id,
+  icon: LeadingIcon,
+  label,
+  name,
+  placeholder,
+  type,
+}: FieldProps) {
   const isPassword = type === "password";
   const [isPasswordVisible, setIsPasswordVisible] = useState(false);
   const inputType = isPassword && isPasswordVisible ? "text" : type;
+  const PasswordVisibilityIcon = isPasswordVisible ? EyeIcon : EyeOffIcon;
 
   return (
     <UIField>
       <FieldLabel htmlFor={id}>{label}</FieldLabel>
       <InputGroup>
-        <InputGroupAddon>
-          <Icon name={icon} />
-        </InputGroupAddon>
         <InputGroupInput
           id={id}
           name={name}
@@ -40,16 +46,20 @@ export function Field({ autoComplete, id, icon, label, name, placeholder, type }
           autoComplete={autoComplete}
           required
         />
+        <InputGroupAddon align="inline-start">
+          <LeadingIcon aria-hidden="true" />
+        </InputGroupAddon>
         {isPassword ? (
           <InputGroupAddon align="inline-end">
             <InputGroupButton
+              type="button"
               data-password-toggle=""
               aria-controls={id}
               aria-label={`${isPasswordVisible ? "Hide" : "Show"} ${label.toLowerCase()}`}
               aria-pressed={isPasswordVisible}
               onClick={() => setIsPasswordVisible((visible) => !visible)}
             >
-              <Icon name={isPasswordVisible ? "eye" : "eye-off"} className="input-action-icon" />
+              <PasswordVisibilityIcon aria-hidden="true" />
             </InputGroupButton>
           </InputGroupAddon>
         ) : null}

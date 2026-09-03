@@ -1,6 +1,6 @@
 import { useNavigate } from "@tanstack/react-router";
 import { useEffect, useState } from "react";
-import { MoreHorizontal, Plus } from "lucide-react";
+import { MoreHorizontal, Plus, Search, ShoppingBag } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import {
   Card,
@@ -94,8 +94,13 @@ function ProductCard({
         </Button>
         <DropdownMenu>
           <DropdownMenuTrigger asChild>
-            <Button variant="ghost" size="icon-sm" aria-label={`More actions for ${product.name}`}>
-              <MoreHorizontal />
+            <Button
+              type="button"
+              variant="ghost"
+              size="icon-sm"
+              aria-label={`More actions for ${product.name}`}
+            >
+              <MoreHorizontal aria-hidden="true" />
             </Button>
           </DropdownMenuTrigger>
           <DropdownMenuContent align="end">
@@ -272,20 +277,18 @@ export function SupplierProducts({ loadProducts = loadSupplierProducts }: Suppli
             </div>
           ) : products.length ? (
             <EmptyState
-              icon="search"
+              icon={Search}
               title="No matching products"
               copy="Try a different search term."
             />
           ) : (
             <EmptyState
-              icon="bag"
+              icon={ShoppingBag}
               title="No products yet"
               copy="Add your first product and retailers will see it in the catalog."
               action={
                 <Button asChild>
-                  <RouterLink to="/supplier/products/new">
-                    <span>Add product</span>
-                  </RouterLink>
+                  <RouterLink to="/supplier/products/new">Add product</RouterLink>
                 </Button>
               }
             />

@@ -1,11 +1,6 @@
-/* -----------------------------------------------------------------------------
- * Dashboard primitives — the shared layout, metric, queue, table and state parts
- * every role overview composes. Semantically named (`db-*`) rather than borrowing
- * the `admin-*` / `rt-*` page classes, but styled from the same theme tokens.
- * -------------------------------------------------------------------------- */
-
 import { useId, type ReactNode } from "react";
-import { Alert, AlertDescription } from "@/components/ui/alert";
+import { ArrowRight, RotateCcw, TrendingDown, TrendingUp, type LucideIcon } from "lucide-react";
+import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import {
@@ -25,6 +20,16 @@ import {
   EmptyMedia,
   EmptyTitle,
 } from "@/components/ui/empty";
+import {
+  Item,
+  ItemActions,
+  ItemContent,
+  ItemDescription,
+  ItemGroup,
+  ItemMedia,
+  ItemTitle,
+} from "@/components/ui/item";
+import { Progress } from "@/components/ui/progress";
 import { Skeleton } from "@/components/ui/skeleton";
 import {
   Table,
@@ -36,13 +41,18 @@ import {
   TableRow,
 } from "@/components/ui/table";
 import { cn } from "@/lib/utils";
-import { Icon, type IconName } from "../ui/Icon.tsx";
 import { RouterLink } from "../ui/RouterLink.tsx";
 import type { DashboardSeverity, MetricDelta, SizedSegment } from "./dashboard-model.ts";
 
 export type DashboardSplit = "8-4" | "7-5" | "6-6" | "full";
 
-/** Asymmetric two-column band. Collapses to one column on narrow viewports. */
+const splitClasses: Record<DashboardSplit, string> = {
+  "8-4": "lg:grid-cols-[minmax(0,2fr)_minmax(18rem,1fr)]",
+  "7-5": "lg:grid-cols-[minmax(0,7fr)_minmax(18rem,5fr)]",
+  "6-6": "lg:grid-cols-2",
+  full: "grid-cols-1",
+};
+
 export function DashboardRow({
   split = "8-4",
   children,
@@ -50,13 +60,12 @@ export function DashboardRow({
   split?: DashboardSplit;
   children: ReactNode;
 }) {
-  return <div className={`db-row db-row-${split}`}>{children}</div>;
+  return <div className={cn("grid items-start gap-4", splitClasses[split])}>{children}</div>;
 }
 
 type DashboardCardProps = {
   eyebrow?: ReactNode;
   title: ReactNode;
-  /** Period, range or scope for the card's content. Always state it. */
   meta?: ReactNode;
   action?: ReactNode;
   footer?: ReactNode;
@@ -65,7 +74,6 @@ type DashboardCardProps = {
   children: ReactNode;
 };
 
-/** A titled panel. The heading is wired to the section with `aria-labelledby`. */
 export function DashboardCard({
   eyebrow,
   title,
@@ -79,28 +87,33 @@ export function DashboardCard({
   const headingId = useId();
   return (
     <Card
-      className={cn("db-card gap-0 py-0", `is-${severity}`, className)}
+      className={cn(
+        severity === "critical" && "ring-destructive/40",
+        severity === "attention" && "ring-primary/30",
+        className,
+      )}
       aria-labelledby={headingId}
     >
-      <CardHeader className="db-card-head">
-        <div className="db-card-heading">
-          {eyebrow ? <p className="eyebrow">{eyebrow}</p> : null}
-          <CardTitle>
-            <h2 className="db-card-title" id={headingId}>
-              {title}
-            </h2>
+      <CardHeader>
+        <div className="flex min-w-0 flex-col gap-1">
+          {eyebrow ? (
+            <p className="text-xs font-medium tracking-widest text-muted-foreground uppercase">
+              {eyebrow}
+            </p>
+          ) : null}
+          <CardTitle id={headingId} className="text-lg">
+            {title}
           </CardTitle>
-          {meta ? <CardDescription className="db-card-meta">{meta}</CardDescription> : null}
+          {meta ? <CardDescription>{meta}</CardDescription> : null}
         </div>
-        {action ? <CardAction className="db-card-action">{action}</CardAction> : null}
+        {action ? <CardAction>{action}</CardAction> : null}
       </CardHeader>
-      <CardContent className="db-card-body">{children}</CardContent>
-      {footer ? <CardFooter className="db-card-foot">{footer}</CardFooter> : null}
+      <CardContent>{children}</CardContent>
+      {footer ? <CardFooter className="border-t text-muted-foreground">{footer}</CardFooter> : null}
     </Card>
   );
 }
 
-/** Text link that carries a card or metric to its full workflow. */
 export function DashboardLink({
   to,
   params,
@@ -111,33 +124,29 @@ export function DashboardLink({
   children: ReactNode;
 }) {
   return (
-    <RouterLink className="db-link" to={to} params={params}>
-      <span>{children}</span>
-      <Icon name="arrow-right" />
-    </RouterLink>
+    <Button variant="link" size="sm" asChild className="h-auto justify-start px-0">
+      <RouterLink to={to} params={params}>
+        <span>{children}</span>
+        <ArrowRight data-icon="inline-end" />
+      </RouterLink>
+    </Button>
   );
 }
 
-/* -----------------------------------------------------------------------------
- * Metrics
- * -------------------------------------------------------------------------- */
-
 export function MetricRow({ label, children }: { label: string; children: ReactNode }) {
   return (
-    <section className="db-metrics" aria-label={label}>
+    <section className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4" aria-label={label}>
       {children}
     </section>
   );
 }
 
 export type MetricCardProps = {
-  icon: IconName;
+  icon: LucideIcon;
   label: string;
   value: ReactNode;
-  /** The window the value covers, e.g. "Last 30 days". Required so no total is period-less. */
   period: string;
   delta?: MetricDelta;
-  /** One line of decision context: what the number means or what to do about it. */
   context?: ReactNode;
   severity?: DashboardSeverity;
   to: string;
@@ -145,7 +154,7 @@ export type MetricCardProps = {
 };
 
 export function MetricCard({
-  icon,
+  icon: MetricIcon,
   label,
   value,
   period,
@@ -155,39 +164,47 @@ export function MetricCard({
   to,
   linkLabel,
 }: MetricCardProps) {
+  const DeltaIcon = delta?.direction === "down" ? TrendingDown : TrendingUp;
   return (
-    <article className={`db-metric is-${severity}`}>
-      <div className="db-metric-top">
-        <p className="db-metric-label">{label}</p>
-        <span className="db-metric-icon">
-          <Icon name={icon} />
-        </span>
-      </div>
-      <strong className="db-metric-value">{value}</strong>
-      <p className="db-metric-period">{period}</p>
-      {delta ? (
-        <p className={`db-delta is-${delta.direction}`}>
-          <Icon name={delta.direction === "down" ? "arrow-right" : "arrow-up-right"} />
-          <span>{delta.label}</span>
-        </p>
-      ) : null}
-      {context ? <p className="db-metric-context">{context}</p> : null}
-      <DashboardLink to={to}>{linkLabel}</DashboardLink>
-    </article>
+    <Card
+      size="sm"
+      className={cn(
+        severity === "critical" && "ring-destructive/40",
+        severity === "attention" && "ring-primary/30",
+      )}
+    >
+      <CardHeader>
+        <CardDescription className="text-xs font-medium tracking-widest uppercase">
+          {label}
+        </CardDescription>
+        <CardAction>
+          <span className="flex size-9 items-center justify-center rounded-xl bg-muted text-muted-foreground">
+            <MetricIcon />
+          </span>
+        </CardAction>
+        <CardTitle className="text-3xl font-semibold tabular-nums">{value}</CardTitle>
+      </CardHeader>
+      <CardContent className="flex flex-col gap-2">
+        <p className="text-xs text-muted-foreground">{period}</p>
+        {delta ? (
+          <p className="flex items-center gap-1 text-xs font-medium">
+            <DeltaIcon />
+            <span>{delta.label}</span>
+          </p>
+        ) : null}
+        {context ? <p className="text-xs text-muted-foreground">{context}</p> : null}
+        <DashboardLink to={to}>{linkLabel}</DashboardLink>
+      </CardContent>
+    </Card>
   );
 }
 
-/* -----------------------------------------------------------------------------
- * Action queue — what needs attention, newest or most urgent first.
- * -------------------------------------------------------------------------- */
-
 export type ActionQueueEntry = {
   id: string;
-  icon: IconName;
+  icon: LucideIcon;
   title: string;
   detail: string;
   severity: DashboardSeverity;
-  /** Short right-aligned marker: an age, an amount or a count. */
   marker?: string;
   to: string;
   params?: Record<string, string>;
@@ -202,30 +219,33 @@ export function ActionQueue({
   items: readonly ActionQueueEntry[];
 }) {
   return (
-    <ul className="db-queue" aria-label={label}>
-      {items.map((item) => (
-        <li className={`db-queue-item is-${item.severity}`} key={item.id}>
-          <span className="db-queue-icon">
-            <Icon name={item.icon} />
-          </span>
-          <span className="db-queue-body">
-            <strong>{item.title}</strong>
-            <small>{item.detail}</small>
-          </span>
-          {item.marker ? <span className="db-queue-marker">{item.marker}</span> : null}
-          <RouterLink className="db-queue-action" to={item.to} params={item.params}>
-            <span>{item.actionLabel}</span>
-            <Icon name="arrow-right" />
-          </RouterLink>
-        </li>
-      ))}
-    </ul>
+    <ItemGroup aria-label={label}>
+      {items.map((item) => {
+        const ItemIcon = item.icon;
+        return (
+          <Item key={item.id} variant={item.severity === "critical" ? "outline" : "default"}>
+            <ItemMedia variant="icon">
+              <ItemIcon />
+            </ItemMedia>
+            <ItemContent>
+              <ItemTitle>{item.title}</ItemTitle>
+              <ItemDescription>{item.detail}</ItemDescription>
+            </ItemContent>
+            <ItemActions>
+              {item.marker ? <Badge variant="outline">{item.marker}</Badge> : null}
+              <Button variant="ghost" size="sm" asChild>
+                <RouterLink to={item.to} params={item.params}>
+                  {item.actionLabel}
+                  <ArrowRight data-icon="inline-end" />
+                </RouterLink>
+              </Button>
+            </ItemActions>
+          </Item>
+        );
+      })}
+    </ItemGroup>
   );
 }
-
-/* -----------------------------------------------------------------------------
- * Health widget — a distribution bar plus the individual items at risk.
- * -------------------------------------------------------------------------- */
 
 export type HealthItem = {
   id: string;
@@ -253,70 +273,54 @@ export function HealthWidget({
   items: readonly HealthItem[];
   emptyCopy: string;
 }) {
-  const summary = segments
-    .map((segment) => `${segment.count} ${segment.label.toLowerCase()}`)
-    .join(", ");
-
   return (
-    <div className="db-health">
-      <p className="db-health-summary">
-        <strong>{total}</strong> <span>{totalLabel}</span>
+    <div className="flex flex-col gap-5">
+      <p className="flex items-baseline gap-2">
+        <strong className="text-2xl font-semibold tabular-nums">{total}</strong>
+        <span className="text-sm text-muted-foreground">{totalLabel}</span>
       </p>
-      <div
-        className="db-health-bar"
-        role="img"
-        aria-label={total ? `${label}: ${summary}.` : `${label}: nothing listed yet.`}
-      >
+      <div className="grid gap-3" aria-label={label}>
         {segments.map((segment) => (
-          <span
-            className={`db-health-slice is-${segment.severity}`}
-            key={segment.key}
-            style={{ width: `${segment.percent}%` }}
-          />
+          <div className="grid gap-1.5" key={segment.key}>
+            <div className="flex items-center justify-between gap-3 text-xs">
+              <span className="text-muted-foreground">{segment.label}</span>
+              <strong className="tabular-nums">{segment.count}</strong>
+            </div>
+            <Progress value={segment.percent} aria-label={`${segment.label}: ${segment.count}`} />
+          </div>
         ))}
       </div>
-      <ul className="db-health-legend">
-        {segments.map((segment) => (
-          <li key={segment.key}>
-            <span className={`db-dot is-${segment.severity}`} />
-            <span>{segment.label}</span>
-            <strong>{segment.count}</strong>
-          </li>
-        ))}
-      </ul>
       {items.length ? (
-        <ul className="db-health-items">
+        <ItemGroup>
           {items.map((item) => (
-            <li className={`db-health-item is-${item.severity}`} key={item.id}>
-              <span className="db-health-item-body">
-                <strong>{item.title}</strong>
-                <small>{item.detail}</small>
-              </span>
-              <span className="db-health-item-marker">{item.marker}</span>
-              <RouterLink className="db-queue-action" to={item.to} params={item.params}>
-                <span>{item.actionLabel}</span>
-                <Icon name="arrow-right" />
-              </RouterLink>
-            </li>
+            <Item key={item.id} size="sm">
+              <ItemContent>
+                <ItemTitle>{item.title}</ItemTitle>
+                <ItemDescription>{item.detail}</ItemDescription>
+              </ItemContent>
+              <ItemActions>
+                <Badge variant={item.severity === "critical" ? "destructive" : "outline"}>
+                  {item.marker}
+                </Badge>
+                <Button variant="ghost" size="sm" asChild>
+                  <RouterLink to={item.to} params={item.params}>
+                    {item.actionLabel}
+                  </RouterLink>
+                </Button>
+              </ItemActions>
+            </Item>
           ))}
-        </ul>
+        </ItemGroup>
       ) : (
-        <p className="db-note">{emptyCopy}</p>
+        <p className="text-sm text-muted-foreground">{emptyCopy}</p>
       )}
     </div>
   );
 }
 
-/* -----------------------------------------------------------------------------
- * Compact data table. One DOM tree: at narrow widths CSS reflows the rows into
- * stacked cards and reveals each cell's `data-label`, so the table semantics and
- * the reading order survive on mobile.
- * -------------------------------------------------------------------------- */
-
 export type DashboardColumn<Row> = {
   key: string;
   header: string;
-  /** Right-align numeric columns. */
   numeric?: boolean;
   cell: (row: Row) => ReactNode;
 };
@@ -333,14 +337,14 @@ export function DashboardTable<Row>({
   rowKey: (row: Row) => string;
 }) {
   return (
-    <div className="db-table-wrap">
-      <Table className="db-table">
+    <div className="overflow-x-auto rounded-xl border">
+      <Table>
         <TableCaption className="sr-only">{label}</TableCaption>
         <TableHeader>
           <TableRow>
             {columns.map((column) => (
               <TableHead
-                className={column.numeric ? "is-numeric" : undefined}
+                className={column.numeric ? "text-right" : undefined}
                 key={column.key}
                 scope="col"
               >
@@ -354,7 +358,7 @@ export function DashboardTable<Row>({
             <TableRow key={rowKey(row)}>
               {columns.map((column) => (
                 <TableCell
-                  className={column.numeric ? "is-numeric" : undefined}
+                  className={column.numeric ? "text-right tabular-nums" : undefined}
                   data-label={column.header}
                   key={column.key}
                 >
@@ -369,44 +373,47 @@ export function DashboardTable<Row>({
   );
 }
 
-/* -----------------------------------------------------------------------------
- * Section states — loading, failed and empty, all scoped to one card.
- * -------------------------------------------------------------------------- */
-
-/**
- * Placeholder blocks sized like the real dashboard. The shimmer is a CSS animation,
- * which the global `prefers-reduced-motion` rule already reduces to a static tint.
- */
 export function DashboardSkeleton({ label = "Loading the dashboard" }: { label?: string }) {
   return (
-    <div className="db-skeleton" role="status" aria-live="polite">
+    <div className="flex flex-col gap-4" role="status" aria-live="polite">
       <span className="sr-only">{label}</span>
-      <div className="db-metrics" aria-hidden="true">
+      <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4" aria-hidden="true">
         {[0, 1, 2, 3].map((slot) => (
-          <div className="db-skeleton-metric" key={slot}>
-            <Skeleton className="db-shimmer-label" />
-            <Skeleton className="db-shimmer-value" />
-            <Skeleton className="db-shimmer-line" />
-          </div>
+          <Card size="sm" key={slot}>
+            <CardHeader>
+              <Skeleton className="h-3 w-24" />
+              <Skeleton className="h-8 w-32" />
+            </CardHeader>
+            <CardContent>
+              <Skeleton className="h-3 w-20" />
+            </CardContent>
+          </Card>
         ))}
       </div>
-      <div className="db-row db-row-8-4" aria-hidden="true">
-        <div className="db-skeleton-card db-skeleton-chart">
-          <Skeleton className="db-shimmer-line" />
-          <Skeleton className="db-shimmer-plot" />
-        </div>
-        <div className="db-skeleton-card">
-          <Skeleton className="db-shimmer-line" />
-          <Skeleton className="db-shimmer-row" />
-          <Skeleton className="db-shimmer-row" />
-          <Skeleton className="db-shimmer-row" />
-        </div>
+      <div className="grid gap-4 lg:grid-cols-[minmax(0,2fr)_minmax(18rem,1fr)]" aria-hidden="true">
+        <Card>
+          <CardHeader>
+            <Skeleton className="h-4 w-36" />
+          </CardHeader>
+          <CardContent>
+            <Skeleton className="h-64 w-full" />
+          </CardContent>
+        </Card>
+        <Card>
+          <CardHeader>
+            <Skeleton className="h-4 w-28" />
+          </CardHeader>
+          <CardContent className="flex flex-col gap-3">
+            <Skeleton className="h-12 w-full" />
+            <Skeleton className="h-12 w-full" />
+            <Skeleton className="h-12 w-full" />
+          </CardContent>
+        </Card>
       </div>
     </div>
   );
 }
 
-/** A failure that only takes down one section; the rest of the dashboard stays usable. */
 export function SectionError({
   message,
   onRetry,
@@ -417,11 +424,12 @@ export function SectionError({
   retryLabel?: string;
 }) {
   return (
-    <Alert className="db-section-error" role="status" aria-live="polite">
-      <Icon name="refresh" />
+    <Alert variant="destructive" role="status" aria-live="polite">
+      <RotateCcw />
+      <AlertTitle>Couldn&apos;t load this section</AlertTitle>
       <AlertDescription>{message}</AlertDescription>
       {onRetry ? (
-        <Button variant="link" className="h-auto justify-self-start p-0" onClick={onRetry}>
+        <Button type="button" variant="outline" size="sm" className="mt-3" onClick={onRetry}>
           {retryLabel}
         </Button>
       ) : null}
@@ -430,21 +438,21 @@ export function SectionError({
 }
 
 export function SectionEmpty({
-  icon,
+  icon: EmptyIcon,
   title,
   copy,
   action,
 }: {
-  icon: IconName;
+  icon: LucideIcon;
   title: ReactNode;
   copy?: ReactNode;
   action?: ReactNode;
 }) {
   return (
-    <Empty className="db-empty">
+    <Empty>
       <EmptyHeader>
         <EmptyMedia variant="icon">
-          <Icon name={icon} />
+          <EmptyIcon />
         </EmptyMedia>
         <EmptyTitle>{title}</EmptyTitle>
         {copy ? <EmptyDescription>{copy}</EmptyDescription> : null}
@@ -454,7 +462,6 @@ export function SectionEmpty({
   );
 }
 
-/** Small labelled chip. Pairs a severity tone with words so tone is never the only cue. */
 export function DashboardBadge({
   severity = "neutral",
   children,

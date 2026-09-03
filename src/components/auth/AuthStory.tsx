@@ -1,21 +1,32 @@
-import { Icon } from "../ui/Icon.tsx";
+import { Layers3Icon, RefreshCwIcon, StoreIcon } from "lucide-react";
+import { Badge } from "@/components/ui/badge";
 
 export function AuthStory() {
   return (
-    <aside className="auth-story" aria-label="SoukCart highlights">
-      <div className="story-content">
-        <div>
-          <p className="eyebrow story-eyebrow">Why SoukCart</p>
-          <h2 className="display-xl story-headline">Sell everywhere. Stay in sync.</h2>
-          <p className="story-copy">
+    <aside
+      className="relative hidden min-h-svh overflow-hidden bg-primary p-10 text-primary-foreground lg:flex lg:items-center"
+      aria-label="SoukCart highlights"
+    >
+      <div className="mx-auto flex w-full max-w-xl flex-col gap-8">
+        <div className="flex flex-col gap-3">
+          <p className="text-sm font-medium uppercase tracking-[0.2em] text-primary-foreground/70">
+            Why SoukCart
+          </p>
+          <h2 className="text-balance text-4xl font-semibold tracking-tight xl:text-5xl">
+            Sell everywhere. Stay in sync.
+          </h2>
+          <p className="max-w-lg text-base leading-7 text-primary-foreground/80">
             Connect your storefronts, keep inventory accurate, and spend more time growing your
             business.
           </p>
         </div>
 
-        <div className="story-art-frame" aria-hidden="true">
+        <div
+          className="rounded-3xl border border-primary-foreground/20 bg-primary-foreground/5 p-5"
+          aria-hidden="true"
+        >
           <svg
-            className="story-art"
+            className="aspect-[4/3] w-full text-primary-foreground/75"
             viewBox="0 0 400 300"
             fill="none"
             stroke="currentColor"
@@ -48,19 +59,19 @@ export function AuthStory() {
           </svg>
         </div>
 
-        <div className="story-chips">
-          <span className="chip">
-            <Icon name="store" />
-            <span>Storefront sync</span>
-          </span>
-          <span className="chip">
-            <Icon name="layers" />
-            <span>Live inventory</span>
-          </span>
-          <span className="chip">
-            <Icon name="refresh" />
-            <span>Order routing</span>
-          </span>
+        <div className="flex flex-wrap gap-2">
+          <Badge variant="secondary">
+            <StoreIcon data-icon="inline-start" aria-hidden="true" />
+            Storefront sync
+          </Badge>
+          <Badge variant="secondary">
+            <Layers3Icon data-icon="inline-start" aria-hidden="true" />
+            Live inventory
+          </Badge>
+          <Badge variant="secondary">
+            <RefreshCwIcon data-icon="inline-start" aria-hidden="true" />
+            Order routing
+          </Badge>
         </div>
       </div>
     </aside>
