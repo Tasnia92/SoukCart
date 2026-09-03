@@ -73,7 +73,7 @@ import {
 } from "../orders/order-presentation.tsx";
 import { formatDate, formatPrice, initials } from "../workspace/format.ts";
 import { recordIdFromHash, searchParam } from "../workspace/search.ts";
-import { WorkspaceShell } from "../workspace/WorkspaceShell.tsx";
+import { AdminWorkspaceShell } from "./admin-workspace-shell.tsx";
 import {
   completeManualRefund,
   filterActivityOrders,
@@ -83,7 +83,6 @@ import {
   type ActivityResponse,
   type CancellationCharges,
 } from "./admin-activity-api.ts";
-import { ADMIN_NAV_ITEMS } from "./admin-nav.ts";
 
 type AdminActivityProps = {
   loadActivity?: () => Promise<ActivityResponse>;
@@ -354,12 +353,8 @@ export function AdminActivity({ loadActivity = loadAdminActivity }: AdminActivit
   const filtered = orders ? filterActivityOrders(orders, searchTerm, shortId) : [];
 
   return (
-    <WorkspaceShell
-      navigationLabel="Admin navigation"
-      items={ADMIN_NAV_ITEMS.map((item) => ({
-        ...item,
-        active: item.to === "/admin/activity",
-      }))}
+    <AdminWorkspaceShell
+      activePath="/admin/activity"
       userName={userName}
       userEmail={state.profile.email}
       onLogout={onLogout}
@@ -739,6 +734,6 @@ export function AdminActivity({ loadActivity = loadAdminActivity }: AdminActivit
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
-    </WorkspaceShell>
+    </AdminWorkspaceShell>
   );
 }

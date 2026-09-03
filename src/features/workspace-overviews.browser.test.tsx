@@ -15,6 +15,7 @@ import { buildAdminDashboard, type AdminDashboard } from "./admin/admin-dashboar
 import type { ActivityOrder } from "./admin/admin-activity-api.ts";
 import type { AdminComplaint } from "./admin/admin-complaints-api.ts";
 import type { AdminOverviewUser } from "./admin/admin-overview-api.ts";
+import { AdminInbox } from "./admin/AdminInbox.tsx";
 import { AdminOverview } from "./admin/AdminOverview.tsx";
 import type { RetailerComplaint } from "./retailer/retailer-complaints-api.ts";
 import type { RetailerOrder } from "./retailer/retailer-orders-api.ts";
@@ -69,7 +70,7 @@ function createSessionStore(profile: Profile) {
   };
 }
 
-function createOverviewRouter(path: "/admin" | "/supplier" | "/retailer", content: ReactNode) {
+function createOverviewRouter(path: string, content: ReactNode) {
   const rootRoute = createRootRoute({ component: Outlet });
   const signedOutRoute = createRoute({
     getParentRoute: () => rootRoute,
@@ -131,6 +132,19 @@ async function openWorkspaceMenu(host: ParentNode) {
     host.querySelector<HTMLButtonElement>("[data-sidebar=trigger]") ??
     document.querySelector<HTMLButtonElement>("[data-sidebar=trigger]");
   if (!trigger) throw new Error("Expected a sidebar trigger");
+  await act(async () => userEvent.click(trigger));
+  await flush();
+}
+
+async function openInboxMenu() {
+  const { userEvent } = await import("vite-plus/test/browser/context");
+  await openWorkspaceMenu(document);
+  const trigger =
+    document.querySelector<HTMLButtonElement>('[aria-label="Inbox"]') ??
+    [...document.querySelectorAll("button")].find((candidate) =>
+      candidate.textContent?.includes("Inbox"),
+    );
+  if (!trigger) throw new Error("Expected an Inbox sidebar control");
   await act(async () => userEvent.click(trigger));
   await flush();
 }
@@ -523,19 +537,20 @@ describe("React workspace overview behavior", () => {
         expect(metricValue(mounted.host, "Open disputes")).toBe("1");
         expect(metricValue(mounted.host, "Accounts needing setup")).toBe("1");
 
-        // Urgent SLA work sits above analytics.
-        expect(mounted.host.textContent).toContain("Urgent work");
-        expect(mounted.host.textContent).toContain("Overdue");
-        expect(mounted.host.textContent).toContain("at risk");
+        // Urgent SLA work and the action queue are Inbox pages, not dashboard sections.
+        expect(mounted.host.querySelector(".db-queue")).toBeNull();
+        expect(mounted.host.querySelector(".db-inbox")).toBeNull();
 
-        // The urgent queue leads with the refund and keeps the record id on the action.
-        const queue = element(mounted.host, ".db-queue");
-        expect(queue.children.length).toBeGreaterThanOrEqual(3);
-        expect(queue.children[0]?.textContent).toContain("Refund needs review");
-        expect(queue.children[0]?.textContent).toContain("৳150.00");
-        expect(queue.textContent).toContain("Cancellation requested by retailer");
-        expect(queue.textContent).toContain("Damaged crate");
-        expect(queue.textContent).toContain("awaiting confirmation");
+        await openInboxMenu();
+        expect(
+          element<HTMLAnchorElement>(document, 'a[href="/admin/inbox/urgent"]').textContent,
+        ).toContain("Urgent work");
+        expect(
+          element<HTMLAnchorElement>(document, 'a[href="/admin/inbox/queue"]').textContent,
+        ).toContain("Action queue");
+        const { userEvent } = await import("vite-plus/test/browser/context");
+        await act(async () => userEvent.keyboard("{Escape}"));
+        await flush();
 
         // Every chart carries a text equivalent (the data table), even if the
         // SVG needs a real layout width to paint.
@@ -560,6 +575,40 @@ describe("React workspace overview behavior", () => {
       }
     },
   );
+
+  it.runIf(inBrowser)("lists inbox work on a full page instead of a sidebar overlay", async () => {
+    const admin = createSessionStore({
+      id: "admin-1",
+      email: "admin@example.com",
+      name: "Avery Administrator",
+      role: "admin",
+    });
+    await admin.ready();
+
+    const router = createOverviewRouter(
+      "/admin/inbox/queue",
+      <SessionProvider store={admin.store}>
+        <AdminInbox view="queue" loadDashboard={() => Promise.resolve(adminDashboard())} />
+      </SessionProvider>,
+    );
+    const mounted = await mount(<RouterProvider router={router} />);
+
+    try {
+      await flush();
+      expect(mounted.host.textContent).toContain("Action queue.");
+      expect(mounted.host.querySelector('[data-slot="sheet-content"]')).toBeNull();
+
+      const queue = element(mounted.host, ".db-queue");
+      expect(queue.querySelectorAll("tbody tr").length).toBeGreaterThanOrEqual(3);
+      expect(queue.textContent).toContain("Refund needs review");
+      expect(queue.textContent).toContain("৳150.00");
+      expect(queue.textContent).toContain("Cancellation requested by retailer");
+      expect(queue.textContent).toContain("Damaged crate");
+      expect(queue.textContent).toContain("awaiting confirmation");
+    } finally {
+      await unmount(mounted.root);
+    }
+  });
 
   it.runIf(inBrowser)("leads the supplier overview with fulfillment and stock risk", async () => {
     const seller = createSessionStore({

@@ -53,7 +53,7 @@ import {
 } from "../../components/ui/Workspace.tsx";
 import { useSessionSnapshot, useSessionStore } from "../../session.tsx";
 import { formatDate, initials } from "../workspace/format.ts";
-import { WorkspaceShell } from "../workspace/WorkspaceShell.tsx";
+import { AdminWorkspaceShell } from "./admin-workspace-shell.tsx";
 import {
   createAdminUser,
   deleteAdminUser,
@@ -62,7 +62,6 @@ import {
   updateAdminUser,
   type AdminUser,
 } from "./admin-users-api.ts";
-import { ADMIN_NAV_ITEMS } from "./admin-nav.ts";
 
 type AdminUsersProps = {
   loadUsers?: () => Promise<AdminUser[]>;
@@ -360,9 +359,8 @@ export function AdminUsers({ loadUsers = loadAdminUsers }: AdminUsersProps) {
   const filtered = users ? filterAdminUsers(users, searchTerm) : [];
 
   return (
-    <WorkspaceShell
-      navigationLabel="Admin navigation"
-      items={ADMIN_NAV_ITEMS.map((item) => ({ ...item, active: item.to === "/admin/users" }))}
+    <AdminWorkspaceShell
+      activePath="/admin/users"
       userName={userName}
       userEmail={state.profile.email}
       onLogout={onLogout}
@@ -628,6 +626,6 @@ export function AdminUsers({ loadUsers = loadAdminUsers }: AdminUsersProps) {
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
-    </WorkspaceShell>
+    </AdminWorkspaceShell>
   );
 }

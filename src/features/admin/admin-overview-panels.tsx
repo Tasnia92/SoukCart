@@ -1,4 +1,4 @@
-import { useState, type FormEvent, type MouseEvent, type ReactNode } from "react";
+import { useState, type FormEvent, type MouseEvent } from "react";
 import { ArrowRight, Package, ShieldCheck, Store } from "lucide-react";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import {
@@ -42,6 +42,14 @@ import {
   SheetTitle,
 } from "@/components/ui/sheet";
 import { Spinner } from "@/components/ui/spinner";
+import {
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from "@/components/ui/table";
 import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group";
 import {
   DashboardBadge,
@@ -53,7 +61,7 @@ import {
   type DashboardColumn,
 } from "../../components/dashboard/Dashboard.tsx";
 import { failureFor } from "../../components/dashboard/dashboard-model.ts";
-import type { NoticeState } from "../../components/ui/Workspace.tsx";
+import { TableShell, type NoticeState } from "../../components/ui/Workspace.tsx";
 import { PaymentBadge, shortId, StatusBadge } from "../orders/order-presentation.tsx";
 import { formatDate, formatPrice } from "../workspace/format.ts";
 import { RouterLink } from "../workspace/WorkspaceShell.tsx";
@@ -86,12 +94,9 @@ type AdminActionWorkspaceProps = {
   onSlaFilter: (value: QueueSlaFilter) => void;
   onMutated: () => void;
   onNotice: (notice: { message: string; state: NoticeState }) => void;
-  afterQueue?: ReactNode;
+  search?: string;
+  showKindFilters?: boolean;
 };
-
-type SheetTarget =
-  | { type: "queue"; item: AdminQueueItem }
-  | { type: "recent"; order: AdminRecentOrder };
 
 type PendingMutation =
   | { type: "confirm"; order: ActivityOrder }
@@ -109,7 +114,7 @@ type ChargeDraft = {
   deliveryCharge: string;
 };
 
-const KIND_FILTERS: { value: QueueKindFilter; label: string }[] = [
+export const KIND_FILTERS: { value: QueueKindFilter; label: string }[] = [
   { value: "all", label: "All" },
   { value: "refund", label: "Refunds" },
   { value: "cancellation", label: "Cancellations" },
@@ -118,12 +123,20 @@ const KIND_FILTERS: { value: QueueKindFilter; label: string }[] = [
   { value: "verification", label: "Verifications" },
 ];
 
-const SLA_FILTERS: { value: QueueSlaFilter; label: string }[] = [
+export const SLA_FILTERS: { value: QueueSlaFilter; label: string }[] = [
   { value: "all", label: "Any SLA" },
   { value: "overdue", label: "Overdue" },
   { value: "due_today", label: "Due today" },
   { value: "due_soon", label: "Due soon" },
 ];
+
+export const QUEUE_KIND_LABELS: Record<AdminQueueKind, string> = {
+  refund: "Refund",
+  cancellation: "Cancellation",
+  confirmation: "Confirmation",
+  dispute: "Dispute",
+  verification: "Verification",
+};
 
 function parseCharge(value: string): number {
   if (!value.trim()) return NaN;
@@ -165,7 +178,7 @@ function matchesFilters(
   return true;
 }
 
-function exposureCopy(dashboard: AdminDashboard): string {
+export function exposureCopy(dashboard: AdminDashboard): string {
   const { sla } = dashboard;
   const parts: string[] = [];
   if (sla.refundCount) {
@@ -188,6 +201,12 @@ function exposureCopy(dashboard: AdminDashboard): string {
     parts.push(`${sla.verificationCount} verification${sla.verificationCount === 1 ? "" : "s"}`);
   }
   return parts.join(" · ");
+}
+
+function partyName(item: AdminQueueItem): string {
+  if (item.order) return item.order.retailer_name;
+  if (item.verification) return item.verification.shop_name;
+  return item.title;
 }
 
 function recordHref(item: AdminQueueItem): {
@@ -248,48 +267,6 @@ const recentColumns: DashboardColumn<AdminRecentOrder>[] = [
   },
 ];
 
-export function AdminSlaSummaryCard({
-  dashboard,
-  slaFilter,
-  onSlaFilter,
-}: {
-  dashboard: AdminDashboard;
-  slaFilter: QueueSlaFilter;
-  onSlaFilter: (value: QueueSlaFilter) => void;
-}) {
-  const { sla } = dashboard;
-  const counts: { value: QueueSlaFilter; label: string; count: number }[] = [
-    { value: "overdue", label: "Overdue", count: sla.overdue },
-    { value: "due_today", label: "Due today", count: sla.dueToday },
-    { value: "due_soon", label: "Due soon", count: sla.dueSoon },
-  ];
-
-  return (
-    <DashboardCard
-      eyebrow="Risk & SLA"
-      title="Urgent work"
-      meta={exposureCopy(dashboard) || "No monetary exposure"}
-      severity={sla.overdue ? "critical" : sla.dueToday ? "attention" : "neutral"}
-    >
-      <ToggleGroup
-        type="single"
-        variant="outline"
-        value={slaFilter === "all" ? "" : slaFilter}
-        onValueChange={(value) => onSlaFilter((value || "all") as QueueSlaFilter)}
-        className="grid w-full grid-cols-1 sm:grid-cols-3"
-        aria-label="Filter urgent work by SLA"
-      >
-        {counts.map((entry) => (
-          <ToggleGroupItem value={entry.value} key={entry.value} className="justify-between">
-            <span>{entry.label}</span>
-            <strong className="tabular-nums">{entry.count}</strong>
-          </ToggleGroupItem>
-        ))}
-      </ToggleGroup>
-    </DashboardCard>
-  );
-}
-
 export function AdminActionWorkspace({
   dashboard,
   kindFilter,
@@ -298,10 +275,11 @@ export function AdminActionWorkspace({
   onSlaFilter,
   onMutated,
   onNotice,
-  afterQueue,
+  search = "",
+  showKindFilters = true,
 }: AdminActionWorkspaceProps) {
   const [selected, setSelected] = useState<ReadonlySet<string>>(new Set());
-  const [sheet, setSheet] = useState<SheetTarget | null>(null);
+  const [sheet, setSheet] = useState<AdminQueueItem | null>(null);
   const [pending, setPending] = useState<PendingMutation | null>(null);
   const [chargeDraft, setChargeDraft] = useState<ChargeDraft | null>(null);
   const [chargeError, setChargeError] = useState<string | null>(null);
@@ -309,7 +287,17 @@ export function AdminActionWorkspace({
 
   const disputesFailure = failureFor(dashboard.failures, ADMIN_DISPUTES_SECTION);
   const verificationsFailure = failureFor(dashboard.failures, ADMIN_VERIFICATIONS_SECTION);
-  const visible = dashboard.queue.filter((item) => matchesFilters(item, kindFilter, slaFilter));
+  const query = search.trim().toLowerCase();
+  const visible = dashboard.queue.filter((item) => {
+    if (!matchesFilters(item, kindFilter, slaFilter)) return false;
+    if (!query) return true;
+    return (
+      item.title.toLowerCase().includes(query) ||
+      item.detail.toLowerCase().includes(query) ||
+      item.recordId.toLowerCase().includes(query) ||
+      partyName(item).toLowerCase().includes(query)
+    );
+  });
   const selectedItems = visible.filter((item) => selected.has(item.id));
   const selectedKind = selectedItems[0]?.kind;
   const canBatch =
@@ -509,46 +497,30 @@ export function AdminActionWorkspace({
     return `Mark ${pending.items.length} disputes as resolved?`;
   })();
 
-  const openQueueItem = (item: AdminQueueItem) => setSheet({ type: "queue", item });
-  const openRecent = (order: AdminRecentOrder) => {
-    const queued = dashboard.queue.find((item) => item.order?.id === order.id);
-    if (queued) {
-      setSheet({ type: "queue", item: queued });
-      return;
-    }
-    setSheet({ type: "recent", order });
-  };
+  const openQueueItem = (item: AdminQueueItem) => setSheet(item);
 
-  const sheetItem = sheet?.type === "queue" ? sheet.item : null;
-  const sheetOrder =
-    sheet?.type === "queue" ? sheet.item.order : sheet?.type === "recent" ? undefined : undefined;
-  const recentOrder = sheet?.type === "recent" ? sheet.order : null;
+  const sheetItem = sheet;
+  const sheetOrder = sheet?.order;
 
   return (
     <>
       {dashboard.queue.length ? (
-        <DashboardCard
-          eyebrow="Needs attention"
-          title="Action queue"
-          meta={`${visible.length} of ${dashboard.queue.length} items`}
-          severity={dashboard.sla.overdue ? "critical" : "attention"}
-          action={<DashboardLink to="/admin/activity">All orders</DashboardLink>}
-        >
-          <div className="flex flex-col gap-4" id="admin-action-queue">
-            {disputesFailure ? (
-              <SectionError
-                message={`Disputes could not be loaded, so this queue may be incomplete. ${disputesFailure.message}`}
-                onRetry={onMutated}
-              />
-            ) : null}
-            {verificationsFailure ? (
-              <SectionError
-                message={`Supplier verifications could not be loaded. ${verificationsFailure.message}`}
-                onRetry={onMutated}
-              />
-            ) : null}
+        <div className="flex flex-col gap-4" id="admin-action-queue">
+          {disputesFailure ? (
+            <SectionError
+              message={`Disputes could not be loaded, so this queue may be incomplete. ${disputesFailure.message}`}
+              onRetry={onMutated}
+            />
+          ) : null}
+          {verificationsFailure ? (
+            <SectionError
+              message={`Supplier verifications could not be loaded. ${verificationsFailure.message}`}
+              onRetry={onMutated}
+            />
+          ) : null}
 
-            <div className="flex flex-col gap-3">
+          <div className="flex flex-col gap-3">
+            {showKindFilters ? (
               <ToggleGroup
                 type="single"
                 variant="outline"
@@ -564,133 +536,189 @@ export function AdminActionWorkspace({
                   </ToggleGroupItem>
                 ))}
               </ToggleGroup>
-              <ToggleGroup
-                type="single"
-                variant="outline"
-                size="sm"
-                value={slaFilter}
-                onValueChange={(value) => onSlaFilter((value || "all") as QueueSlaFilter)}
-                className="flex flex-wrap"
-                aria-label="Filter queue by SLA"
-              >
-                {SLA_FILTERS.map((filter) => (
-                  <ToggleGroupItem value={filter.value} key={filter.value}>
-                    {filter.label}
-                  </ToggleGroupItem>
-                ))}
-              </ToggleGroup>
-            </div>
-
-            {selectedItems.length ? (
-              <div className="flex flex-wrap items-center gap-2">
-                <span className="text-sm text-muted-foreground">
-                  {selectedItems.length} selected
-                </span>
-                <Button type="button" size="sm" disabled={!canBatch || busy} onClick={startBatch}>
-                  {busy ? <Spinner data-icon="inline-start" /> : null}
-                  {selectedKind === "refund"
-                    ? "Settle selected refunds"
-                    : selectedKind === "confirmation"
-                      ? "Confirm selected orders"
-                      : selectedKind === "dispute"
-                        ? "Resolve selected disputes"
-                        : "Batch not available"}
-                </Button>
-                <Button
-                  type="button"
-                  size="sm"
-                  variant="ghost"
-                  onClick={() => setSelected(new Set())}
-                >
-                  Clear
-                </Button>
-              </div>
             ) : null}
+            <ToggleGroup
+              type="single"
+              variant="outline"
+              size="sm"
+              value={slaFilter}
+              onValueChange={(value) => onSlaFilter((value || "all") as QueueSlaFilter)}
+              className="flex flex-wrap"
+              aria-label="Filter queue by SLA"
+            >
+              {SLA_FILTERS.map((filter) => (
+                <ToggleGroupItem value={filter.value} key={filter.value}>
+                  {filter.label}
+                </ToggleGroupItem>
+              ))}
+            </ToggleGroup>
+          </div>
 
-            {visible.length ? (
-              <ItemGroup className="db-queue" aria-label="Items needing an admin decision">
-                {visible.map((item) => {
-                  const ItemIcon = item.icon;
-                  return (
-                    <Item
-                      key={item.id}
-                      variant={
-                        item.sla === "overdue" || item.severity === "critical"
-                          ? "outline"
-                          : "default"
-                      }
-                      className="cursor-pointer"
-                      onClick={() => openQueueItem(item)}
-                    >
-                      <ItemMedia variant="icon">
-                        <span onClick={stopRow} onKeyDown={(event) => event.stopPropagation()}>
+          {selectedItems.length ? (
+            <div className="flex flex-wrap items-center gap-2">
+              <span className="text-sm text-muted-foreground">{selectedItems.length} selected</span>
+              <Button type="button" size="sm" disabled={!canBatch || busy} onClick={startBatch}>
+                {busy ? <Spinner data-icon="inline-start" /> : null}
+                {selectedKind === "refund"
+                  ? "Settle selected refunds"
+                  : selectedKind === "confirmation"
+                    ? "Confirm selected orders"
+                    : selectedKind === "dispute"
+                      ? "Resolve selected disputes"
+                      : "Batch not available"}
+              </Button>
+              <Button
+                type="button"
+                size="sm"
+                variant="ghost"
+                onClick={() => setSelected(new Set())}
+              >
+                Clear
+              </Button>
+            </div>
+          ) : null}
+
+          {visible.length ? (
+            <>
+              <div className="flex flex-col gap-3 md:hidden">
+                {visible.map((item) => (
+                  <Item
+                    key={item.id}
+                    variant="outline"
+                    className="cursor-pointer"
+                    onClick={() => openQueueItem(item)}
+                  >
+                    <ItemMedia variant="icon">
+                      <span onClick={stopRow} onKeyDown={(event) => event.stopPropagation()}>
+                        <Checkbox
+                          checked={selected.has(item.id)}
+                          onCheckedChange={(checked) => toggleSelected(item.id, checked === true)}
+                          aria-label={`Select ${item.title}`}
+                        />
+                      </span>
+                    </ItemMedia>
+                    <ItemContent>
+                      <ItemTitle>{item.title}</ItemTitle>
+                      <ItemDescription>
+                        {partyName(item)} · {item.marker}
+                      </ItemDescription>
+                    </ItemContent>
+                    <ItemActions onClick={stopRow}>
+                      <Badge variant={slaVariant(item.sla)}>{ADMIN_SLA_LABELS[item.sla]}</Badge>
+                      <Button type="button" size="sm" onClick={() => openQueueItem(item)}>
+                        Open
+                      </Button>
+                    </ItemActions>
+                  </Item>
+                ))}
+              </div>
+              <TableShell className="hidden md:block">
+                <Table className="db-queue min-w-[64rem]">
+                  <TableHeader>
+                    <TableRow>
+                      <TableHead className="w-10">
+                        <span className="sr-only">Select</span>
+                      </TableHead>
+                      <TableHead>Type</TableHead>
+                      <TableHead>Record</TableHead>
+                      <TableHead>Party</TableHead>
+                      <TableHead>Amount</TableHead>
+                      <TableHead>SLA</TableHead>
+                      <TableHead>Age</TableHead>
+                      <TableHead className="text-right">Actions</TableHead>
+                    </TableRow>
+                  </TableHeader>
+                  <TableBody>
+                    {visible.map((item) => (
+                      <TableRow
+                        key={item.id}
+                        className="cursor-pointer"
+                        onClick={() => openQueueItem(item)}
+                      >
+                        <TableCell onClick={stopRow}>
                           <Checkbox
                             checked={selected.has(item.id)}
                             onCheckedChange={(checked) => toggleSelected(item.id, checked === true)}
                             aria-label={`Select ${item.title}`}
                           />
-                        </span>
-                      </ItemMedia>
-                      <ItemMedia variant="icon">
-                        <ItemIcon />
-                      </ItemMedia>
-                      <ItemContent>
-                        <ItemTitle>{item.title}</ItemTitle>
-                        <ItemDescription>{item.detail}</ItemDescription>
-                      </ItemContent>
-                      <ItemActions onClick={stopRow}>
-                        <Badge variant={slaVariant(item.sla)}>{ADMIN_SLA_LABELS[item.sla]}</Badge>
-                        <Badge variant="outline">{item.marker}</Badge>
-                        {item.kind === "confirmation" && item.order ? (
-                          <Button
-                            type="button"
-                            size="sm"
-                            disabled={busy}
-                            onClick={() => {
-                              const order = item.order;
-                              if (order) setPending({ type: "confirm", order });
-                            }}
-                          >
-                            Confirm
-                          </Button>
-                        ) : null}
-                        {item.kind === "refund" &&
-                        item.order?.manual_refund_status === "pending" ? (
-                          <Button
-                            type="button"
-                            size="sm"
-                            disabled={busy}
-                            onClick={() => {
-                              const order = item.order;
-                              if (order) setPending({ type: "settle", order });
-                            }}
-                          >
-                            Settle
-                          </Button>
-                        ) : null}
-                        <Button
-                          type="button"
-                          variant="ghost"
-                          size="sm"
-                          onClick={() => openQueueItem(item)}
-                        >
-                          Open
-                          <ArrowRight data-icon="inline-end" />
-                        </Button>
-                      </ItemActions>
-                    </Item>
-                  );
-                })}
-              </ItemGroup>
-            ) : (
-              <SectionEmpty
-                icon={ShieldCheck}
-                title="No items match these filters"
-                copy="Clear a filter to see the rest of the queue."
-              />
-            )}
-          </div>
-        </DashboardCard>
+                        </TableCell>
+                        <TableCell>
+                          <Badge variant="outline">{QUEUE_KIND_LABELS[item.kind]}</Badge>
+                        </TableCell>
+                        <TableCell>
+                          <div className="flex min-w-0 flex-col gap-1">
+                            <strong className="font-medium">{item.title}</strong>
+                            <small className="truncate text-xs text-muted-foreground">
+                              {item.detail}
+                            </small>
+                          </div>
+                        </TableCell>
+                        <TableCell>{partyName(item)}</TableCell>
+                        <TableCell>
+                          {item.amount !== null ? (
+                            <strong className="font-medium">{formatPrice(item.amount)}</strong>
+                          ) : (
+                            "—"
+                          )}
+                        </TableCell>
+                        <TableCell>
+                          <Badge variant={slaVariant(item.sla)}>{ADMIN_SLA_LABELS[item.sla]}</Badge>
+                        </TableCell>
+                        <TableCell className="text-muted-foreground">{item.marker}</TableCell>
+                        <TableCell className="text-right" onClick={stopRow}>
+                          <div className="flex justify-end gap-2">
+                            {item.kind === "confirmation" && item.order ? (
+                              <Button
+                                type="button"
+                                size="sm"
+                                disabled={busy}
+                                onClick={() => {
+                                  const order = item.order;
+                                  if (order) setPending({ type: "confirm", order });
+                                }}
+                              >
+                                Confirm
+                              </Button>
+                            ) : null}
+                            {item.kind === "refund" &&
+                            item.order?.manual_refund_status === "pending" ? (
+                              <Button
+                                type="button"
+                                size="sm"
+                                disabled={busy}
+                                onClick={() => {
+                                  const order = item.order;
+                                  if (order) setPending({ type: "settle", order });
+                                }}
+                              >
+                                Settle
+                              </Button>
+                            ) : null}
+                            <Button
+                              type="button"
+                              variant="ghost"
+                              size="sm"
+                              onClick={() => openQueueItem(item)}
+                            >
+                              Open
+                              <ArrowRight data-icon="inline-end" />
+                            </Button>
+                          </div>
+                        </TableCell>
+                      </TableRow>
+                    ))}
+                  </TableBody>
+                </Table>
+              </TableShell>
+            </>
+          ) : (
+            <SectionEmpty
+              icon={ShieldCheck}
+              title="No items match these filters"
+              copy="Clear a filter or search to see the rest of the queue."
+            />
+          )}
+        </div>
       ) : (
         <Alert>
           <ShieldCheck />
@@ -702,95 +730,6 @@ export function AdminActionWorkspace({
         </Alert>
       )}
 
-      {afterQueue}
-
-      <DashboardCard
-        eyebrow="Latest activity"
-        title="Recent orders"
-        meta={`Newest ${dashboard.recent.length} of the marketplace`}
-        action={<DashboardLink to="/admin/activity">View all</DashboardLink>}
-      >
-        {dashboard.recent.length ? (
-          <>
-            <div className="flex flex-col gap-3 md:hidden">
-              {dashboard.recent.map((order) => (
-                <Item key={order.id} variant="outline">
-                  <ItemContent>
-                    <ItemTitle>
-                      #{shortId(order.id)} · {formatPrice(order.total)}
-                    </ItemTitle>
-                    <ItemDescription>
-                      {order.retailerName} · {formatDate(order.createdAt)}
-                    </ItemDescription>
-                  </ItemContent>
-                  <ItemActions>
-                    <StatusBadge status={order.status} />
-                    <Button type="button" size="sm" onClick={() => openRecent(order)}>
-                      Open
-                    </Button>
-                  </ItemActions>
-                </Item>
-              ))}
-            </div>
-            <div className="hidden md:block">
-              <DashboardTable
-                label="Recent marketplace orders"
-                columns={recentColumns}
-                rows={dashboard.recent}
-                rowKey={(order) => order.id}
-                onRowClick={openRecent}
-              />
-            </div>
-          </>
-        ) : (
-          <SectionEmpty
-            icon={Package}
-            title="No orders yet"
-            copy="Orders will appear here as soon as retailers start checking out."
-          />
-        )}
-      </DashboardCard>
-
-      {dashboard.summary.accountsNeedingSetup > 0 && dashboard.pendingVerifications.length ? (
-        <DashboardCard
-          eyebrow="Onboarding"
-          title="Pending supplier verifications"
-          meta={`${dashboard.pendingVerifications.length} waiting for review`}
-          severity="attention"
-          action={<DashboardLink to="/admin/verifications">Open verifications</DashboardLink>}
-        >
-          <ItemGroup aria-label="Pending supplier verifications">
-            {dashboard.pendingVerifications.map((verification) => (
-              <Item key={verification.user_id} variant="outline">
-                <ItemMedia variant="icon">
-                  <Store />
-                </ItemMedia>
-                <ItemContent>
-                  <ItemTitle>{verification.shop_name}</ItemTitle>
-                  <ItemDescription>
-                    {verification.supplier_name} · {verification.location}
-                  </ItemDescription>
-                </ItemContent>
-                <ItemActions>
-                  <Badge variant="outline">
-                    {ADMIN_SLA_LABELS[slaBucketFromQueue(dashboard, verification.user_id)]}
-                  </Badge>
-                  <Button variant="ghost" size="sm" asChild>
-                    <RouterLink
-                      to="/admin/verifications/$userId"
-                      params={{ userId: verification.user_id }}
-                    >
-                      Review
-                      <ArrowRight data-icon="inline-end" />
-                    </RouterLink>
-                  </Button>
-                </ItemActions>
-              </Item>
-            ))}
-          </ItemGroup>
-        </DashboardCard>
-      ) : null}
-
       <Sheet
         open={Boolean(sheet)}
         onOpenChange={(open) => {
@@ -799,19 +738,9 @@ export function AdminActionWorkspace({
       >
         <SheetContent className="w-full sm:max-w-lg" side="right">
           <SheetHeader>
-            <SheetTitle>
-              {sheetItem
-                ? sheetItem.title
-                : recentOrder
-                  ? `Order #${shortId(recentOrder.id)}`
-                  : "Record"}
-            </SheetTitle>
+            <SheetTitle>{sheetItem ? sheetItem.title : "Record"}</SheetTitle>
             <SheetDescription>
-              {sheetItem
-                ? sheetItem.detail
-                : recentOrder
-                  ? `${recentOrder.retailerName} · ${formatPrice(recentOrder.total)}`
-                  : "Review this record and take action here."}
+              {sheetItem ? sheetItem.detail : "Review this record and take action here."}
             </SheetDescription>
           </SheetHeader>
           <div className="flex flex-col gap-4 px-6">
@@ -855,22 +784,6 @@ export function AdminActionWorkspace({
                     </AlertDescription>
                   </Alert>
                 ) : null}
-              </div>
-            ) : null}
-            {recentOrder && !sheetItem ? (
-              <div className="flex flex-col gap-2 text-sm">
-                <p className="flex items-center gap-2">
-                  <StatusBadge status={recentOrder.status} />
-                  <PaymentBadge
-                    paymentStatus={recentOrder.paymentStatus}
-                    paymentMethod={recentOrder.paymentMethod}
-                    showFailed
-                  />
-                </p>
-                <p>
-                  <span className="text-muted-foreground">Retailer </span>
-                  {recentOrder.retailerName}
-                </p>
               </div>
             ) : null}
             {sheetItem?.complaint ? (
@@ -949,18 +862,6 @@ export function AdminActionWorkspace({
                   hash={recordHref(sheetItem).hash}
                 >
                   Open full record
-                  <ArrowRight data-icon="inline-end" />
-                </RouterLink>
-              </Button>
-            ) : null}
-            {recentOrder && !sheetItem ? (
-              <Button asChild>
-                <RouterLink
-                  to="/admin/activity"
-                  search={{ order: recentOrder.id }}
-                  hash={`order-${recentOrder.id}`}
-                >
-                  Open order #{shortId(recentOrder.id)}
                   <ArrowRight data-icon="inline-end" />
                 </RouterLink>
               </Button>
@@ -1077,4 +978,147 @@ export function AdminActionWorkspace({
 
 function slaBucketFromQueue(dashboard: AdminDashboard, userId: string): AdminSlaBucket {
   return dashboard.queue.find((item) => item.recordId === userId)?.sla ?? "due_soon";
+}
+
+export function AdminRecentOrders({ dashboard }: { dashboard: AdminDashboard }) {
+  const [recent, setRecent] = useState<AdminRecentOrder | null>(null);
+
+  return (
+    <>
+      <DashboardCard
+        eyebrow="Latest activity"
+        title="Recent orders"
+        meta={`Newest ${dashboard.recent.length} of the marketplace`}
+        action={<DashboardLink to="/admin/activity">View all</DashboardLink>}
+      >
+        {dashboard.recent.length ? (
+          <>
+            <div className="flex flex-col gap-3 md:hidden">
+              {dashboard.recent.map((order) => (
+                <Item key={order.id} variant="outline">
+                  <ItemContent>
+                    <ItemTitle>
+                      #{shortId(order.id)} · {formatPrice(order.total)}
+                    </ItemTitle>
+                    <ItemDescription>
+                      {order.retailerName} · {formatDate(order.createdAt)}
+                    </ItemDescription>
+                  </ItemContent>
+                  <ItemActions>
+                    <StatusBadge status={order.status} />
+                    <Button type="button" size="sm" onClick={() => setRecent(order)}>
+                      Open
+                    </Button>
+                  </ItemActions>
+                </Item>
+              ))}
+            </div>
+            <div className="hidden md:block">
+              <DashboardTable
+                label="Recent marketplace orders"
+                columns={recentColumns}
+                rows={dashboard.recent}
+                rowKey={(order) => order.id}
+                onRowClick={setRecent}
+              />
+            </div>
+          </>
+        ) : (
+          <SectionEmpty
+            icon={Package}
+            title="No orders yet"
+            copy="Orders will appear here as soon as retailers start checking out."
+          />
+        )}
+      </DashboardCard>
+
+      {dashboard.summary.accountsNeedingSetup > 0 && dashboard.pendingVerifications.length ? (
+        <DashboardCard
+          eyebrow="Onboarding"
+          title="Pending supplier verifications"
+          meta={`${dashboard.pendingVerifications.length} waiting for review`}
+          severity="attention"
+          action={<DashboardLink to="/admin/verifications">Open verifications</DashboardLink>}
+        >
+          <ItemGroup aria-label="Pending supplier verifications">
+            {dashboard.pendingVerifications.map((verification) => (
+              <Item key={verification.user_id} variant="outline">
+                <ItemMedia variant="icon">
+                  <Store />
+                </ItemMedia>
+                <ItemContent>
+                  <ItemTitle>{verification.shop_name}</ItemTitle>
+                  <ItemDescription>
+                    {verification.supplier_name} · {verification.location}
+                  </ItemDescription>
+                </ItemContent>
+                <ItemActions>
+                  <Badge variant="outline">
+                    {ADMIN_SLA_LABELS[slaBucketFromQueue(dashboard, verification.user_id)]}
+                  </Badge>
+                  <Button variant="ghost" size="sm" asChild>
+                    <RouterLink
+                      to="/admin/verifications/$userId"
+                      params={{ userId: verification.user_id }}
+                    >
+                      Review
+                      <ArrowRight data-icon="inline-end" />
+                    </RouterLink>
+                  </Button>
+                </ItemActions>
+              </Item>
+            ))}
+          </ItemGroup>
+        </DashboardCard>
+      ) : null}
+
+      <Sheet
+        open={Boolean(recent)}
+        onOpenChange={(open) => {
+          if (!open) setRecent(null);
+        }}
+      >
+        <SheetContent className="w-full sm:max-w-lg" side="right">
+          <SheetHeader>
+            <SheetTitle>{recent ? `Order #${shortId(recent.id)}` : "Order"}</SheetTitle>
+            <SheetDescription>
+              {recent
+                ? `${recent.retailerName} · ${formatPrice(recent.total)}`
+                : "Review this marketplace order."}
+            </SheetDescription>
+          </SheetHeader>
+          {recent ? (
+            <div className="flex flex-col gap-2 px-6 text-sm">
+              <p className="flex items-center gap-2">
+                <StatusBadge status={recent.status} />
+                <PaymentBadge
+                  paymentStatus={recent.paymentStatus}
+                  paymentMethod={recent.paymentMethod}
+                  showFailed
+                />
+              </p>
+              <p>
+                <span className="text-muted-foreground">Retailer </span>
+                {recent.retailerName}
+              </p>
+            </div>
+          ) : null}
+          <SheetFooter>
+            {recent ? (
+              <Button asChild>
+                <RouterLink
+                  to="/admin/activity"
+                  search={{ order: recent.id }}
+                  hash={`order-${recent.id}`}
+                >
+                  Open order #{shortId(recent.id)}
+                  <ArrowRight data-icon="inline-end" />
+                </RouterLink>
+              </Button>
+            ) : null}
+          </SheetFooter>
+        </SheetContent>
+      </Sheet>
+    </>
+  );
 }

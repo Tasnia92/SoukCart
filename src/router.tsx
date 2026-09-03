@@ -11,6 +11,7 @@ import { resolveAuthAccess, type AuthArea } from "./auth-access.ts";
 import { AdminAuthRoute, RootAuthRoute } from "./components/auth/AuthRoutes.tsx";
 import { AdminActivity } from "./features/admin/AdminActivity.tsx";
 import { AdminComplaints } from "./features/admin/AdminComplaints.tsx";
+import { AdminInbox } from "./features/admin/AdminInbox.tsx";
 import { AdminOverview } from "./features/admin/AdminOverview.tsx";
 import { AdminSupplierVerifications } from "./features/admin/AdminSupplierVerifications.tsx";
 import { AdminSupplierVerificationDetail } from "./features/admin/AdminSupplierVerificationDetail.tsx";
@@ -42,6 +43,8 @@ export const PAYMENT_SEARCH_KEYS = ["status", "tran_id", "val_id"] as const;
 export const routeContract = [
   { path: "/", target: "root" },
   { path: "/admin", target: "admin" },
+  { path: "/admin/inbox/urgent", target: "admin" },
+  { path: "/admin/inbox/queue", target: "admin" },
   { path: "/admin/users", target: "admin" },
   { path: "/admin/activity", target: "admin" },
   { path: "/admin/complaints", target: "admin" },
@@ -153,6 +156,9 @@ function AdminRoute(): ReactElement {
   const pathname = useRouterState({ select: (routerState) => routerState.location.pathname });
   if (state.status !== "admin") return <AdminAuthRoute />;
   if (isReactOverviewRoute(pathname, "admin")) return <AdminOverview />;
+  if (pathname === "/admin/inbox/urgent" || pathname === "/admin/inbox/queue") {
+    return <AdminInbox />;
+  }
   if (pathname === "/admin/users") return <AdminUsers />;
   if (pathname === "/admin/activity") return <AdminActivity />;
   if (pathname === "/admin/verifications") return <AdminSupplierVerifications />;

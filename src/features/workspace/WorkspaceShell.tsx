@@ -1,6 +1,5 @@
 import type { ReactNode } from "react";
-import type { LucideIcon } from "lucide-react";
-import { ChevronsUpDown } from "lucide-react";
+import { ChevronsUpDown, type LucideIcon } from "lucide-react";
 import { RouterLink } from "../../components/ui/RouterLink.tsx";
 import {
   Breadcrumb,
@@ -42,6 +41,8 @@ export { RouterLink };
 export type WorkspacePath =
   | "/"
   | "/admin"
+  | "/admin/inbox/urgent"
+  | "/admin/inbox/queue"
   | "/admin/users"
   | "/admin/activity"
   | "/admin/complaints"
@@ -59,6 +60,8 @@ export type WorkspacePath =
 export type WorkspaceNavMenuChoice = {
   id: string;
   label: string;
+  to?: WorkspacePath;
+  search?: Record<string, string>;
 };
 
 export type WorkspaceNavItem = {
@@ -138,17 +141,31 @@ function WorkspaceNavDropdown({ item }: { item: WorkspaceNavItem }) {
         >
           <DropdownMenuGroup>
             <DropdownMenuLabel>{item.label}</DropdownMenuLabel>
-            {choices.map((choice) => (
-              <DropdownMenuItem
-                key={choice.id}
-                onClick={() => {
-                  if (isMobile) setOpenMobile(false);
-                  item.onSelect?.(choice.id);
-                }}
-              >
-                {choice.label}
-              </DropdownMenuItem>
-            ))}
+            {choices.map((choice) =>
+              choice.to ? (
+                <DropdownMenuItem key={choice.id} asChild>
+                  <RouterLink
+                    to={choice.to}
+                    search={choice.search}
+                    onClick={() => {
+                      if (isMobile) setOpenMobile(false);
+                    }}
+                  >
+                    {choice.label}
+                  </RouterLink>
+                </DropdownMenuItem>
+              ) : (
+                <DropdownMenuItem
+                  key={choice.id}
+                  onClick={() => {
+                    if (isMobile) setOpenMobile(false);
+                    item.onSelect?.(choice.id);
+                  }}
+                >
+                  {choice.label}
+                </DropdownMenuItem>
+              ),
+            )}
           </DropdownMenuGroup>
         </DropdownMenuContent>
       </DropdownMenu>
@@ -192,7 +209,7 @@ export function WorkspaceShell({
   children,
 }: WorkspaceShellProps) {
   const role = workspaceRole(items);
-  const current = items.find((item) => item.active);
+  const current = items.find((item) => item.active && item.to) ?? items.find((item) => item.active);
 
   return (
     <AppShell

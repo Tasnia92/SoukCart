@@ -27,7 +27,7 @@ import {
 import { useSessionSnapshot, useSessionStore } from "../../session.tsx";
 import { formatDate, initials } from "../workspace/format.ts";
 import { recordIdFromHash, searchParam } from "../workspace/search.ts";
-import { WorkspaceShell } from "../workspace/WorkspaceShell.tsx";
+import { AdminWorkspaceShell } from "./admin-workspace-shell.tsx";
 import {
   filterComplaints,
   getComplaintStats,
@@ -35,7 +35,6 @@ import {
   resolveComplaint,
   type AdminComplaint,
 } from "./admin-complaints-api.ts";
-import { ADMIN_NAV_ITEMS } from "./admin-nav.ts";
 
 type AdminComplaintsProps = {
   loadComplaints?: () => Promise<AdminComplaint[]>;
@@ -205,12 +204,8 @@ export function AdminComplaints({
   const filtered = complaints ? filterComplaints(complaints, searchTerm) : [];
 
   return (
-    <WorkspaceShell
-      navigationLabel="Admin navigation"
-      items={ADMIN_NAV_ITEMS.map((item) => ({
-        ...item,
-        active: item.to === "/admin/complaints",
-      }))}
+    <AdminWorkspaceShell
+      activePath="/admin/complaints"
       userName={userName}
       userEmail={state.profile.email}
       onLogout={onLogout}
@@ -285,6 +280,6 @@ export function AdminComplaints({
       ) : (
         <LoadingState title="Loading the admin workspace…" />
       )}
-    </WorkspaceShell>
+    </AdminWorkspaceShell>
   );
 }

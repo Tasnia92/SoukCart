@@ -16,6 +16,8 @@ import { SessionStore, type Profile, type SessionGateway } from "./session.tsx";
 const expectedRoutes = {
   "/": "root",
   "/admin": "admin",
+  "/admin/inbox/urgent": "admin",
+  "/admin/inbox/queue": "admin",
   "/admin/users": "admin",
   "/admin/activity": "admin",
   "/admin/complaints": "admin",
@@ -90,6 +92,8 @@ describe("route contract", () => {
     expect(router.routesByPath["/"].options.component?.name).toBe("RootRoute");
     for (const path of [
       "/admin",
+      "/admin/inbox/urgent",
+      "/admin/inbox/queue",
       "/admin/users",
       "/admin/activity",
       "/admin/complaints",

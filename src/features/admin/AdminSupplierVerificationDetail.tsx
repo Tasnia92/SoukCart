@@ -43,7 +43,8 @@ import {
 } from "../../components/ui/Workspace.tsx";
 import { useSessionSnapshot, useSessionStore } from "../../session.tsx";
 import { formatDateTime, initials } from "../workspace/format.ts";
-import { RouterLink, WorkspaceShell } from "../workspace/WorkspaceShell.tsx";
+import { RouterLink } from "../workspace/WorkspaceShell.tsx";
+import { AdminWorkspaceShell } from "./admin-workspace-shell.tsx";
 import {
   approveSupplier,
   loadSupplierVerifications,
@@ -51,7 +52,6 @@ import {
   tradeLicenseKind,
   type AdminSupplierVerification,
 } from "./admin-supplier-verifications-api.ts";
-import { ADMIN_NAV_ITEMS } from "./admin-nav.ts";
 
 type AdminSupplierVerificationDetailProps = {
   userId: string;
@@ -238,18 +238,14 @@ export function AdminSupplierVerificationDetail({
   }
 
   const shell = (children: ReactNode) => (
-    <WorkspaceShell
-      navigationLabel="Admin navigation"
-      items={ADMIN_NAV_ITEMS.map((item) => ({
-        ...item,
-        active: item.to === "/admin/verifications",
-      }))}
+    <AdminWorkspaceShell
+      activePath="/admin/verifications"
       userName={userName}
       userEmail={state.profile.email}
       onLogout={onLogout}
     >
       {children}
-    </WorkspaceShell>
+    </AdminWorkspaceShell>
   );
 
   if (verification === undefined) {

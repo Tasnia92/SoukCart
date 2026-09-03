@@ -21,7 +21,8 @@ import {
 } from "../../components/ui/Workspace.tsx";
 import { useSessionSnapshot, useSessionStore } from "../../session.tsx";
 import { formatDateTime, initials } from "../workspace/format.ts";
-import { RouterLink, WorkspaceShell } from "../workspace/WorkspaceShell.tsx";
+import { RouterLink } from "../workspace/WorkspaceShell.tsx";
+import { AdminWorkspaceShell } from "./admin-workspace-shell.tsx";
 import {
   filterVerifications,
   getVerificationStats,
@@ -30,7 +31,6 @@ import {
   tradeLicenseKind,
   type AdminSupplierVerification,
 } from "./admin-supplier-verifications-api.ts";
-import { ADMIN_NAV_ITEMS } from "./admin-nav.ts";
 
 type AdminSupplierVerificationsProps = {
   loadVerifications?: () => Promise<AdminSupplierVerification[]>;
@@ -180,12 +180,8 @@ export function AdminSupplierVerifications({
     : [];
 
   return (
-    <WorkspaceShell
-      navigationLabel="Admin navigation"
-      items={ADMIN_NAV_ITEMS.map((item) => ({
-        ...item,
-        active: item.to === "/admin/verifications",
-      }))}
+    <AdminWorkspaceShell
+      activePath="/admin/verifications"
       userName={userName}
       userEmail={state.profile.email}
       onLogout={onLogout}
@@ -237,6 +233,6 @@ export function AdminSupplierVerifications({
       ) : (
         <LoadingState title="Loading supplier verifications…" />
       )}
-    </WorkspaceShell>
+    </AdminWorkspaceShell>
   );
 }
