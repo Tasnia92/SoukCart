@@ -1,4 +1,5 @@
 import { useEffect, useState } from "react";
+import { Badge } from "@/components/ui/badge";
 import { Icon } from "../../components/ui/Icon.tsx";
 import {
   EmptyState,
@@ -62,9 +63,17 @@ function VerificationCard({ verification }: { verification: AdminSupplierVerific
       <span className="sv-card-body">
         <span className="sv-card-head">
           <strong>{verification.shop_name}</strong>
-          <span className={`sv-status is-${verification.status}`}>
+          <Badge
+            variant={
+              verification.status === "rejected"
+                ? "destructive"
+                : verification.status === "approved"
+                  ? "default"
+                  : "outline"
+            }
+          >
             {STATUS_LABELS[verification.status]}
-          </span>
+          </Badge>
         </span>
         <span className="sv-card-supplier">
           <span className="admin-avatar">{initials(verification.supplier_name)}</span>

@@ -1,5 +1,6 @@
 import { useNavigate } from "@tanstack/react-router";
 import { useEffect, useMemo, useState } from "react";
+import { Button } from "@/components/ui/button";
 import {
   DashboardBadge,
   DashboardCard,
@@ -129,10 +130,12 @@ function NextActionWidget({ action }: { action: RetailerNextAction }) {
         <p>{action.copy}</p>
       </div>
       <div className="db-next-actions">
-        <RouterLink className="button button-primary" to={action.to}>
-          <Icon name={action.icon} />
-          <span>{action.actionLabel}</span>
-        </RouterLink>
+        <Button asChild>
+          <RouterLink to={action.to}>
+            <Icon name={action.icon} />
+            <span>{action.actionLabel}</span>
+          </RouterLink>
+        </Button>
       </div>
     </section>
   );
@@ -231,7 +234,7 @@ export function RetailerOverview({
           to: "/retailer/cart",
           icon: "cart",
           label: "Cart",
-          trailing: cartUnits ? <span className="rt-nav-badge">{cartUnits}</span> : undefined,
+          trailing: cartUnits || undefined,
         },
         { to: "/retailer/orders", icon: "package", label: "My orders" },
         { to: "/retailer/complaints", icon: "message", label: "Help Center" },
@@ -246,14 +249,18 @@ export function RetailerOverview({
         copy="One next step, then everything you have in flight and what you have spent."
         actions={
           <>
-            <RouterLink className="button button-primary" to="/retailer/catalog">
-              <Icon name="bag" />
-              <span>Place order</span>
-            </RouterLink>
-            <RouterLink className="button button-subtle" to="/retailer/orders">
-              <Icon name="package" />
-              <span>My orders</span>
-            </RouterLink>
+            <Button asChild>
+              <RouterLink to="/retailer/catalog">
+                <Icon name="bag" />
+                <span>Place order</span>
+              </RouterLink>
+            </Button>
+            <Button asChild variant="ghost">
+              <RouterLink to="/retailer/orders">
+                <Icon name="package" />
+                <span>My orders</span>
+              </RouterLink>
+            </Button>
           </>
         }
       />
@@ -377,9 +384,11 @@ export function RetailerOverview({
                   title="No orders yet"
                   copy="Start with the catalog and place your first order."
                   action={
-                    <RouterLink className="button button-primary" to="/retailer/catalog">
-                      <span>Place order</span>
-                    </RouterLink>
+                    <Button asChild>
+                      <RouterLink to="/retailer/catalog">
+                        <span>Place order</span>
+                      </RouterLink>
+                    </Button>
                   }
                 />
               )}

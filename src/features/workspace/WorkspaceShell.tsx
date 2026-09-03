@@ -1,8 +1,19 @@
 import type { ReactNode } from "react";
-import { Button } from "../../components/ui/Button.tsx";
+import { Button } from "@/components/ui/button";
 import { Icon, type IconName } from "../../components/ui/Icon.tsx";
 import { RouterLink } from "../../components/ui/RouterLink.tsx";
-import { AppShell } from "../../components/ui/Workspace.tsx";
+import {
+  Sidebar,
+  SidebarContent,
+  SidebarFooter,
+  SidebarGroup,
+  SidebarHeader,
+  SidebarMenu,
+  SidebarMenuBadge,
+  SidebarMenuButton,
+  SidebarMenuItem,
+} from "../../components/ui/sidebar";
+import { AppShell, SidebarUser } from "../../components/ui/Workspace.tsx";
 
 // Re-exported so the many existing `from "../workspace/WorkspaceShell.tsx"` imports keep working
 // while shared UI primitives import the link from the component layer instead.
@@ -53,8 +64,8 @@ export function WorkspaceShell({
   return (
     <AppShell
       sidebar={
-        <aside className="admin-sidebar">
-          <div className="admin-sidebar-top">
+        <Sidebar collapsible="none">
+          <SidebarHeader>
             <RouterLink className="brand brand-dark" to="/" aria-label="SoukCart home">
               <img
                 className="brand-logo"
@@ -65,33 +76,35 @@ export function WorkspaceShell({
               />
               <span className="brand-word">SoukCart</span>
             </RouterLink>
-          </div>
-          <nav className="admin-nav" aria-label={navigationLabel}>
-            {items.map(({ to, icon, label, active, trailing }) => (
-              <RouterLink
-                className={`admin-tab${active ? " is-active" : ""}`}
-                to={to}
-                aria-current={active ? "page" : undefined}
-                key={to}
-              >
-                <Icon name={icon} />
-                <span>{label}</span>
-                {trailing}
-              </RouterLink>
-            ))}
-          </nav>
-          <div className="admin-sidebar-footer">
-            <div className="admin-user">
-              <span className="admin-user-info">
-                <strong>{userName}</strong>
-                <small>{userEmail}</small>
-              </span>
-            </div>
-            <Button variant="secondary" block onClick={onLogout}>
+          </SidebarHeader>
+          <SidebarContent>
+            <SidebarGroup>
+              <nav aria-label={navigationLabel}>
+                <SidebarMenu>
+                  {items.map(({ to, icon, label, active, trailing }) => (
+                    <SidebarMenuItem key={to}>
+                      <SidebarMenuButton asChild isActive={active}>
+                        <RouterLink to={to} aria-current={active ? "page" : undefined}>
+                          <Icon name={icon} />
+                          <span>{label}</span>
+                        </RouterLink>
+                      </SidebarMenuButton>
+                      {trailing ? (
+                        <SidebarMenuBadge className="rt-nav-badge">{trailing}</SidebarMenuBadge>
+                      ) : null}
+                    </SidebarMenuItem>
+                  ))}
+                </SidebarMenu>
+              </nav>
+            </SidebarGroup>
+          </SidebarContent>
+          <SidebarFooter>
+            <SidebarUser userName={userName} userEmail={userEmail} />
+            <Button variant="secondary" className="w-full" onClick={onLogout}>
               Log out
             </Button>
-          </div>
-        </aside>
+          </SidebarFooter>
+        </Sidebar>
       }
     >
       {children}

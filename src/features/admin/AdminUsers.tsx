@@ -1,5 +1,22 @@
 import { useEffect, useRef, useState, type FormEvent } from "react";
-import { Button, buttonClassName } from "../../components/ui/Button.tsx";
+import { Field, FieldLabel } from "@/components/ui/field";
+import {
+  Select,
+  SelectContent,
+  SelectGroup,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
+import {
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from "@/components/ui/table";
+import { Button } from "@/components/ui/button";
 import {
   InlineNotice,
   LoadingState,
@@ -29,20 +46,26 @@ type Notice = { message: string; state: NoticeState } | null;
 
 const CREATE_PANEL_ID = "admin-create-panel";
 const EDIT_PANEL_ID = "admin-edit-panel";
+const UNASSIGNED_ROLE = "__unassigned__";
 
 function readText(formData: FormData, name: string): string {
   const value = formData.get(name);
   return typeof value === "string" ? value : "";
 }
 
+function readRole(formData: FormData): string {
+  const role = readText(formData, "role");
+  return role === UNASSIGNED_ROLE ? "" : role;
+}
+
 function RoleOptions() {
   return (
-    <>
-      <option value="">Let the user choose later</option>
-      <option value="seller">Seller</option>
-      <option value="retailer">Retailer</option>
-      <option value="admin">Administrator</option>
-    </>
+    <SelectGroup>
+      <SelectItem value={UNASSIGNED_ROLE}>Let the user choose later</SelectItem>
+      <SelectItem value="seller">Seller</SelectItem>
+      <SelectItem value="retailer">Retailer</SelectItem>
+      <SelectItem value="admin">Administrator</SelectItem>
+    </SelectGroup>
   );
 }
 
@@ -61,8 +84,8 @@ function UserRow({
 }) {
   const status = user.email_confirmed_at ? "Verified" : "Pending";
   return (
-    <tr>
-      <td>
+    <TableRow>
+      <TableCell>
         <div className="admin-user-cell">
           <span className="admin-avatar">{initials(user.name || user.email)}</span>
           <span>
@@ -70,49 +93,44 @@ function UserRow({
             <small>{status}</small>
           </span>
         </div>
-      </td>
-      <td>{user.email}</td>
-      <td>
+      </TableCell>
+      <TableCell>{user.email}</TableCell>
+      <TableCell>
         <code className="admin-user-id" title={user.id}>
           {user.id}
         </code>
-      </td>
-      <td>
+      </TableCell>
+      <TableCell>
         <span className="admin-role">{user.role || "Needs setup"}</span>
-      </td>
-      <td>{formatDate(user.created_at)}</td>
-      <td>
+      </TableCell>
+      <TableCell>{formatDate(user.created_at)}</TableCell>
+      <TableCell>
         {user.last_sign_in_at ? (
           formatDate(user.last_sign_in_at)
         ) : (
           <span className="admin-muted">Never</span>
         )}
-      </td>
-      <td className="admin-action-cell">
+      </TableCell>
+      <TableCell className="admin-action-cell">
         <div className="admin-create-actions">
-          <button
-            className="text-button"
-            type="button"
+          <Button
+            variant="link"
+            className="h-auto p-0"
             disabled={busy}
             onClick={() => onEdit(user)}
           >
             Edit
-          </button>
+          </Button>
           {user.id === currentAdminId ? (
             <span className="admin-current-user">You</span>
           ) : (
-            <button
-              className="delete-button"
-              type="button"
-              disabled={busy}
-              onClick={() => onDelete(user)}
-            >
+            <Button variant="destructive" size="sm" disabled={busy} onClick={() => onDelete(user)}>
               Delete
-            </button>
+            </Button>
           )}
         </div>
-      </td>
-    </tr>
+      </TableCell>
+    </TableRow>
   );
 }
 
@@ -226,7 +244,7 @@ export function AdminUsers({ loadUsers = loadAdminUsers }: AdminUsersProps) {
         name: readText(formData, "name"),
         email: readText(formData, "email"),
         password: readText(formData, "password"),
-        role: readText(formData, "role"),
+        role: readRole(formData),
       });
       form.reset();
       setCreateOpen(false);
@@ -258,7 +276,7 @@ export function AdminUsers({ loadUsers = loadAdminUsers }: AdminUsersProps) {
         userId: editingUser.id,
         name: readText(formData, "name"),
         email: readText(formData, "email"),
-        role: readText(formData, "role"),
+        role: readRole(formData),
       });
       setUsers(
         (current) => current?.map((user) => (user.id === updated.id ? updated : user)) ?? current,
@@ -317,16 +335,14 @@ export function AdminUsers({ loadUsers = loadAdminUsers }: AdminUsersProps) {
         title="User directory"
         copy="Search by ID number and create, edit, or remove user accounts."
         actions={
-          <button
+          <Button
             ref={triggerRef}
-            type="button"
-            className={buttonClassName()}
             onClick={openCreate}
             aria-expanded={createOpen}
             aria-controls={CREATE_PANEL_ID}
           >
             <span>+ New user</span>
-          </button>
+          </Button>
         }
       />
       <InlineNotice message={notice?.message} state={notice?.state} />
@@ -338,14 +354,14 @@ export function AdminUsers({ loadUsers = loadAdminUsers }: AdminUsersProps) {
                 <p className="eyebrow">Add to workspace</p>
                 <h3 className="display-sm">Create a user</h3>
               </div>
-              <button
-                className="icon-button"
-                type="button"
+              <Button
+                variant="ghost"
+                size="icon-sm"
                 onClick={closeCreate}
                 aria-label="Close create user form"
               >
                 ×
-              </button>
+              </Button>
             </div>
             <form className="admin-create-form" ref={createFormRef} onSubmit={onCreate} noValidate>
               <label className="admin-field">
@@ -373,12 +389,17 @@ export function AdminUsers({ loadUsers = loadAdminUsers }: AdminUsersProps) {
                   required
                 />
               </label>
-              <label className="admin-field">
-                <span>Account type</span>
-                <select name="role" defaultValue="">
-                  <RoleOptions />
-                </select>
-              </label>
+              <Field>
+                <FieldLabel htmlFor="create-user-role">Account type</FieldLabel>
+                <Select name="role" defaultValue={UNASSIGNED_ROLE}>
+                  <SelectTrigger id="create-user-role" className="w-full">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <RoleOptions />
+                  </SelectContent>
+                </Select>
+              </Field>
               <div className="admin-create-actions">
                 <Button variant="secondary" onClick={closeCreate}>
                   Cancel
@@ -404,14 +425,14 @@ export function AdminUsers({ loadUsers = loadAdminUsers }: AdminUsersProps) {
                   <p className="eyebrow">Account details</p>
                   <h3 className="display-sm">Edit user</h3>
                 </div>
-                <button
-                  className="icon-button"
-                  type="button"
+                <Button
+                  variant="ghost"
+                  size="icon-sm"
                   onClick={closeEdit}
                   aria-label="Close edit user form"
                 >
                   ×
-                </button>
+                </Button>
               </div>
               <form
                 className="admin-create-form"
@@ -441,12 +462,17 @@ export function AdminUsers({ loadUsers = loadAdminUsers }: AdminUsersProps) {
                     required
                   />
                 </label>
-                <label className="admin-field">
-                  <span>Account type</span>
-                  <select name="role" defaultValue={editingUser.role ?? ""}>
-                    <RoleOptions />
-                  </select>
-                </label>
+                <Field>
+                  <FieldLabel htmlFor="edit-user-role">Account type</FieldLabel>
+                  <Select name="role" defaultValue={editingUser.role ?? UNASSIGNED_ROLE}>
+                    <SelectTrigger id="edit-user-role" className="w-full">
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <RoleOptions />
+                    </SelectContent>
+                  </Select>
+                </Field>
                 <div className="admin-create-actions">
                   <Button variant="secondary" onClick={closeEdit}>
                     Cancel
@@ -475,21 +501,21 @@ export function AdminUsers({ loadUsers = loadAdminUsers }: AdminUsersProps) {
           />
 
           <TableShell>
-            <table className="admin-table">
-              <thead>
-                <tr>
-                  <th>User</th>
-                  <th>Email</th>
-                  <th>User ID</th>
-                  <th>Type</th>
-                  <th>Joined</th>
-                  <th>Last active</th>
-                  <th>
+            <Table className="min-w-[62rem]">
+              <TableHeader>
+                <TableRow>
+                  <TableHead>User</TableHead>
+                  <TableHead>Email</TableHead>
+                  <TableHead>User ID</TableHead>
+                  <TableHead>Type</TableHead>
+                  <TableHead>Joined</TableHead>
+                  <TableHead>Last active</TableHead>
+                  <TableHead>
                     <span className="sr-only">Actions</span>
-                  </th>
-                </tr>
-              </thead>
-              <tbody>
+                  </TableHead>
+                </TableRow>
+              </TableHeader>
+              <TableBody>
                 {filtered.length ? (
                   filtered.map((user) => (
                     <UserRow
@@ -502,22 +528,22 @@ export function AdminUsers({ loadUsers = loadAdminUsers }: AdminUsersProps) {
                     />
                   ))
                 ) : users.length ? (
-                  <tr>
-                    <td className="admin-empty" colSpan={7}>
+                  <TableRow>
+                    <TableCell className="admin-empty" colSpan={7}>
                       <strong>No matching users</strong>
                       <span>Try a different ID, email, or name.</span>
-                    </td>
-                  </tr>
+                    </TableCell>
+                  </TableRow>
                 ) : (
-                  <tr>
-                    <td className="admin-empty" colSpan={7}>
+                  <TableRow>
+                    <TableCell className="admin-empty" colSpan={7}>
                       <strong>No users yet</strong>
                       <span>New registrations will appear here automatically.</span>
-                    </td>
-                  </tr>
+                    </TableCell>
+                  </TableRow>
                 )}
-              </tbody>
-            </table>
+              </TableBody>
+            </Table>
           </TableShell>
         </>
       ) : (

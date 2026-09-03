@@ -10,7 +10,7 @@
 import "./landing.css";
 import { useState, type FormEvent } from "react";
 import { Brand } from "../../components/ui/Brand.tsx";
-import { Button } from "../../components/ui/Button.tsx";
+import { Button } from "@/components/ui/button";
 import { Icon } from "../../components/ui/Icon.tsx";
 import type { AuthMode, AuthRole } from "../../components/auth/types.ts";
 import { GrowthArt } from "./GrowthArt.tsx";
@@ -48,7 +48,7 @@ function LandingHeader({ onOpenAuth }: { onOpenAuth: OpenAuth }) {
         <Button
           className="ld-signin"
           variant="secondary"
-          size="compact"
+          size="sm"
           onClick={() => onOpenAuth({ mode: "login", role: "retailer" })}
         >
           Sign in

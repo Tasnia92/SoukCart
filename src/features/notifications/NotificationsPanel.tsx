@@ -1,4 +1,5 @@
 import { useEffect, useState } from "react";
+import { Button } from "@/components/ui/button";
 import { formatDateTime } from "../workspace/format.ts";
 import {
   loadNotifications,
@@ -55,9 +56,14 @@ export function NotificationsPanel() {
             <p>{notification.message}</p>
             <small>{formatDateTime(notification.created_at)}</small>
             {!notification.read_at ? (
-              <button className="text-button" type="button" onClick={() => markRead(notification)}>
+              <Button
+                variant="link"
+                className="h-auto p-0"
+                type="button"
+                onClick={() => markRead(notification)}
+              >
                 Mark as read
-              </button>
+              </Button>
             ) : null}
           </article>
         ))}

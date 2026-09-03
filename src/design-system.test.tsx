@@ -1,8 +1,9 @@
 import { renderToStaticMarkup } from "react-dom/server";
 import { describe, expect, it } from "vite-plus/test";
 import { Brand } from "./components/ui/Brand.tsx";
-import { buttonClassName } from "./components/ui/Button.tsx";
+import { Button, buttonVariants } from "./components/ui/button.tsx";
 import { Icon, ICON_NAMES, iconPaths } from "./components/ui/Icon.tsx";
+import { SidebarProvider } from "./components/ui/sidebar.tsx";
 import { SidebarNav } from "./components/ui/Workspace.tsx";
 
 function svgBody(markup: string): string {
@@ -23,37 +24,56 @@ describe("Phase 2 design contract", () => {
     }
   });
 
-  it("preserves brand and button class contracts", () => {
+  it("preserves the brand contract", () => {
     const brand = renderToStaticMarkup(<Brand variant="dark" />);
     expect(brand).toContain('class="brand brand-dark"');
     expect(brand).toContain('href="/"');
     expect(brand).toContain('src="/soukcart-logo.png"');
     expect(brand).toContain('alt=""');
     expect(brand).toContain("SoukCart");
-
-    expect(buttonClassName()).toBe("button button-primary");
-    expect(buttonClassName({ variant: "secondary", block: true })).toBe(
-      "button button-secondary button-block",
-    );
-    expect(buttonClassName({ variant: "destructive", size: "compact" })).toBe(
-      "delete-button button-compact",
-    );
-    expect(buttonClassName({ variant: "subtle", size: "icon" })).toBe(
-      "button button-subtle icon-button",
-    );
   });
 
-  it("adds active navigation semantics without changing legacy classes", () => {
-    const sidebar = renderToStaticMarkup(
-      <SidebarNav
-        label="Test navigation"
-        items={[{ href: "/supplier", icon: "home", label: "Overview", active: true }]}
-        userName="Supplier"
-        userEmail="supplier@example.com"
-        onLogout={() => undefined}
-      />,
+  it("uses the official Button data-slot/variant contract and defaults real buttons to type=button", () => {
+    const primary = renderToStaticMarkup(<Button>Save</Button>);
+    expect(primary).toContain('data-slot="button"');
+    expect(primary).toContain('data-variant="default"');
+    expect(primary).toContain('type="button"');
+
+    const destructive = renderToStaticMarkup(<Button variant="destructive">Delete</Button>);
+    expect(destructive).toContain('data-variant="destructive"');
+
+    // asChild composes onto the child (e.g. an anchor) and must not leak a `type` attribute.
+    const link = renderToStaticMarkup(
+      <Button asChild variant="link">
+        <a href="/somewhere">Go</a>
+      </Button>,
     );
-    expect(sidebar).toContain('class="admin-tab is-active"');
+    expect(link).toContain('data-variant="link"');
+    expect(link).toContain('href="/somewhere"');
+    expect(link).not.toContain("type=");
+
+    // buttonVariants still expresses the variant styling for composed, non-button controls.
+    expect(buttonVariants({ variant: "ghost" })).toContain("hover:bg-accent");
+    expect(buttonVariants({ size: "sm" })).toContain("h-8");
+  });
+
+  it("adds active navigation semantics through the official sidebar composition", () => {
+    const sidebar = renderToStaticMarkup(
+      <SidebarProvider>
+        <SidebarNav
+          label="Test navigation"
+          items={[{ href: "/supplier", icon: "home", label: "Overview", active: true }]}
+          userName="Supplier"
+          userEmail="supplier@example.com"
+          onLogout={() => undefined}
+        />
+      </SidebarProvider>,
+    );
+    expect(sidebar).toContain('aria-label="Test navigation"');
+    expect(sidebar).toContain('data-slot="sidebar-menu-button"');
+    expect(sidebar).toContain('data-active="true"');
     expect(sidebar).toContain('aria-current="page"');
+    // Legacy admin-tab class contract is gone; navigation state is now data/aria driven.
+    expect(sidebar).not.toContain("admin-tab");
   });
 });

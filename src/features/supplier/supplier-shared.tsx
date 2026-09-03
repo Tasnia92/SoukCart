@@ -1,3 +1,4 @@
+import { Badge } from "@/components/ui/badge";
 import { Icon } from "../../components/ui/Icon.tsx";
 import type { WorkspaceNavItem } from "../workspace/WorkspaceShell.tsx";
 import type { SupplierProduct } from "./supplier-overview-api.ts";
@@ -15,9 +16,9 @@ export function consumeSupplierNotice(): SupplierNotice | null {
 }
 
 export function StockChip({ product }: { product: Pick<SupplierProduct, "is_active" | "stock"> }) {
-  if (!product.is_active) return <span className="sp-chip is-hidden">Hidden</span>;
-  if (product.stock <= 0) return <span className="sp-chip is-out">Out of stock</span>;
-  return <span className="sp-chip is-active">Active</span>;
+  if (!product.is_active) return <Badge variant="secondary">Hidden</Badge>;
+  if (product.stock <= 0) return <Badge variant="destructive">Out of stock</Badge>;
+  return <Badge>Active</Badge>;
 }
 
 export function ProductThumb({ product }: { product: Pick<SupplierProduct, "image_url"> }) {

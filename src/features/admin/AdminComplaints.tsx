@@ -1,4 +1,14 @@
 import { useEffect, useState } from "react";
+import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
+import {
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from "@/components/ui/table";
 import { Icon } from "../../components/ui/Icon.tsx";
 import {
   EmptyState,
@@ -40,8 +50,8 @@ function ComplaintRow({
   onResolve: (complaint: AdminComplaint) => void;
 }) {
   return (
-    <tr>
-      <td>
+    <TableRow>
+      <TableCell>
         <div className="cp-cell">
           <strong>{complaint.subject}</strong>
           {complaint.order_id ? (
@@ -51,8 +61,8 @@ function ComplaintRow({
           ) : null}
           <small>{complaint.description}</small>
         </div>
-      </td>
-      <td>
+      </TableCell>
+      <TableCell>
         <div className="admin-user-cell">
           <span className="admin-avatar">{initials(complaint.retailer_name)}</span>
           <span>
@@ -60,41 +70,39 @@ function ComplaintRow({
             <small>{complaint.retailer_email}</small>
           </span>
         </div>
-      </td>
-      <td>
+      </TableCell>
+      <TableCell>
         {complaint.attachment_url ? (
-          <a
-            className="text-button"
-            href={complaint.attachment_url}
-            target="_blank"
-            rel="noopener noreferrer"
-          >
-            <Icon name="download" />
-            <span>Attachment</span>
-          </a>
+          <Button asChild variant="link" className="h-auto p-0">
+            <a href={complaint.attachment_url} target="_blank" rel="noopener noreferrer">
+              <Icon name="download" />
+              <span>Attachment</span>
+            </a>
+          </Button>
         ) : (
           <span className="admin-muted">None</span>
         )}
-      </td>
-      <td>{formatDate(complaint.created_at)}</td>
-      <td>
-        <span className={`cp-status cp-status-${complaint.status}`}>
+      </TableCell>
+      <TableCell>{formatDate(complaint.created_at)}</TableCell>
+      <TableCell>
+        <Badge variant={complaint.status === "open" ? "outline" : "secondary"}>
           {complaint.status === "open" ? "Open" : "Resolved"}
-        </span>
-      </td>
-      <td className="admin-action-cell">
+        </Badge>
+      </TableCell>
+      <TableCell className="admin-action-cell">
         {complaint.status === "open" ? (
-          <button
-            className="delete-button"
+          <Button
+            variant="destructive"
+            size="sm"
             type="button"
             disabled={busy}
             onClick={() => onResolve(complaint)}
           >
             Mark resolved
-          </button>
+          </Button>
         ) : null}
-      </td>
-    </tr>
+      </TableCell>
+    </TableRow>
   );
 }
 
@@ -217,20 +225,20 @@ export function AdminComplaints({
 
           {complaints.length ? (
             <TableShell>
-              <table className="admin-table cp-table">
-                <thead>
-                  <tr>
-                    <th>Complaint</th>
-                    <th>Retailer</th>
-                    <th>Attachment</th>
-                    <th>Filed</th>
-                    <th>Status</th>
-                    <th>
+              <Table className="cp-table">
+                <TableHeader>
+                  <TableRow>
+                    <TableHead>Complaint</TableHead>
+                    <TableHead>Retailer</TableHead>
+                    <TableHead>Attachment</TableHead>
+                    <TableHead>Filed</TableHead>
+                    <TableHead>Status</TableHead>
+                    <TableHead>
                       <span className="sr-only">Actions</span>
-                    </th>
-                  </tr>
-                </thead>
-                <tbody>
+                    </TableHead>
+                  </TableRow>
+                </TableHeader>
+                <TableBody>
                   {filtered.length ? (
                     filtered.map((complaint) => (
                       <ComplaintRow
@@ -241,15 +249,15 @@ export function AdminComplaints({
                       />
                     ))
                   ) : (
-                    <tr>
-                      <td className="admin-empty" colSpan={6}>
+                    <TableRow>
+                      <TableCell className="admin-empty" colSpan={6}>
                         <strong>No matching complaints</strong>
                         <span>Try a different retailer or subject.</span>
-                      </td>
-                    </tr>
+                      </TableCell>
+                    </TableRow>
                   )}
-                </tbody>
-              </table>
+                </TableBody>
+              </Table>
             </TableShell>
           ) : (
             <EmptyState icon="message" title="No complaints yet" />

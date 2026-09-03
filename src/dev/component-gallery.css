@@ -78,13 +78,13 @@
   align-content: center;
   gap: 0.5rem;
   padding: 0.75rem;
-  color: var(--color-ink);
-  background: var(--color-card);
-  border: 1px solid var(--color-hairline);
+  color: var(--foreground);
+  background: var(--card);
+  border: 1px solid var(--border);
 }
 
 .design-gallery-icon small {
-  color: var(--color-mute);
+  color: var(--muted-foreground);
   font-family: var(--font-mono);
   font-size: 0.6875rem;
 }
@@ -97,7 +97,7 @@
 
 .design-gallery-workspace {
   overflow: hidden;
-  border: 1px solid var(--color-hairline);
+  border: 1px solid var(--border);
 }
 
 .design-gallery-table {

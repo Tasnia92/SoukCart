@@ -1,5 +1,14 @@
 import { useNavigate } from "@tanstack/react-router";
 import { useEffect, useState } from "react";
+import { Button } from "@/components/ui/button";
+import {
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from "@/components/ui/table";
 import { Icon } from "../../components/ui/Icon.tsx";
 import {
   EmptyState,
@@ -66,28 +75,30 @@ function OrderActions({
   return (
     <>
       {!order.accepted_at && order.status === "pending" ? (
-        <button
-          className="text-button"
+        <Button
+          variant="link"
+          className="h-auto p-0"
           type="button"
           disabled={disabled}
           onClick={() => onAccept(order)}
         >
           <Icon name="check" />
           <span>Accept order</span>
-        </button>
+        </Button>
       ) : order.accepted_at ? (
         <span className="admin-muted">Accepted {formatDate(order.accepted_at)}</span>
       ) : null}
       {canSupplierCancel(order) ? (
-        <button
-          className="text-button rt-cancel-button"
+        <Button
+          variant="ghost"
+          className="rt-cancel-button h-auto p-0 text-destructive hover:text-destructive"
           type="button"
           disabled={disabled}
           onClick={() => onCancel(order)}
         >
           <Icon name="trash" />
           <span>Request cancellation</span>
-        </button>
+        </Button>
       ) : !order.supplier_can_cancel ? (
         <span className="admin-muted">
           Multi-supplier order · contact admin to resolve your fulfillment
@@ -237,10 +248,12 @@ export function SupplierOrders({ loadOrders = loadSupplierOrders }: SupplierOrde
         title="Orders."
         copy="Accept incoming orders or request cancellation before delivery is verified. The admin completes all refunds manually."
         actions={
-          <RouterLink className="button button-subtle" to="/supplier/stock">
-            <Icon name="layers" />
-            <span>Manage stock</span>
-          </RouterLink>
+          <Button asChild variant="ghost">
+            <RouterLink to="/supplier/stock">
+              <Icon name="layers" />
+              <span>Manage stock</span>
+            </RouterLink>
+          </Button>
         }
       />
       <InlineNotice message={notice?.message} state={notice?.state} />
@@ -256,22 +269,22 @@ export function SupplierOrders({ loadOrders = loadSupplierOrders }: SupplierOrde
           />
           {orders.length ? (
             <TableShell>
-              <table className="admin-table rt-orders-table">
-                <thead>
-                  <tr>
-                    <th>Order</th>
-                    <th>Placed</th>
-                    <th>Retailer</th>
-                    <th>Units</th>
-                    <th>Total</th>
-                    <th>Payment</th>
-                    <th>Status</th>
-                    <th>
+              <Table className="rt-orders-table">
+                <TableHeader>
+                  <TableRow>
+                    <TableHead>Order</TableHead>
+                    <TableHead>Placed</TableHead>
+                    <TableHead>Retailer</TableHead>
+                    <TableHead>Units</TableHead>
+                    <TableHead>Total</TableHead>
+                    <TableHead>Payment</TableHead>
+                    <TableHead>Status</TableHead>
+                    <TableHead>
                       <span className="sr-only">Order lines</span>
-                    </th>
-                  </tr>
-                </thead>
-                <tbody>
+                    </TableHead>
+                  </TableRow>
+                </TableHeader>
+                <TableBody>
                   {filtered.length ? (
                     filtered.map((order) => (
                       <OrderRow
@@ -280,11 +293,11 @@ export function SupplierOrders({ loadOrders = loadSupplierOrders }: SupplierOrde
                         toggleLabel={`Toggle lines for order #${shortId(order.id)}`}
                         summaryCells={
                           <>
-                            <td>
+                            <TableCell>
                               <strong className="rt-order-id">#{shortId(order.id)}</strong>
-                            </td>
-                            <td>{formatDate(order.created_at)}</td>
-                            <td>
+                            </TableCell>
+                            <TableCell>{formatDate(order.created_at)}</TableCell>
+                            <TableCell>
                               <div className="admin-user-cell">
                                 <span className="admin-avatar">
                                   {initials(order.retailer_name)}
@@ -294,18 +307,20 @@ export function SupplierOrders({ loadOrders = loadSupplierOrders }: SupplierOrde
                                   <small>{order.retailer_email}</small>
                                 </span>
                               </div>
-                            </td>
-                            <td>{order.items.reduce((sum, item) => sum + item.quantity, 0)}</td>
-                            <td>
+                            </TableCell>
+                            <TableCell>
+                              {order.items.reduce((sum, item) => sum + item.quantity, 0)}
+                            </TableCell>
+                            <TableCell>
                               <strong>{formatPrice(order.supplier_total)}</strong>
-                            </td>
-                            <td>
+                            </TableCell>
+                            <TableCell>
                               <PaymentBadge
                                 paymentStatus={order.payment_status}
                                 paymentMethod={order.payment_method}
                               />
-                            </td>
-                            <td>
+                            </TableCell>
+                            <TableCell>
                               <StatusBadge status={order.status} />
                               {order.accepted_at ? (
                                 <span className="rt-cancel-flag">Accepted</span>
@@ -315,7 +330,7 @@ export function SupplierOrders({ loadOrders = loadSupplierOrders }: SupplierOrde
                                   Cancel requested by {order.cancellation_initiator}
                                 </span>
                               ) : null}
-                            </td>
+                            </TableCell>
                           </>
                         }
                         detail={
@@ -354,15 +369,15 @@ export function SupplierOrders({ loadOrders = loadSupplierOrders }: SupplierOrde
                       />
                     ))
                   ) : (
-                    <tr>
-                      <td className="admin-empty" colSpan={8}>
+                    <TableRow>
+                      <TableCell className="admin-empty" colSpan={8}>
                         <strong>No matching orders</strong>
                         <span>Try a different order number, retailer, or product.</span>
-                      </td>
-                    </tr>
+                      </TableCell>
+                    </TableRow>
                   )}
-                </tbody>
-              </table>
+                </TableBody>
+              </Table>
             </TableShell>
           ) : (
             <EmptyState

@@ -1,19 +1,14 @@
 /* =============================================================================
- * Soukcart theme tokens — Warm Terracotta Editorial (cream + ink + terracotta)
+ * SoukCart theme tokens — Warm Terracotta Editorial (cream + ink + terracotta)
  * -----------------------------------------------------------------------------
- * Every colour, type, radius and shadow value lives here, and only here.
- * Component CSS in style.css references these variables and never raw values.
- *
- * To restyle the whole app later, replace this file with another theme's token
- * sheet (or edit the values below). Keep the variable NAMES intact — style.css
- * depends on them. That is the entire theme-swap contract.
+ * Semantic shadcn roles are the source of truth. Tailwind exposes these through
+ * src/tailwind.css, while legacy --color-* aliases remain temporarily available
+ * for components that have not yet moved to shadcn primitives.
  *
  * Warm Terracotta Editorial: warm cream canvas (#faf9f5), olive-brown body ink
  * (#3d3929), near-black headings (#141413), terracotta brand (#c96442) reserved
- * for actions and active states, sand tinted surfaces, monochrome destructive.
- * Sharp geometry (radius 0), Geist Sans + Geist Mono, hairline borders and
- * near-invisible neutral shadows. Dark values mirror the .dark sheet and apply
- * when the `dark` class is set on <html>.
+ * for actions and active states, and sand-tinted surfaces. Dark values apply
+ * whenever the `dark` class is set on <html>.
  * ========================================================================== */
 
 :root {
@@ -32,60 +27,78 @@
   -moz-osx-font-smoothing: grayscale;
   letter-spacing: 0;
 
-  /* Brand — drives CTAs, sidebars, the auth story band, status accents. */
-  --color-primary: #c96442; /* terracotta — the only saturated hue; actions, active nav, delivered states */
-  --color-primary-hover: #b05730; /* deeper terracotta on hover/press (sheet chart-1) */
-  --color-on-dark: #ffffff; /* text on primary fills */
-  --color-on-dark-muted: rgba(255, 255, 255, 0.75); /* muted text on primary fills */
+  /* Standard shadcn color roles. */
+  --background: #faf9f5;
+  --foreground: #141413;
+  --card: #f5f4ef;
+  --card-foreground: #141413;
+  --popover: #ffffff;
+  --popover-foreground: #141413;
+  --primary: #c96442;
+  --primary-foreground: #ffffff;
+  --secondary: #ede9de;
+  --secondary-foreground: #141413;
+  --muted: #ede9de;
+  --muted-foreground: #6e6d68;
+  --accent: #e9e6dc;
+  --accent-foreground: #28261b;
+  --destructive: #141413;
+  --destructive-foreground: #ffffff;
+  --border: #dad9d4;
+  --input: #dad9d4;
+  --ring: #c96442;
 
-  /* Canvas — the page ground (warm cream). */
-  --color-canvas: #faf9f5; /* background — page ground */
-  --color-canvas-soft: #ede9de; /* muted wash — stat cards, tinted panels, chips, art tiles */
-  --color-canvas-softer: #e9e6dc; /* deeper wash — table headers, hover rows, drop zones, tiles */
-  --color-surface-pressed: #ded8c4; /* deepest sand — pressed states (sheet chart-3) */
+  /* SoukCart semantic extensions for states not covered by core shadcn roles. */
+  --foreground-subtle: #3d3929;
+  --foreground-quiet: #535146;
+  --primary-hover: #b05730;
+  --primary-foreground-muted: rgb(255 255 255 / 0.75);
+  --muted-strong: #e9e6dc;
+  --accent-pressed: #ded8c4;
+  --border-strong: #b4b2a7;
+  --input-background: #ffffff;
+  --print-background: #ffffff;
 
-  /* Surfaces — tinted cards and white input wells on the cream canvas. */
-  --color-card: #f5f4ef; /* card — slightly deeper than canvas, so cards read as panels */
-  --color-input: #ffffff; /* popover white — input wells */
-  --color-sidebar: #f5f4ef; /* soft surface — auth story band & admin sidebar */
+  /* Chart roles use the same restrained editorial palette. */
+  --chart-1: #c96442;
+  --chart-2: #b05730;
+  --chart-3: #ded8c4;
+  --chart-4: #3d3929;
+  --chart-5: #6e6d68;
 
-  /* Text roles */
-  --color-ink: #141413; /* headings, labels, strong values — near-black ink */
-  --color-body: #3d3929; /* supporting copy — warm olive-brown */
-  --color-mute: #6e6d68; /* placeholders, quiet labels, timestamps */
-  --color-hairline-mid: #535146; /* quiet-but-readable links (legal text) */
+  /* Sidebar roles follow shadcn's standard component contract. */
+  --sidebar: #f5f4ef;
+  --sidebar-foreground: #141413;
+  --sidebar-primary: #c96442;
+  --sidebar-primary-foreground: #ffffff;
+  --sidebar-accent: #ede9de;
+  --sidebar-accent-foreground: #141413;
+  --sidebar-border: #dad9d4;
+  --sidebar-ring: #c96442;
 
-  /* Hairlines & borders */
-  --color-hairline: #dad9d4; /* card borders, dividers */
-  --color-hairline-dark: #b4b2a7; /* strong borders — selects, hover borders */
-
-  /* Semantic accents */
-  --color-accent: #e9e6dc; /* selected payment method, add-to-order success flash */
-  --color-accent-foreground: #28261b;
-  --color-destructive: #141413; /* monochrome destructive — errors, cancel, out-of-stock */
-  --color-destructive-foreground: #ffffff;
-
-  /* Focus ring */
-  --color-ring: #c96442;
-
-  /* shadcn/Tailwind semantic roles — aliases only; SoukCart tokens stay authoritative. */
-  --background: var(--color-canvas);
-  --foreground: var(--color-ink);
-  --card: var(--color-card);
-  --card-foreground: var(--color-ink);
-  --muted: var(--color-canvas-soft);
-  --muted-foreground: var(--color-mute);
-  --border: var(--color-hairline);
-  --input: var(--color-input);
-  --primary: var(--color-primary);
-  --primary-foreground: var(--color-on-dark);
-  --secondary: var(--color-canvas-soft);
-  --secondary-foreground: var(--color-ink);
-  --accent: var(--color-accent);
-  --accent-foreground: var(--color-accent-foreground);
-  --destructive: var(--color-destructive);
-  --destructive-foreground: var(--color-destructive-foreground);
-  --ring: var(--color-ring);
+  /* Temporary compatibility aliases for custom components still being migrated. */
+  --color-primary: var(--primary);
+  --color-primary-hover: var(--primary-hover);
+  --color-on-dark: var(--primary-foreground);
+  --color-on-dark-muted: var(--primary-foreground-muted);
+  --color-canvas: var(--background);
+  --color-canvas-soft: var(--muted);
+  --color-canvas-softer: var(--muted-strong);
+  --color-surface-pressed: var(--accent-pressed);
+  --color-card: var(--card);
+  --color-input: var(--input-background);
+  --color-sidebar: var(--sidebar);
+  --color-ink: var(--foreground);
+  --color-body: var(--foreground-subtle);
+  --color-mute: var(--muted-foreground);
+  --color-hairline-mid: var(--foreground-quiet);
+  --color-hairline: var(--border);
+  --color-hairline-dark: var(--border-strong);
+  --color-accent: var(--accent);
+  --color-accent-foreground: var(--accent-foreground);
+  --color-destructive: var(--destructive);
+  --color-destructive-foreground: var(--destructive-foreground);
+  --color-ring: var(--ring);
 
   /* Type */
   --font-sans:
@@ -94,7 +107,7 @@
   --font-mono: "Geist Mono", ui-monospace, SFMono-Regular, Consolas, monospace;
 
   /* Radius scale — sharp editorial geometry; true circles use rounded-full/50%. */
-  --radius: 0rem; /* base card radius */
+  --radius: 0rem;
   --radius-xs: 0rem;
   --radius-sm: 0rem;
   --radius-md: 0rem;
@@ -110,15 +123,16 @@
   --shadow-s: 0 1px 3px 0 rgb(0 0 0 / 0.05);
   --shadow-m: 0 1px 3px 0 rgb(0 0 0 / 0.1), 0 1px 2px -1px rgb(0 0 0 / 0.1);
   --shadow-l: 0 1px 3px 0 rgb(0 0 0 / 0.1), 0 4px 6px -1px rgb(0 0 0 / 0.1);
+  --shadow-card-hover: 0 10px 30px -18px rgb(0 0 0 / 0.4);
   --shadow-inset: inset 0 1px 2px rgb(0 0 0 / 0.05);
 
   /* Button treatments — flat fill + faint shadow; secondary gets a 1px ring. */
   --shadow-pillow-primary: 0 1px 2px 0 rgb(0 0 0 / 0.1);
   --shadow-pillow-primary-hover: 0 2px 4px 0 rgb(0 0 0 / 0.12);
-  --shadow-pillow-secondary: 0 0 0 1px #dad9d4, 0 1px 2px 0 rgb(0 0 0 / 0.05);
-  --shadow-pillow-secondary-hover: 0 0 0 1px #b4b2a7, 0 1px 3px 0 rgb(0 0 0 / 0.08);
+  --shadow-pillow-secondary: 0 0 0 1px var(--border), 0 1px 2px 0 rgb(0 0 0 / 0.05);
+  --shadow-pillow-secondary-hover: 0 0 0 1px var(--border-strong), 0 1px 3px 0 rgb(0 0 0 / 0.08);
 
-  /* Back-compat elevation aliases (style.css uses these names). */
+  /* Back-compat elevation aliases used by existing custom CSS. */
   --shadow-level-1: var(--shadow-s);
   --shadow-level-2: var(--shadow-m);
   --shadow-level-3: var(--shadow-l);
@@ -141,58 +155,48 @@
 .dark {
   color-scheme: dark;
 
-  /* Brand */
-  --color-primary: #d97757;
-  --color-primary-hover: #e58a66; /* derived lighter terracotta for hover */
-  --color-on-dark: #fbfbfb;
-  --color-on-dark-muted: rgba(255, 255, 255, 0.8);
+  --background: #262624;
+  --foreground: #faf9f5;
+  --card: #2c2c2b;
+  --card-foreground: #faf9f5;
+  --popover: #1b1b19;
+  --popover-foreground: #faf9f5;
+  --primary: #d97757;
+  --primary-foreground: #fbfbfb;
+  --secondary: #30302e;
+  --secondary-foreground: #faf9f5;
+  --muted: #30302e;
+  --muted-foreground: #b7b5a9;
+  --accent: #1a1915;
+  --accent-foreground: #f5f4ee;
+  --destructive: #ef4444;
+  --destructive-foreground: #ffffff;
+  --border: #3e3e38;
+  --input: #3e3e38;
+  --ring: #d97757;
 
-  /* Canvas */
-  --color-canvas: #262624;
-  --color-canvas-soft: #30302e;
-  --color-canvas-softer: #1b1b19;
-  --color-surface-pressed: #3e3e38;
+  --foreground-subtle: #e5e5e2;
+  --foreground-quiet: #c3c0b6;
+  --primary-hover: #e58a66;
+  --primary-foreground-muted: rgb(255 255 255 / 0.8);
+  --muted-strong: #1b1b19;
+  --accent-pressed: #3e3e38;
+  --border-strong: #52514a;
+  --input-background: #1b1b19;
+  --print-background: #ffffff;
 
-  /* Surfaces */
-  --color-card: #2c2c2b;
-  --color-input: #1b1b19;
-  --color-sidebar: #1f1e1d;
+  --chart-1: #d97757;
+  --chart-2: #e58a66;
+  --chart-3: #3e3e38;
+  --chart-4: #e5e5e2;
+  --chart-5: #b7b5a9;
 
-  /* Text roles */
-  --color-ink: #faf9f5;
-  --color-body: #e5e5e2;
-  --color-mute: #b7b5a9;
-  --color-hairline-mid: #c3c0b6;
-
-  /* Hairlines & borders */
-  --color-hairline: #3e3e38;
-  --color-hairline-dark: #52514a;
-
-  /* Semantic accents */
-  --color-accent: #1a1915;
-  --color-accent-foreground: #f5f4ee;
-  --color-destructive: #ef4444;
-  --color-destructive-foreground: #ffffff;
-
-  /* Focus ring */
-  --color-ring: #d97757;
-
-  /* Keep semantic consumers scoped to the active dark SoukCart tokens. */
-  --background: var(--color-canvas);
-  --foreground: var(--color-ink);
-  --card: var(--color-card);
-  --card-foreground: var(--color-ink);
-  --muted: var(--color-canvas-soft);
-  --muted-foreground: var(--color-mute);
-  --border: var(--color-hairline);
-  --input: var(--color-input);
-  --primary: var(--color-primary);
-  --primary-foreground: var(--color-on-dark);
-  --secondary: var(--color-canvas-soft);
-  --secondary-foreground: var(--color-ink);
-  --accent: var(--color-accent);
-  --accent-foreground: var(--color-accent-foreground);
-  --destructive: var(--color-destructive);
-  --destructive-foreground: var(--color-destructive-foreground);
-  --ring: var(--color-ring);
+  --sidebar: #1f1e1d;
+  --sidebar-foreground: #faf9f5;
+  --sidebar-primary: #d97757;
+  --sidebar-primary-foreground: #fbfbfb;
+  --sidebar-accent: #30302e;
+  --sidebar-accent-foreground: #faf9f5;
+  --sidebar-border: #3e3e38;
+  --sidebar-ring: #d97757;
 }

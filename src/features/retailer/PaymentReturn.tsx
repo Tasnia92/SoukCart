@@ -1,4 +1,13 @@
 import { useEffect, useState } from "react";
+import { Button } from "@/components/ui/button";
+import {
+  Empty,
+  EmptyContent,
+  EmptyDescription,
+  EmptyHeader,
+  EmptyMedia,
+  EmptyTitle,
+} from "@/components/ui/empty";
 import { Brand } from "../../components/ui/Brand.tsx";
 import { Icon, type IconName } from "../../components/ui/Icon.tsx";
 import {
@@ -187,15 +196,21 @@ function PaymentResultCard({ outcome }: { outcome: Outcome }) {
   const action = resultAction(outcome);
 
   return (
-    <div className="rt-empty-card" role="status" aria-live="polite" data-payment-result>
-      <span className={`rt-empty-icon${state === "paid" ? " is-success" : ""}`}>
-        <Icon name={icon} />
-      </span>
-      <strong>{title}</strong>
-      <span>{copy}</span>
-      <a className="button button-primary" href={action.href}>
-        <span>{action.label}</span>
-      </a>
-    </div>
+    <Empty role="status" aria-live="polite" data-payment-result>
+      <EmptyHeader>
+        <EmptyMedia variant="icon">
+          <Icon name={icon} />
+        </EmptyMedia>
+        <EmptyTitle>{title}</EmptyTitle>
+        <EmptyDescription>{copy}</EmptyDescription>
+      </EmptyHeader>
+      <EmptyContent>
+        <Button asChild>
+          <a href={action.href}>
+            <span>{action.label}</span>
+          </a>
+        </Button>
+      </EmptyContent>
+    </Empty>
   );
 }

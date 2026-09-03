@@ -7,6 +7,15 @@
  * -------------------------------------------------------------------------- */
 
 import type { ReactNode } from "react";
+import {
+  Table,
+  TableBody,
+  TableCaption,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from "@/components/ui/table";
 import { areaGeometry, barShare } from "./dashboard-model.ts";
 import { DashboardCard, SectionEmpty } from "./Dashboard.tsx";
 
@@ -138,31 +147,31 @@ export function TrendChartCard({
           <details className="db-chart-data">
             <summary>View the {labels.length}-day figures</summary>
             <div className="db-table-wrap">
-              <table className="db-table">
-                <caption className="sr-only">{rangeLabel}</caption>
-                <thead>
-                  <tr>
-                    <th scope="col">Day</th>
+              <Table className="db-table">
+                <TableCaption className="sr-only">{rangeLabel}</TableCaption>
+                <TableHeader>
+                  <TableRow>
+                    <TableHead scope="col">Day</TableHead>
                     {series.map((entry) => (
-                      <th className="is-numeric" key={entry.key} scope="col">
+                      <TableHead className="is-numeric" key={entry.key} scope="col">
                         {entry.label}
-                      </th>
+                      </TableHead>
                     ))}
-                  </tr>
-                </thead>
-                <tbody>
+                  </TableRow>
+                </TableHeader>
+                <TableBody>
                   {labels.map((dayLabel, index) => (
-                    <tr key={`${dayLabel}-${index}`}>
-                      <td data-label="Day">{dayLabel}</td>
+                    <TableRow key={`${dayLabel}-${index}`}>
+                      <TableCell data-label="Day">{dayLabel}</TableCell>
                       {series.map((entry) => (
-                        <td className="is-numeric" data-label={entry.label} key={entry.key}>
+                        <TableCell className="is-numeric" data-label={entry.label} key={entry.key}>
                           {entry.format(entry.values[index] ?? 0)}
-                        </td>
+                        </TableCell>
                       ))}
-                    </tr>
+                    </TableRow>
                   ))}
-                </tbody>
-              </table>
+                </TableBody>
+              </Table>
             </div>
           </details>
         </figure>

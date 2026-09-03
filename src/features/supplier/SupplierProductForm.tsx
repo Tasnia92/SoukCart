@@ -1,5 +1,15 @@
 import { useNavigate } from "@tanstack/react-router";
 import { useEffect, useRef, useState, type FormEvent, type ReactNode } from "react";
+import { Button } from "@/components/ui/button";
+import { Field, FieldLabel } from "@/components/ui/field";
+import {
+  Select,
+  SelectContent,
+  SelectGroup,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 import { Icon } from "../../components/ui/Icon.tsx";
 import {
   InlineNotice,
@@ -29,6 +39,8 @@ type SupplierProductFormProps = {
 };
 
 type Feedback = { message: string; state: "info" | "success" | "error" } | null;
+
+const UNCATEGORIZED = "__uncategorized__";
 
 function readText(formData: FormData, name: string): string {
   const value = formData.get(name);
@@ -145,7 +157,10 @@ export function SupplierProductForm({
       price: Number(readText(formData, "price")),
       unit: readText(formData, "unit").trim() || "piece",
       stock: Number(readText(formData, "stock")),
-      category: readText(formData, "category").trim() || null,
+      category: (() => {
+        const category = readText(formData, "category").trim();
+        return !category || category === UNCATEGORIZED ? null : category;
+      })(),
     };
     const validationMessage = productValidationError(payload);
     if (validationMessage) {
@@ -224,9 +239,9 @@ export function SupplierProductForm({
   return shell(
     <>
       <p className="sp-back-row">
-        <RouterLink className="text-button" to="/supplier/products">
-          Back to my products
-        </RouterLink>
+        <Button asChild variant="link" className="h-auto p-0">
+          <RouterLink to="/supplier/products">Back to my products</RouterLink>
+        </Button>
       </p>
       <PageHeader
         eyebrow={editing ? "Edit listing" : "New listing"}
@@ -284,21 +299,24 @@ export function SupplierProductForm({
               required
             />
           </label>
-          <label className="admin-field">
-            <span>Category</span>
-            <select
-              name="category"
-              className="sp-category-select"
-              defaultValue={editing?.category ?? ""}
-            >
-              <option value="">Choose a category</option>
-              {PRODUCT_CATEGORIES.map((category) => (
-                <option value={category} key={category}>
-                  {category}
-                </option>
-              ))}
-            </select>
-          </label>
+          <Field>
+            <FieldLabel htmlFor="product-category">Category</FieldLabel>
+            <Select name="category" defaultValue={editing?.category ?? UNCATEGORIZED}>
+              <SelectTrigger id="product-category" className="w-full">
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectGroup>
+                  <SelectItem value={UNCATEGORIZED}>Choose a category</SelectItem>
+                  {PRODUCT_CATEGORIES.map((category) => (
+                    <SelectItem value={category} key={category}>
+                      {category}
+                    </SelectItem>
+                  ))}
+                </SelectGroup>
+              </SelectContent>
+            </Select>
+          </Field>
           <label className="admin-field">
             <span>Stock</span>
             <input
@@ -331,19 +349,19 @@ export function SupplierProductForm({
                 src={displayUrl ?? ""}
                 alt="Product image preview"
               />
-              <button className="button button-subtle" type="button" onClick={onRemoveImage}>
+              <Button variant="ghost" onClick={onRemoveImage}>
                 <span>Choose a different image</span>
-              </button>
+              </Button>
             </div>
           </div>
         </div>
         <div className="sp-form-actions">
-          <RouterLink className="button button-secondary" to="/supplier/products">
-            Cancel
-          </RouterLink>
-          <button className="button button-primary" type="submit" disabled={submitting}>
+          <Button asChild variant="secondary">
+            <RouterLink to="/supplier/products">Cancel</RouterLink>
+          </Button>
+          <Button type="submit" disabled={submitting}>
             <span>{editing ? "Save changes" : "Create product"}</span>
-          </button>
+          </Button>
         </div>
         <p
           className={`admin-form-feedback${feedback ? ` is-visible is-${feedback.state}` : ""}`}

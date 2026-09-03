@@ -1,6 +1,7 @@
 import { useEffect, useState, type ReactNode } from "react";
 import { useNavigate } from "@tanstack/react-router";
-import { Button } from "../../components/ui/Button.tsx";
+import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
 import { Icon } from "../../components/ui/Icon.tsx";
 import {
   InlineNotice,
@@ -54,10 +55,12 @@ function LicencePreview({ verification }: { verification: AdminSupplierVerificat
     <figure className="sv-licence">
       <figcaption>
         <span>Trade licence</span>
-        <a className="text-button" href={url} target="_blank" rel="noopener noreferrer">
-          <Icon name="arrow-up-right" />
-          <span>Open original</span>
-        </a>
+        <Button asChild variant="link" className="h-auto p-0">
+          <a href={url} target="_blank" rel="noopener noreferrer">
+            <Icon name="arrow-up-right" />
+            <span>Open original</span>
+          </a>
+        </Button>
       </figcaption>
       {kind === "image" ? (
         <a href={url} target="_blank" rel="noopener noreferrer" className="sv-licence-image">
@@ -68,30 +71,24 @@ function LicencePreview({ verification }: { verification: AdminSupplierVerificat
           <div className="sv-licence-empty">
             <Icon name="package" />
             <strong>PDF preview unavailable</strong>
-            <a
-              className="button button-secondary button-compact"
-              href={url}
-              target="_blank"
-              rel="noopener noreferrer"
-            >
-              <Icon name="download" />
-              <span>Download licence</span>
-            </a>
+            <Button asChild variant="secondary" size="sm">
+              <a href={url} target="_blank" rel="noopener noreferrer">
+                <Icon name="download" />
+                <span>Download licence</span>
+              </a>
+            </Button>
           </div>
         </object>
       ) : (
         <div className="sv-licence-empty">
           <Icon name="download" />
           <strong>Downloadable file</strong>
-          <a
-            className="button button-secondary button-compact"
-            href={url}
-            target="_blank"
-            rel="noopener noreferrer"
-          >
-            <Icon name="download" />
-            <span>Download licence</span>
-          </a>
+          <Button asChild variant="secondary" size="sm">
+            <a href={url} target="_blank" rel="noopener noreferrer">
+              <Icon name="download" />
+              <span>Download licence</span>
+            </a>
+          </Button>
         </div>
       )}
     </figure>
@@ -191,10 +188,12 @@ export function AdminSupplierVerificationDetail({
   if (verification === null) {
     return shell(
       <>
-        <RouterLink className="text-button sv-back" to="/admin/verifications">
-          <Icon name="arrow-right" />
-          <span>Back to verifications</span>
-        </RouterLink>
+        <Button asChild variant="link" className="sv-back h-auto p-0">
+          <RouterLink to="/admin/verifications">
+            <Icon name="arrow-right" />
+            <span>Back to verifications</span>
+          </RouterLink>
+        </Button>
         <PageHeader
           eyebrow="Supplier onboarding"
           title="Application not found."
@@ -234,18 +233,28 @@ export function AdminSupplierVerificationDetail({
 
   return shell(
     <>
-      <RouterLink className="text-button sv-back" to="/admin/verifications">
-        <Icon name="arrow-right" />
-        <span>Back to verifications</span>
-      </RouterLink>
+      <Button asChild variant="link" className="sv-back h-auto p-0">
+        <RouterLink to="/admin/verifications">
+          <Icon name="arrow-right" />
+          <span>Back to verifications</span>
+        </RouterLink>
+      </Button>
       <PageHeader
         eyebrow="Supplier onboarding"
         title={verification.shop_name}
         copy="Review the attached trade licence and shop details, then approve or reject the supplier."
         actions={
-          <span className={`sv-status is-${verification.status}`}>
+          <Badge
+            variant={
+              verification.status === "rejected"
+                ? "destructive"
+                : verification.status === "approved"
+                  ? "default"
+                  : "outline"
+            }
+          >
             {STATUS_LABELS[verification.status]}
-          </span>
+          </Badge>
         }
       />
       <InlineNotice message={notice?.message} state={notice?.state} />

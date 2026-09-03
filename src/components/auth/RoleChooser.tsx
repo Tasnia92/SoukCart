@@ -1,5 +1,5 @@
 import { Brand } from "../ui/Brand.tsx";
-import { Button } from "../ui/Button.tsx";
+import { Button } from "@/components/ui/button";
 import type { AuthFeedback } from "./types.ts";
 
 export type AccountRole = "retailer" | "seller";
@@ -33,7 +33,7 @@ export function RoleChooser({ feedback = null, onSelectRole, pending = false }: 
           <span>I&apos;m a seller</span>
         </Button>
         <Button
-          variant="subtle"
+          variant="ghost"
           type="button"
           data-role="retailer"
           disabled={pending}

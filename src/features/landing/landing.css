@@ -3,9 +3,9 @@
  *
  * Same contract as style.css: every colour, font, radius and shadow resolves to
  * a token declared in src/theme.css. No raw colour values below. The canvas is
- * --color-canvas (#faf9f5), tinted panels use --color-canvas-soft / --softer,
- * hairlines use --color-hairline, and terracotta (--color-primary) is reserved
- * for actions, the accented headline word and route/step accents.
+ * `--background`, tinted panels use `--muted` / `--muted-strong`, hairlines use
+ * `--border`, and `--primary` is reserved for actions, the accented headline
+ * word, and route/step accents.
  *
  * Class prefix: `ld-` (landing), matching the app's per-area prefixes.
  * -------------------------------------------------------------------------- */
@@ -19,8 +19,8 @@
   display: flex;
   min-height: 100svh;
   flex-direction: column;
-  background: var(--color-canvas);
-  color: var(--color-ink);
+  background: var(--background);
+  color: var(--foreground);
 }
 
 .ld-shell {
@@ -39,12 +39,12 @@
 }
 
 .ld-accent {
-  color: var(--color-primary);
+  color: var(--primary);
   font-style: normal;
 }
 
 .ld-eyebrow {
-  color: var(--color-primary);
+  color: var(--primary);
 }
 
 /* -----------------------------------------------------------------------------
@@ -84,7 +84,7 @@
 }
 
 .ld-nav-link {
-  color: var(--color-body);
+  color: var(--foreground-subtle);
   font-size: 0.875rem;
   font-weight: 500;
   line-height: 1.25rem;
@@ -93,7 +93,7 @@
 }
 
 .ld-nav-link:hover {
-  color: var(--color-ink);
+  color: var(--foreground);
 }
 
 .ld-signin {
@@ -118,7 +118,7 @@
 
 .ld-hero-title {
   margin: 0;
-  color: var(--color-ink);
+  color: var(--foreground);
   font-size: clamp(2.375rem, 5.4vw, 4.25rem);
   font-weight: 700;
   letter-spacing: -0.03em;
@@ -127,7 +127,7 @@
 
 .ld-hero-lead {
   margin: 1.75rem 0 0;
-  color: var(--color-ink);
+  color: var(--foreground);
   font-size: 1.25rem;
   font-weight: 400;
   line-height: 1.75rem;
@@ -136,7 +136,7 @@
 .ld-hero-body {
   max-width: 28rem;
   margin: 1rem 0 0;
-  color: var(--color-body);
+  color: var(--foreground-subtle);
   font-size: 1rem;
   line-height: 1.625rem;
 }
@@ -153,7 +153,7 @@
   align-items: center;
   gap: 0.5rem;
   margin: 2.25rem 0 0;
-  color: var(--color-mute);
+  color: var(--muted-foreground);
   font-size: 0.75rem;
   line-height: 1.125rem;
 }
@@ -188,8 +188,8 @@
   width: max-content;
   max-width: 45%;
   padding: 0.4375rem 0.625rem;
-  border: 1px solid var(--color-hairline);
-  background: var(--color-canvas);
+  border: 1px solid var(--border);
+  background: var(--background);
   box-shadow: var(--shadow-s);
   gap: 0.0625rem;
 }
@@ -215,7 +215,7 @@
 }
 
 .ld-handoff-step {
-  color: var(--color-primary);
+  color: var(--primary);
   font-family: var(--font-mono);
   font-size: 0.625rem;
   font-weight: 500;
@@ -223,14 +223,14 @@
 }
 
 .ld-handoff-title {
-  color: var(--color-ink);
+  color: var(--foreground);
   font-size: 0.75rem;
   font-weight: 600;
   line-height: 1rem;
 }
 
 .ld-handoff-detail {
-  color: var(--color-mute);
+  color: var(--muted-foreground);
   font-size: 0.625rem;
   line-height: 0.875rem;
 }
@@ -253,7 +253,7 @@
 
 .ld-highlights-title {
   margin: 0;
-  color: var(--color-ink);
+  color: var(--foreground);
   font-size: clamp(1.625rem, 3vw, 2rem);
   font-weight: 700;
   letter-spacing: -0.02em;
@@ -263,7 +263,7 @@
 .ld-highlights-copy {
   max-width: 26rem;
   margin: 0;
-  color: var(--color-body);
+  color: var(--foreground-subtle);
   font-size: 0.9375rem;
   line-height: 1.5rem;
 }
@@ -282,8 +282,8 @@
   align-items: start;
   gap: 1rem;
   padding: 1.5rem;
-  border: 1px solid var(--color-hairline);
-  background: var(--color-card);
+  border: 1px solid var(--border);
+  background: var(--card);
 }
 
 .ld-highlight-art {
@@ -292,8 +292,8 @@
   height: 3rem;
   place-items: center;
   border-radius: 50%;
-  background: var(--color-canvas-soft);
-  color: var(--color-ink);
+  background: var(--muted);
+  color: var(--foreground);
 }
 
 .ld-highlight-art .icon {
@@ -303,7 +303,7 @@
 
 .ld-highlight-title {
   margin: 0;
-  color: var(--color-ink);
+  color: var(--foreground);
   font-size: 1rem;
   font-weight: 600;
   line-height: 1.375rem;
@@ -311,7 +311,7 @@
 
 .ld-highlight-copy {
   margin: 0.5rem 0 0;
-  color: var(--color-body);
+  color: var(--foreground-subtle);
   font-size: 0.8125rem;
   line-height: 1.375rem;
 }
@@ -336,7 +336,7 @@
 
 .ld-flow-title {
   margin: 0;
-  color: var(--color-ink);
+  color: var(--foreground);
   font-size: clamp(1.625rem, 3vw, 2rem);
   font-weight: 700;
   letter-spacing: -0.02em;
@@ -346,7 +346,7 @@
 .ld-flow-copy {
   max-width: 24rem;
   margin: 0.625rem auto 0;
-  color: var(--color-body);
+  color: var(--foreground-subtle);
   font-size: 0.9375rem;
   line-height: 1.5rem;
 }
@@ -377,7 +377,7 @@
   top: calc(var(--ld-flow-art) / 2);
   left: calc((var(--ld-flow-art) - 100%) / 2 - var(--ld-flow-gap) + 0.75rem);
   width: calc(100% - var(--ld-flow-art) + var(--ld-flow-gap) - 1.5rem);
-  border-top: 1px dashed var(--color-hairline-dark);
+  border-top: 1px dashed var(--border-strong);
 }
 
 .ld-flow-art {
@@ -388,8 +388,8 @@
   justify-content: center;
   border-radius: 50%;
   margin-bottom: 0.625rem;
-  background: var(--color-canvas-soft);
-  color: var(--color-ink);
+  background: var(--muted);
+  color: var(--foreground);
 }
 
 .ld-flow-art .icon {
@@ -398,7 +398,7 @@
 }
 
 .ld-flow-index {
-  color: var(--color-primary);
+  color: var(--primary);
   font-family: var(--font-mono);
   font-size: 0.75rem;
   font-weight: 600;
@@ -407,7 +407,7 @@
 }
 
 .ld-flow-step-title {
-  color: var(--color-ink);
+  color: var(--foreground);
   font-size: 0.9375rem;
   font-weight: 600;
   line-height: 1.375rem;
@@ -415,7 +415,7 @@
 
 .ld-flow-step-copy {
   max-width: 11rem;
-  color: var(--color-body);
+  color: var(--foreground-subtle);
   font-size: 0.8125rem;
   line-height: 1.25rem;
 }
@@ -430,8 +430,8 @@
   grid-template-columns: 15rem minmax(0, 1fr) auto;
   gap: 2rem;
   padding: 1.75rem 2.5rem;
-  border: 1px solid var(--color-hairline);
-  background: var(--color-canvas-soft);
+  border: 1px solid var(--border);
+  background: var(--muted);
 }
 
 .ld-join-copy {
@@ -444,7 +444,7 @@
 
 .ld-join-title {
   margin: 0;
-  color: var(--color-ink);
+  color: var(--foreground);
   font-size: 1.5rem;
   font-weight: 700;
   letter-spacing: -0.02em;
@@ -454,7 +454,7 @@
 .ld-join-body {
   max-width: 22rem;
   margin: 0.5rem 0 0;
-  color: var(--color-body);
+  color: var(--foreground-subtle);
   font-size: 0.875rem;
   line-height: 1.375rem;
 }
@@ -469,7 +469,7 @@
 
 .ld-footer {
   padding-bottom: 1.5rem;
-  background: var(--color-canvas);
+  background: var(--background);
 }
 
 .ld-footer-inner {
@@ -485,7 +485,7 @@
 
 .ld-footer-word {
   margin: 0;
-  color: var(--color-ink);
+  color: var(--foreground);
   font-size: 1.25rem;
   font-weight: 700;
   letter-spacing: 0.03em;
@@ -496,7 +496,7 @@
 .ld-footer-copy {
   max-width: 18rem;
   margin: 0.75rem 0 0;
-  color: var(--color-body);
+  color: var(--foreground-subtle);
   font-size: 0.8125rem;
   line-height: 1.25rem;
 }
@@ -516,8 +516,8 @@
 .ld-footer-heading {
   margin: 0;
   padding-bottom: 0.625rem;
-  border-bottom: 1px solid var(--color-hairline);
-  color: var(--color-ink);
+  border-bottom: 1px solid var(--border);
+  color: var(--foreground);
   font-size: 0.6875rem;
   font-weight: 600;
   letter-spacing: 0.08em;
@@ -526,7 +526,7 @@
 }
 
 .ld-footer-link {
-  color: var(--color-body);
+  color: var(--foreground-subtle);
   font-size: 0.8125rem;
   line-height: 1.25rem;
   text-decoration: none;
@@ -534,7 +534,7 @@
 }
 
 .ld-footer-link:hover {
-  color: var(--color-primary);
+  color: var(--primary);
 }
 
 .ld-footer-subscribe .ld-footer-copy {
@@ -556,19 +556,19 @@
   width: 100%;
   height: 2.5rem;
   padding: 0 0.75rem;
-  border: 1px solid var(--color-hairline);
+  border: 1px solid var(--border);
   border-right: 0;
-  background: var(--color-input);
-  color: var(--color-ink);
+  background: var(--input-background);
+  color: var(--foreground);
   font-size: 0.8125rem;
 }
 
 .ld-newsletter-field input::placeholder {
-  color: var(--color-mute);
+  color: var(--muted-foreground);
 }
 
 .ld-newsletter-field input:focus-visible {
-  outline: 2px solid var(--color-ring);
+  outline: 2px solid var(--ring);
   outline-offset: -2px;
 }
 
@@ -585,7 +585,7 @@
 
 .ld-newsletter-feedback {
   margin: 0;
-  color: var(--color-body);
+  color: var(--foreground-subtle);
   font-size: 0.75rem;
   grid-column: 1 / -1;
   line-height: 1.125rem;
@@ -603,11 +603,11 @@
   gap: 1rem;
   margin-top: 2.5rem;
   padding-top: 1.25rem;
-  border-top: 1px solid var(--color-hairline);
+  border-top: 1px solid var(--border);
 }
 
 .ld-footer-legal small {
-  color: var(--color-mute);
+  color: var(--muted-foreground);
   font-size: 0.75rem;
   line-height: 1.125rem;
 }
@@ -622,7 +622,7 @@
 }
 
 .ld-footer-legal .ld-footer-link {
-  color: var(--color-mute);
+  color: var(--muted-foreground);
   font-size: 0.75rem;
 }
 
@@ -639,63 +639,63 @@
 
 .ld-art-line {
   fill: none;
-  stroke: var(--color-ink);
+  stroke: var(--foreground);
   stroke-width: 2.4;
   stroke-linecap: round;
   stroke-linejoin: round;
 }
 
 .ld-art-line--soft {
-  stroke: var(--color-hairline-dark);
+  stroke: var(--border-strong);
   stroke-width: 1.8;
 }
 
 .ld-art-fill--paper {
-  fill: var(--color-canvas);
+  fill: var(--background);
 }
 
 .ld-art-fill--soft {
-  fill: var(--color-canvas-soft);
+  fill: var(--muted);
 }
 
 .ld-art-fill--softer {
-  fill: var(--color-canvas-softer);
+  fill: var(--muted-strong);
 }
 
 .ld-art-fill--accent {
-  fill: var(--color-primary);
+  fill: var(--primary);
 }
 
 .ld-art-fill--ink {
-  fill: var(--color-ink);
+  fill: var(--foreground);
 }
 
 .ld-art-fill--mid {
-  fill: var(--color-hairline-mid);
+  fill: var(--foreground-quiet);
 }
 
 .ld-art-shadow {
-  fill: var(--color-canvas-soft);
+  fill: var(--muted);
   stroke: none;
   opacity: 0.7;
 }
 
 /* The growth band already sits on --color-canvas-soft, so its shadow steps down. */
 .ld-art--growth .ld-art-shadow {
-  fill: var(--color-canvas-softer);
+  fill: var(--muted-strong);
   opacity: 1;
 }
 
 .ld-art-route {
   fill: none;
-  stroke: var(--color-primary);
+  stroke: var(--primary);
   stroke-width: 5;
   stroke-linecap: round;
 }
 
 .ld-art-wheel circle {
-  fill: var(--color-canvas);
-  stroke: var(--color-ink);
+  fill: var(--background);
+  stroke: var(--foreground);
   stroke-width: 5;
 }
 
@@ -704,12 +704,12 @@
 }
 
 .ld-art-badge {
-  stroke: var(--color-hairline-dark);
+  stroke: var(--border-strong);
   stroke-width: 2;
 }
 
 .ld-art-sign {
-  fill: var(--color-ink);
+  fill: var(--foreground);
   stroke: none;
   font-family: var(--font-sans);
   font-size: 21px;
@@ -718,18 +718,18 @@
 }
 
 .ld-art-sign--wall {
-  fill: var(--color-body);
+  fill: var(--foreground-subtle);
   font-size: 19px;
   font-weight: 600;
   letter-spacing: 2.5px;
 }
 
 .ld-art-glyph--light {
-  color: var(--color-canvas);
+  color: var(--background);
 }
 
 .ld-art-glyph--accent {
-  color: var(--color-primary);
+  color: var(--primary);
 }
 
 .ld-art--growth {
@@ -779,7 +779,7 @@
   }
 
   .ld-stat:nth-child(n + 3) {
-    border-top: 1px solid var(--color-hairline);
+    border-top: 1px solid var(--border);
   }
 
   .ld-flow-steps {
@@ -869,7 +869,7 @@
   }
 
   .ld-stat + .ld-stat {
-    border-top: 1px solid var(--color-hairline);
+    border-top: 1px solid var(--border);
   }
 
   .ld-flow-steps {

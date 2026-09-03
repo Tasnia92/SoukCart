@@ -1,6 +1,14 @@
 import type { ReactNode } from "react";
+import {
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from "@/components/ui/table";
 import { Brand } from "../components/ui/Brand.tsx";
-import { Button, buttonClassName } from "../components/ui/Button.tsx";
+import { Button } from "@/components/ui/button";
 import { Icon, ICON_NAMES } from "../components/ui/Icon.tsx";
 import {
   AppShell,
@@ -57,21 +65,21 @@ function ThemePanel({ dark = false }: { dark?: boolean }) {
           Primary
         </Button>
         <Button variant="secondary">Secondary</Button>
-        <Button variant="subtle">Subtle</Button>
-        <Button variant="text">Text action</Button>
+        <Button variant="ghost">Subtle</Button>
+        <Button variant="link">Text action</Button>
         <Button variant="destructive">Delete</Button>
-        <Button size="compact">Compact</Button>
-        <Button variant="subtle" size="icon" aria-label="Refresh preview">
+        <Button size="sm">Compact</Button>
+        <Button variant="ghost" size="icon" aria-label="Refresh preview">
           <Icon name="refresh" />
         </Button>
         <Button disabled>Working…</Button>
         <Button aria-pressed="true">Pressed</Button>
-        <a className={buttonClassName({ variant: "secondary" })} href="#workspace-preview">
-          Anchor action
-        </a>
+        <Button asChild variant="secondary">
+          <a href="#workspace-preview">Anchor action</a>
+        </Button>
       </div>
 
-      <Button block>A deliberately long block action label for narrow layouts</Button>
+      <Button className="w-full">A deliberately long block action label for narrow layouts</Button>
     </section>
   );
 }
@@ -118,7 +126,7 @@ function WorkspacePreview() {
                 <Icon name="plus" />
                 Add product
               </Button>
-              <Button variant="subtle">Refresh</Button>
+              <Button variant="ghost">Refresh</Button>
             </>
           }
         />
@@ -135,26 +143,26 @@ function WorkspacePreview() {
           result="3 of 128 products"
         />
         <TableShell>
-          <table className="admin-table design-gallery-table">
-            <thead>
-              <tr>
-                <th>Product</th>
-                <th>Status</th>
-                <th>Stock</th>
-                <th>Action</th>
-              </tr>
-            </thead>
-            <tbody>
-              <tr>
-                <td>Miniket rice, 50 kg sack</td>
-                <td>Active</td>
-                <td>24</td>
-                <td>
-                  <Button variant="text">Edit</Button>
-                </td>
-              </tr>
-            </tbody>
-          </table>
+          <Table className="design-gallery-table">
+            <TableHeader>
+              <TableRow>
+                <TableHead>Product</TableHead>
+                <TableHead>Status</TableHead>
+                <TableHead>Stock</TableHead>
+                <TableHead>Action</TableHead>
+              </TableRow>
+            </TableHeader>
+            <TableBody>
+              <TableRow>
+                <TableCell>Miniket rice, 50 kg sack</TableCell>
+                <TableCell>Active</TableCell>
+                <TableCell>24</TableCell>
+                <TableCell>
+                  <Button variant="link">Edit</Button>
+                </TableCell>
+              </TableRow>
+            </TableBody>
+          </Table>
         </TableShell>
         <EmptyState
           icon="store"

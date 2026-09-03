@@ -1,5 +1,14 @@
 import { useNavigate } from "@tanstack/react-router";
 import { useEffect, useState } from "react";
+import { Button } from "@/components/ui/button";
+import {
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from "@/components/ui/table";
 import { Brand } from "../../components/ui/Brand.tsx";
 import { Icon } from "../../components/ui/Icon.tsx";
 import {
@@ -97,7 +106,7 @@ export function RetailerInvoice({
           to: "/retailer/cart",
           icon: "cart",
           label: "Cart",
-          trailing: cartCount ? <span className="rt-nav-badge">{cartCount}</span> : undefined,
+          trailing: cartCount || undefined,
         },
         { to: "/retailer/orders", icon: "package", label: "My orders", active: true },
         { to: "/retailer/complaints", icon: "message", label: "Help Center" },
@@ -111,10 +120,12 @@ export function RetailerInvoice({
         title={`Order ${shortId(orderId)}.`}
         copy="Download a copy of this invoice for your records."
         actions={
-          <RouterLink className="button button-subtle" to="/retailer/orders">
-            <Icon name="package" />
-            <span>Back to orders</span>
-          </RouterLink>
+          <Button asChild variant="ghost">
+            <RouterLink to="/retailer/orders">
+              <Icon name="package" />
+              <span>Back to orders</span>
+            </RouterLink>
+          </Button>
         }
       />
       <InlineNotice />
@@ -126,9 +137,11 @@ export function RetailerInvoice({
               title="Invoice not found"
               copy="This order could not be loaded."
               action={
-                <RouterLink className="button button-primary" to="/retailer/orders">
-                  <span>Back to orders</span>
-                </RouterLink>
+                <Button asChild>
+                  <RouterLink to="/retailer/orders">
+                    <span>Back to orders</span>
+                  </RouterLink>
+                </Button>
               }
             />
           ) : result.kind === "unpaid" ? (
@@ -137,9 +150,11 @@ export function RetailerInvoice({
               title="Invoice not available yet"
               copy="The invoice appears once the order has been paid."
               action={
-                <RouterLink className="button button-primary" to="/retailer/orders">
-                  <span>Back to orders</span>
-                </RouterLink>
+                <Button asChild>
+                  <RouterLink to="/retailer/orders">
+                    <span>Back to orders</span>
+                  </RouterLink>
+                </Button>
               }
             />
           ) : (
@@ -192,28 +207,28 @@ function InvoiceCard({
       </div>
 
       <TableShell>
-        <table className="admin-table rt-invoice-table">
-          <thead>
-            <tr>
-              <th>Item</th>
-              <th>Qty</th>
-              <th>Unit price</th>
-              <th>Total</th>
-            </tr>
-          </thead>
-          <tbody>
+        <Table className="rt-invoice-table">
+          <TableHeader>
+            <TableRow>
+              <TableHead>Item</TableHead>
+              <TableHead>Qty</TableHead>
+              <TableHead>Unit price</TableHead>
+              <TableHead>Total</TableHead>
+            </TableRow>
+          </TableHeader>
+          <TableBody>
             {order.items.map((item) => (
-              <tr key={item.id}>
-                <td>{item.product_name}</td>
-                <td>{item.quantity}</td>
-                <td>{formatPrice(item.unit_price)}</td>
-                <td>
+              <TableRow key={item.id}>
+                <TableCell>{item.product_name}</TableCell>
+                <TableCell>{item.quantity}</TableCell>
+                <TableCell>{formatPrice(item.unit_price)}</TableCell>
+                <TableCell>
                   <strong>{formatPrice(item.unit_price * item.quantity)}</strong>
-                </td>
-              </tr>
+                </TableCell>
+              </TableRow>
             ))}
-          </tbody>
-        </table>
+          </TableBody>
+        </Table>
       </TableShell>
 
       <div className="rt-invoice-total">
@@ -229,13 +244,15 @@ function InvoiceCard({
       </div>
 
       <div className="rt-invoice-actions">
-        <button className="button button-primary" type="button" onClick={() => window.print()}>
+        <Button type="button" onClick={() => window.print()}>
           <Icon name="download" />
           <span>Download PDF</span>
-        </button>
-        <RouterLink className="button button-subtle" to="/retailer/orders">
-          <span>Back to orders</span>
-        </RouterLink>
+        </Button>
+        <Button asChild variant="ghost">
+          <RouterLink to="/retailer/orders">
+            <span>Back to orders</span>
+          </RouterLink>
+        </Button>
       </div>
     </div>
   );

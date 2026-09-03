@@ -1,5 +1,7 @@
 import { useNavigate } from "@tanstack/react-router";
 import { useEffect, useRef, useState } from "react";
+import { Button } from "@/components/ui/button";
+import { cn } from "@/lib/utils";
 import { Icon } from "../../components/ui/Icon.tsx";
 import {
   EmptyState,
@@ -183,7 +185,7 @@ export function RetailerCatalog({
           icon: "cart",
           label: "Cart",
           trailing: cartCount ? (
-            <span className="rt-nav-badge rt-nav-badge--pop" key={popKey}>
+            <span className="animate-in zoom-in" key={popKey}>
               {cartCount}
             </span>
           ) : undefined,
@@ -200,10 +202,12 @@ export function RetailerCatalog({
         title="Place an order."
         copy="Pick products, choose quantities, and add them to your order."
         actions={
-          <RouterLink className="button button-primary" to="/retailer/cart">
-            <Icon name="cart" />
-            <span>Review order{cartCount ? ` (${cartCount})` : ""}</span>
-          </RouterLink>
+          <Button asChild>
+            <RouterLink to="/retailer/cart">
+              <Icon name="cart" />
+              <span>Review order{cartCount ? ` (${cartCount})` : ""}</span>
+            </RouterLink>
+          </Button>
         }
       />
       <InlineNotice message={notice?.message} state={notice?.state} />
@@ -333,9 +337,8 @@ function ProductCard({
               <Icon name="plus" />
             </button>
           </div>
-          <button
-            className={`button button-primary rt-add-button${added ? " is-added" : ""}`}
-            type="button"
+          <Button
+            className={cn("rt-add-button", added && "is-added")}
             disabled={outOfStock || atMax || adding}
             onClick={() => onAdd(product)}
           >
@@ -347,7 +350,7 @@ function ProductCard({
             ) : (
               <span>{atMax ? "All stock in cart" : "Add to Cart"}</span>
             )}
-          </button>
+          </Button>
         </div>
       </div>
     </article>

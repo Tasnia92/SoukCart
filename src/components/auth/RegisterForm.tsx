@@ -1,6 +1,7 @@
 import type { FormEvent } from "react";
-import { Button } from "../ui/Button.tsx";
-import { Icon } from "../ui/Icon.tsx";
+import { Button } from "../ui/button.tsx";
+import { Checkbox } from "../ui/checkbox.tsx";
+import { Field as UIField, FieldGroup, FieldLabel } from "../ui/field.tsx";
 import { Field } from "./Field.tsx";
 import type { AuthFeedback, AuthFormSubmitHandler, RegistrationDetails } from "./types.ts";
 
@@ -74,7 +75,7 @@ export function RegisterForm({
       onInput={handleInput}
       onSubmit={handleSubmit}
     >
-      <div className="field-stack">
+      <FieldGroup className="field-stack">
         <Field
           autoComplete="name"
           id="register-name"
@@ -111,23 +112,20 @@ export function RegisterForm({
           placeholder="Repeat your password"
           type="password"
         />
-      </div>
+      </FieldGroup>
 
-      <label className="checkbox-label terms-label">
-        <input type="checkbox" name="terms" required />
-        <span className="checkbox-control">
-          <Icon name="check" />
-        </span>
-        <span>
+      <UIField orientation="horizontal">
+        <Checkbox id="register-terms" name="terms" required />
+        <FieldLabel htmlFor="register-terms">
           I agree to the{" "}
-          <Button variant="text" type="button" data-terms="" disabled={pending} onClick={onTerms}>
+          <Button variant="link" data-terms="" disabled={pending} onClick={onTerms}>
             terms of service
           </Button>
           .
-        </span>
-      </label>
+        </FieldLabel>
+      </UIField>
 
-      <Button block type="submit" disabled={pending}>
+      <Button className="w-full" type="submit" disabled={pending}>
         <span>Create account</span>
       </Button>
 
@@ -137,8 +135,7 @@ export function RegisterForm({
       <p className="auth-switch">
         Already have an account?{" "}
         <Button
-          variant="text"
-          type="button"
+          variant="link"
           data-switch-auth="login"
           disabled={pending}
           onClick={onSwitchToLogin}

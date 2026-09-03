@@ -1,5 +1,6 @@
 import { useNavigate } from "@tanstack/react-router";
 import { useCallback, useEffect, useState } from "react";
+import { Button } from "@/components/ui/button";
 import {
   DashboardBadge,
   DashboardCard,
@@ -205,14 +206,18 @@ export function SupplierOverview({ loadDashboard = loadSupplierDashboard }: Supp
         copy="Accept what is waiting, restock what is running out, and see which products are carrying your sales."
         actions={
           <>
-            <RouterLink className="button button-primary" to="/supplier/orders">
-              <Icon name="package" />
-              <span>Process orders</span>
-            </RouterLink>
-            <RouterLink className="button button-subtle" to="/supplier/products/new">
-              <Icon name="plus" />
-              <span>Add product</span>
-            </RouterLink>
+            <Button asChild>
+              <RouterLink to="/supplier/orders">
+                <Icon name="package" />
+                <span>Process orders</span>
+              </RouterLink>
+            </Button>
+            <Button asChild variant="ghost">
+              <RouterLink to="/supplier/products/new">
+                <Icon name="plus" />
+                <span>Add product</span>
+              </RouterLink>
+            </Button>
           </>
         }
       />
@@ -392,9 +397,11 @@ export function SupplierOverview({ loadDashboard = loadSupplierDashboard }: Supp
                   title="No products yet"
                   copy="Add your first product and retailers will see it in the catalog."
                   action={
-                    <RouterLink className="button button-primary" to="/supplier/products/new">
-                      <span>Add product</span>
-                    </RouterLink>
+                    <Button asChild>
+                      <RouterLink to="/supplier/products/new">
+                        <span>Add product</span>
+                      </RouterLink>
+                    </Button>
                   }
                 />
               )}

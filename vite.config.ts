@@ -2,14 +2,23 @@ import tailwindcss from "@tailwindcss/vite";
 import { defineConfig } from "vite-plus";
 import { playwright } from "vite-plus/test/browser-playwright";
 
+// Absolute path so the rolldown-based resolver treats "@" as <root>/src rather than a
+// filesystem-absolute "/src" (which fails on Windows). Every shadcn/ui registry component
+// imports via "@/...", so this alias must resolve for them to load at runtime. The same alias
+// is applied to each Vitest project below because the inline test projects do not inherit the
+// root `resolve.alias`, and the node "unit" module runner would otherwise fail to resolve "@/...".
+const srcPath = new URL("./src", import.meta.url).pathname.replace(/^\/([A-Za-z]:\/)/, "$1");
+const resolveAlias = { "@": srcPath };
+
 export default defineConfig({
   plugins: [tailwindcss()],
   resolve: {
-    alias: { "@": "/src" },
+    alias: resolveAlias,
   },
   test: {
     projects: [
       {
+        resolve: { alias: resolveAlias },
         test: {
           name: "unit",
           environment: "node",
@@ -18,6 +27,7 @@ export default defineConfig({
         },
       },
       {
+        resolve: { alias: resolveAlias },
         test: {
           name: "browser",
           include: ["src/**/*.browser.test.{ts,tsx}"],

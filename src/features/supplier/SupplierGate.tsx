@@ -10,7 +10,7 @@
 
 import { useEffect, useRef, useState, type FormEvent, type ReactNode } from "react";
 import { Brand } from "../../components/ui/Brand.tsx";
-import { Button } from "../../components/ui/Button.tsx";
+import { Button } from "@/components/ui/button";
 import { Icon, type IconName } from "../../components/ui/Icon.tsx";
 import { useSessionSnapshot, useSessionStore } from "../../session.tsx";
 import { formatDateTime } from "../workspace/format.ts";
@@ -55,7 +55,7 @@ function GateFrame({
               <strong>Signed in</strong>
               <small>{email}</small>
             </span>
-            <Button variant="secondary" size="compact" onClick={onLogout}>
+            <Button variant="secondary" size="sm" onClick={onLogout}>
               Log out
             </Button>
           </div>

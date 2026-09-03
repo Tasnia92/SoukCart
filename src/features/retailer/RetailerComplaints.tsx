@@ -1,5 +1,7 @@
 import { useNavigate } from "@tanstack/react-router";
 import { useEffect, useRef, useState, type FormEvent } from "react";
+import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
 import { Icon } from "../../components/ui/Icon.tsx";
 import {
   EmptyState,
@@ -45,24 +47,21 @@ function ComplaintCard({ complaint }: { complaint: RetailerComplaint }) {
     <article className="cp-card">
       <div className="cp-card-top">
         <strong>{complaint.subject}</strong>
-        <span className={`cp-status cp-status-${complaint.status}`}>
+        <Badge variant={complaint.status === "open" ? "outline" : "secondary"}>
           {complaint.status === "open" ? "Open" : "Resolved"}
-        </span>
+        </Badge>
       </div>
       {complaint.order_id ? (
         <small>Order #{shortId(complaint.order_id)} · cancellation/refund support</small>
       ) : null}
       <p>{complaint.description}</p>
       {complaint.attachment_url ? (
-        <a
-          className="text-button"
-          href={complaint.attachment_url}
-          target="_blank"
-          rel="noopener noreferrer"
-        >
-          <Icon name="download" />
-          <span>View attachment</span>
-        </a>
+        <Button asChild variant="link" className="h-auto p-0">
+          <a href={complaint.attachment_url} target="_blank" rel="noopener noreferrer">
+            <Icon name="download" />
+            <span>View attachment</span>
+          </a>
+        </Button>
       ) : null}
       <small>Filed {formatDateTime(complaint.created_at)}</small>
     </article>
@@ -196,7 +195,7 @@ export function RetailerComplaints({
           to: "/retailer/cart",
           icon: "cart",
           label: "Cart",
-          trailing: cartCount ? <span className="rt-nav-badge">{cartCount}</span> : undefined,
+          trailing: cartCount || undefined,
         },
         { to: "/retailer/orders", icon: "package", label: "My orders" },
         { to: "/retailer/complaints", icon: "message", label: "Help Center", active: true },
@@ -237,9 +236,11 @@ export function RetailerComplaints({
               title="No complaints yet"
               copy="Complaints you file will show up here."
               action={
-                <RouterLink className="button button-primary" to="/retailer/complaints">
-                  <span>File a complaint</span>
-                </RouterLink>
+                <Button asChild>
+                  <RouterLink to="/retailer/complaints">
+                    <span>File a complaint</span>
+                  </RouterLink>
+                </Button>
               }
             />
           )}
@@ -288,9 +289,9 @@ export function RetailerComplaints({
             />
           </label>
           <div className="cp-form-actions">
-            <button className="button button-primary" type="submit" disabled={submitting}>
+            <Button type="submit" disabled={submitting}>
               <span>{linkedOrderId ? "Submit support request" : "Submit complaint"}</span>
-            </button>
+            </Button>
           </div>
           <p
             className={`admin-form-feedback${feedback ? ` is-visible is-${feedback.state}` : ""}`}

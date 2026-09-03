@@ -19,7 +19,7 @@ import {
   type DashboardBucket,
   type DashboardSeverity,
 } from "../../components/dashboard/dashboard-model.ts";
-import { Button } from "../../components/ui/Button.tsx";
+import { Button } from "@/components/ui/button";
 import { Icon } from "../../components/ui/Icon.tsx";
 import { InlineNotice, PageHeader, WorkspaceError } from "../../components/ui/Workspace.tsx";
 import { useSessionSnapshot, useSessionStore } from "../../session.tsx";
@@ -127,9 +127,14 @@ function NotificationFeed({
           <p>{notification.message}</p>
           <small>{formatDateTime(notification.created_at)}</small>
           {notification.read_at ? null : (
-            <button className="text-button" type="button" onClick={() => onMarkRead(notification)}>
+            <Button
+              variant="link"
+              className="h-auto p-0"
+              type="button"
+              onClick={() => onMarkRead(notification)}
+            >
               Mark as read
-            </button>
+            </Button>
           )}
         </li>
       ))}
@@ -230,7 +235,7 @@ export function AdminOverview({ loadDashboard = loadAdminDashboard }: AdminOverv
         title="Command center."
         copy="What moved in the last 30 days, what is blocked right now, and where to act next."
         actions={
-          <Button variant="subtle" disabled={loading} onClick={retry}>
+          <Button variant="ghost" disabled={loading} onClick={retry}>
             <Icon name="refresh" />
             <span>Refresh</span>
           </Button>

@@ -1,6 +1,15 @@
 import { useNavigate } from "@tanstack/react-router";
 import { useEffect, useState, type KeyboardEvent } from "react";
-import { Button } from "../../components/ui/Button.tsx";
+import {
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from "@/components/ui/table";
+import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
 import { Icon } from "../../components/ui/Icon.tsx";
 import {
   EmptyState,
@@ -55,18 +64,18 @@ function StockRow({
   };
 
   return (
-    <tr data-stock-row={product.id}>
-      <td>
+    <TableRow data-stock-row={product.id}>
+      <TableCell>
         <strong className="sp-stock-name">{product.name}</strong>
-        <span className={`sp-stock-chip${product.stock <= 0 ? " is-out" : ""}`}>
+        <Badge variant={product.stock <= 0 ? "destructive" : "secondary"}>
           {product.stock <= 0 ? "Out of stock" : "In stock"}
-        </span>
-      </td>
-      <td>{product.unit}</td>
-      <td>
+        </Badge>
+      </TableCell>
+      <TableCell>{product.unit}</TableCell>
+      <TableCell>
         <strong>{product.stock}</strong>
-      </td>
-      <td>
+      </TableCell>
+      <TableCell>
         <label className="sp-stock-field">
           <span className="sr-only">New stock for {product.name}</span>
           <input
@@ -79,13 +88,13 @@ function StockRow({
             onKeyDown={onKeyDown}
           />
         </label>
-      </td>
-      <td className="sp-stock-save">
+      </TableCell>
+      <TableCell className="sp-stock-save">
         <Button onClick={save} disabled={saving}>
           Save
         </Button>
-      </td>
-    </tr>
+      </TableCell>
+    </TableRow>
   );
 }
 
@@ -194,10 +203,12 @@ export function SupplierStock({ loadProducts = loadSupplierProducts }: SupplierS
         title="Manage stock."
         copy="Set how many units of each product retailers may order. Changes apply immediately."
         actions={
-          <RouterLink className="button button-subtle" to="/supplier/products">
-            <Icon name="bag" />
-            <span>My products</span>
-          </RouterLink>
+          <Button asChild variant="ghost">
+            <RouterLink to="/supplier/products">
+              <Icon name="bag" />
+              <span>My products</span>
+            </RouterLink>
+          </Button>
         }
       />
       <InlineNotice message={notice?.message} state={notice?.state} />
@@ -214,19 +225,19 @@ export function SupplierStock({ loadProducts = loadSupplierProducts }: SupplierS
             <>
               {filteredActive.length ? (
                 <TableShell>
-                  <table className="admin-table sp-stock-table">
-                    <thead>
-                      <tr>
-                        <th>Product</th>
-                        <th>Unit</th>
-                        <th>Available now</th>
-                        <th>New stock</th>
-                        <th>
+                  <Table className="sp-stock-table">
+                    <TableHeader>
+                      <TableRow>
+                        <TableHead>Product</TableHead>
+                        <TableHead>Unit</TableHead>
+                        <TableHead>Available now</TableHead>
+                        <TableHead>New stock</TableHead>
+                        <TableHead>
                           <span className="sr-only">Save</span>
-                        </th>
-                      </tr>
-                    </thead>
-                    <tbody>
+                        </TableHead>
+                      </TableRow>
+                    </TableHeader>
+                    <TableBody>
                       {filteredActive.map((product) => (
                         <StockRow
                           key={`${product.id}:${product.stock}`}
@@ -234,8 +245,8 @@ export function SupplierStock({ loadProducts = loadSupplierProducts }: SupplierS
                           onSave={onSave}
                         />
                       ))}
-                    </tbody>
-                  </table>
+                    </TableBody>
+                  </Table>
                 </TableShell>
               ) : (
                 <EmptyState
@@ -257,9 +268,11 @@ export function SupplierStock({ loadProducts = loadSupplierProducts }: SupplierS
               title="No active products"
               copy="Activate a listing from My products and its stock will appear here."
               action={
-                <RouterLink className="button button-primary" to="/supplier/products">
-                  <span>My products</span>
-                </RouterLink>
+                <Button asChild>
+                  <RouterLink to="/supplier/products">
+                    <span>My products</span>
+                  </RouterLink>
+                </Button>
               }
             />
           )}

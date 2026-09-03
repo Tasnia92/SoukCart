@@ -1,6 +1,6 @@
 import type { Ref } from "react";
 import { Brand } from "../ui/Brand.tsx";
-import { Button } from "../ui/Button.tsx";
+import { Button } from "@/components/ui/button";
 import { AuthStory } from "./AuthStory.tsx";
 import { LoginForm } from "./LoginForm.tsx";
 import { RegisterForm } from "./RegisterForm.tsx";
@@ -100,7 +100,8 @@ export function AuthShell({
             <p className="auth-legal">
               By continuing, you agree to SoukCart&apos;s{" "}
               <Button
-                variant="text"
+                variant="link"
+                className="h-auto p-0"
                 type="button"
                 data-terms=""
                 disabled={pending}

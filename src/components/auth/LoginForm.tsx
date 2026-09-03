@@ -1,6 +1,7 @@
 import type { FormEvent } from "react";
-import { Button } from "../ui/Button.tsx";
-import { Icon } from "../ui/Icon.tsx";
+import { Button } from "../ui/button.tsx";
+import { Checkbox } from "../ui/checkbox.tsx";
+import { Field as UIField, FieldGroup, FieldLabel } from "../ui/field.tsx";
 import { Field } from "./Field.tsx";
 import type { AuthFeedback, AuthFormSubmitHandler, LoginCredentials } from "./types.ts";
 
@@ -47,7 +48,7 @@ export function LoginForm({
 
   return (
     <form className="auth-form" data-auth-form="login" onSubmit={handleSubmit}>
-      <div className="field-stack">
+      <FieldGroup className="field-stack">
         <Field
           autoComplete="email"
           id="login-email"
@@ -66,20 +67,16 @@ export function LoginForm({
           placeholder="Enter your password"
           type="password"
         />
-      </div>
+      </FieldGroup>
 
       <div className="form-options">
-        <label className="checkbox-label">
-          <input type="checkbox" name="remember" />
-          <span className="checkbox-control">
-            <Icon name="check" />
-          </span>
-          <span>Keep me signed in</span>
-        </label>
+        <UIField orientation="horizontal">
+          <Checkbox id="login-remember" name="remember" />
+          <FieldLabel htmlFor="login-remember">Keep me signed in</FieldLabel>
+        </UIField>
         {showForgotPassword ? (
           <Button
-            variant="text"
-            type="button"
+            variant="link"
             data-forgot-password=""
             disabled={pending}
             onClick={onForgotPassword}
@@ -89,7 +86,7 @@ export function LoginForm({
         ) : null}
       </div>
 
-      <Button block type="submit" disabled={pending}>
+      <Button className="w-full" type="submit" disabled={pending}>
         <span>Sign in</span>
       </Button>
 
@@ -100,8 +97,7 @@ export function LoginForm({
         <p className="auth-switch">
           New to SoukCart?{" "}
           <Button
-            variant="text"
-            type="button"
+            variant="link"
             data-switch-auth="register"
             disabled={pending}
             onClick={onSwitchToRegister}

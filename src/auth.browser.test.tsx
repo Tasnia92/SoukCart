@@ -106,7 +106,7 @@ describe("auth browser behavior", () => {
         expect(submissions).toHaveLength(0);
 
         await userEvent.fill(element(mounted.host, "#login-email"), "user@example.com");
-        await click(userEvent, element(mounted.host, "label.checkbox-label"));
+        await click(userEvent, element(mounted.host, "#login-remember"));
         await click(userEvent, submit);
         expect(submissions).toEqual([
           { email: "user@example.com", password: "secret123", remember: true },
@@ -135,7 +135,7 @@ describe("auth browser behavior", () => {
         await userEvent.fill(element(mounted.host, "#register-email"), "test@example.com");
         await userEvent.fill(element(mounted.host, "#register-password"), "secret123");
         await userEvent.fill(element(mounted.host, "#register-confirm-password"), "different");
-        await click(userEvent, element(mounted.host, "label.terms-label"));
+        await click(userEvent, element(mounted.host, "#register-terms"));
         await click(userEvent, element(mounted.host, 'button[type="submit"]'));
 
         const confirmation = element<HTMLInputElement>(mounted.host, "#register-confirm-password");

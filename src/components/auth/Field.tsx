@@ -1,4 +1,11 @@
 import { useState } from "react";
+import { Field as UIField, FieldLabel } from "../ui/field.tsx";
+import {
+  InputGroup,
+  InputGroupAddon,
+  InputGroupButton,
+  InputGroupInput,
+} from "../ui/input-group.tsx";
 import { Icon, type IconName } from "../ui/Icon.tsx";
 
 export type FieldType = "email" | "password" | "text";
@@ -19,15 +26,13 @@ export function Field({ autoComplete, id, icon, label, name, placeholder, type }
   const inputType = isPassword && isPasswordVisible ? "text" : type;
 
   return (
-    <div className="field">
-      <label className="field-label" htmlFor={id}>
-        {label}
-      </label>
-      <div className="input-shell">
-        <span className="input-icon">
+    <UIField>
+      <FieldLabel htmlFor={id}>{label}</FieldLabel>
+      <InputGroup>
+        <InputGroupAddon>
           <Icon name={icon} />
-        </span>
-        <input
+        </InputGroupAddon>
+        <InputGroupInput
           id={id}
           name={name}
           type={inputType}
@@ -36,19 +41,19 @@ export function Field({ autoComplete, id, icon, label, name, placeholder, type }
           required
         />
         {isPassword ? (
-          <button
-            className="input-action"
-            type="button"
-            data-password-toggle=""
-            aria-controls={id}
-            aria-label={`${isPasswordVisible ? "Hide" : "Show"} ${label.toLowerCase()}`}
-            aria-pressed={isPasswordVisible}
-            onClick={() => setIsPasswordVisible((visible) => !visible)}
-          >
-            <Icon name={isPasswordVisible ? "eye" : "eye-off"} className="input-action-icon" />
-          </button>
+          <InputGroupAddon align="inline-end">
+            <InputGroupButton
+              data-password-toggle=""
+              aria-controls={id}
+              aria-label={`${isPasswordVisible ? "Hide" : "Show"} ${label.toLowerCase()}`}
+              aria-pressed={isPasswordVisible}
+              onClick={() => setIsPasswordVisible((visible) => !visible)}
+            >
+              <Icon name={isPasswordVisible ? "eye" : "eye-off"} className="input-action-icon" />
+            </InputGroupButton>
+          </InputGroupAddon>
         ) : null}
-      </div>
-    </div>
+      </InputGroup>
+    </UIField>
   );
 }

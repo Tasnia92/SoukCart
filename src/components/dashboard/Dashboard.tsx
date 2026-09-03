@@ -5,6 +5,37 @@
  * -------------------------------------------------------------------------- */
 
 import { useId, type ReactNode } from "react";
+import { Alert, AlertDescription } from "@/components/ui/alert";
+import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
+import {
+  Card,
+  CardAction,
+  CardContent,
+  CardDescription,
+  CardFooter,
+  CardHeader,
+  CardTitle,
+} from "@/components/ui/card";
+import {
+  Empty,
+  EmptyContent,
+  EmptyDescription,
+  EmptyHeader,
+  EmptyMedia,
+  EmptyTitle,
+} from "@/components/ui/empty";
+import { Skeleton } from "@/components/ui/skeleton";
+import {
+  Table,
+  TableBody,
+  TableCaption,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from "@/components/ui/table";
+import { cn } from "@/lib/utils";
 import { Icon, type IconName } from "../ui/Icon.tsx";
 import { RouterLink } from "../ui/RouterLink.tsx";
 import type { DashboardSeverity, MetricDelta, SizedSegment } from "./dashboard-model.ts";
@@ -47,23 +78,25 @@ export function DashboardCard({
 }: DashboardCardProps) {
   const headingId = useId();
   return (
-    <section
-      className={["db-card", `is-${severity}`, className].filter(Boolean).join(" ")}
+    <Card
+      className={cn("db-card gap-0 py-0", `is-${severity}`, className)}
       aria-labelledby={headingId}
     >
-      <header className="db-card-head">
+      <CardHeader className="db-card-head">
         <div className="db-card-heading">
           {eyebrow ? <p className="eyebrow">{eyebrow}</p> : null}
-          <h2 className="db-card-title" id={headingId}>
-            {title}
-          </h2>
-          {meta ? <p className="db-card-meta">{meta}</p> : null}
+          <CardTitle>
+            <h2 className="db-card-title" id={headingId}>
+              {title}
+            </h2>
+          </CardTitle>
+          {meta ? <CardDescription className="db-card-meta">{meta}</CardDescription> : null}
         </div>
-        {action ? <div className="db-card-action">{action}</div> : null}
-      </header>
-      <div className="db-card-body">{children}</div>
-      {footer ? <footer className="db-card-foot">{footer}</footer> : null}
-    </section>
+        {action ? <CardAction className="db-card-action">{action}</CardAction> : null}
+      </CardHeader>
+      <CardContent className="db-card-body">{children}</CardContent>
+      {footer ? <CardFooter className="db-card-foot">{footer}</CardFooter> : null}
+    </Card>
   );
 }
 
@@ -301,37 +334,37 @@ export function DashboardTable<Row>({
 }) {
   return (
     <div className="db-table-wrap">
-      <table className="db-table">
-        <caption className="sr-only">{label}</caption>
-        <thead>
-          <tr>
+      <Table className="db-table">
+        <TableCaption className="sr-only">{label}</TableCaption>
+        <TableHeader>
+          <TableRow>
             {columns.map((column) => (
-              <th
+              <TableHead
                 className={column.numeric ? "is-numeric" : undefined}
                 key={column.key}
                 scope="col"
               >
                 {column.header}
-              </th>
+              </TableHead>
             ))}
-          </tr>
-        </thead>
-        <tbody>
+          </TableRow>
+        </TableHeader>
+        <TableBody>
           {rows.map((row) => (
-            <tr key={rowKey(row)}>
+            <TableRow key={rowKey(row)}>
               {columns.map((column) => (
-                <td
+                <TableCell
                   className={column.numeric ? "is-numeric" : undefined}
                   data-label={column.header}
                   key={column.key}
                 >
                   {column.cell(row)}
-                </td>
+                </TableCell>
               ))}
-            </tr>
+            </TableRow>
           ))}
-        </tbody>
-      </table>
+        </TableBody>
+      </Table>
     </div>
   );
 }
@@ -351,22 +384,22 @@ export function DashboardSkeleton({ label = "Loading the dashboard" }: { label?:
       <div className="db-metrics" aria-hidden="true">
         {[0, 1, 2, 3].map((slot) => (
           <div className="db-skeleton-metric" key={slot}>
-            <span className="db-shimmer db-shimmer-label" />
-            <span className="db-shimmer db-shimmer-value" />
-            <span className="db-shimmer db-shimmer-line" />
+            <Skeleton className="db-shimmer-label" />
+            <Skeleton className="db-shimmer-value" />
+            <Skeleton className="db-shimmer-line" />
           </div>
         ))}
       </div>
       <div className="db-row db-row-8-4" aria-hidden="true">
         <div className="db-skeleton-card db-skeleton-chart">
-          <span className="db-shimmer db-shimmer-line" />
-          <span className="db-shimmer db-shimmer-plot" />
+          <Skeleton className="db-shimmer-line" />
+          <Skeleton className="db-shimmer-plot" />
         </div>
         <div className="db-skeleton-card">
-          <span className="db-shimmer db-shimmer-line" />
-          <span className="db-shimmer db-shimmer-row" />
-          <span className="db-shimmer db-shimmer-row" />
-          <span className="db-shimmer db-shimmer-row" />
+          <Skeleton className="db-shimmer-line" />
+          <Skeleton className="db-shimmer-row" />
+          <Skeleton className="db-shimmer-row" />
+          <Skeleton className="db-shimmer-row" />
         </div>
       </div>
     </div>
@@ -384,17 +417,15 @@ export function SectionError({
   retryLabel?: string;
 }) {
   return (
-    <div className="db-section-error" role="status" aria-live="polite">
-      <span className="db-section-error-icon">
-        <Icon name="refresh" />
-      </span>
-      <p>{message}</p>
+    <Alert className="db-section-error" role="status" aria-live="polite">
+      <Icon name="refresh" />
+      <AlertDescription>{message}</AlertDescription>
       {onRetry ? (
-        <button className="text-button" type="button" onClick={onRetry}>
+        <Button variant="link" className="h-auto justify-self-start p-0" onClick={onRetry}>
           {retryLabel}
-        </button>
+        </Button>
       ) : null}
-    </div>
+    </Alert>
   );
 }
 
@@ -410,14 +441,16 @@ export function SectionEmpty({
   action?: ReactNode;
 }) {
   return (
-    <div className="db-empty">
-      <span className="db-empty-icon">
-        <Icon name={icon} />
-      </span>
-      <strong>{title}</strong>
-      {copy ? <span>{copy}</span> : null}
-      {action}
-    </div>
+    <Empty className="db-empty">
+      <EmptyHeader>
+        <EmptyMedia variant="icon">
+          <Icon name={icon} />
+        </EmptyMedia>
+        <EmptyTitle>{title}</EmptyTitle>
+        {copy ? <EmptyDescription>{copy}</EmptyDescription> : null}
+      </EmptyHeader>
+      {action ? <EmptyContent>{action}</EmptyContent> : null}
+    </Empty>
   );
 }
 
@@ -429,5 +462,14 @@ export function DashboardBadge({
   severity?: DashboardSeverity;
   children: ReactNode;
 }) {
-  return <span className={`db-badge is-${severity}`}>{children}</span>;
+  const variant =
+    severity === "critical"
+      ? "destructive"
+      : severity === "attention"
+        ? "default"
+        : severity === "positive"
+          ? "secondary"
+          : "outline";
+
+  return <Badge variant={variant}>{children}</Badge>;
 }

@@ -47,7 +47,10 @@ describe("React auth presentation contract", () => {
       expect(markup).toContain(`name="${name}"`);
     }
     expect(markup).toContain('name="terms"');
-    expect(markup).toContain('type="checkbox" required=""');
+    expect(markup).toContain('role="checkbox"');
+    expect(markup).toContain('aria-required="true"');
+    expect(markup).toContain('type="checkbox"');
+    expect(markup).toContain('required=""');
     expect(markup).toContain('aria-controls="register-password"');
     expect(markup).toContain('aria-controls="register-confirm-password"');
     expect(PASSWORD_MISMATCH_MESSAGE).toBe("Passwords do not match.");

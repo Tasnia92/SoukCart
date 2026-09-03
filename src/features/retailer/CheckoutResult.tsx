@@ -1,5 +1,15 @@
 import { useRouterState } from "@tanstack/react-router";
 import { useEffect, useState, type ReactNode } from "react";
+import { Button } from "@/components/ui/button";
+import {
+  Empty,
+  EmptyContent,
+  EmptyDescription,
+  EmptyHeader,
+  EmptyMedia,
+  EmptyTitle,
+} from "@/components/ui/empty";
+import { Skeleton } from "@/components/ui/skeleton";
 import { Brand } from "../../components/ui/Brand.tsx";
 import { Icon, type IconName } from "../../components/ui/Icon.tsx";
 import { PageHeader } from "../../components/ui/Workspace.tsx";
@@ -117,13 +127,15 @@ export function CheckoutResult() {
 function ResultCard({ card }: { card: Card }): ReactNode {
   if (!card) {
     return (
-      <div className="rt-empty-card" role="status" aria-live="polite">
-        <span className="rt-empty-icon">
-          <Icon name="clock" />
-        </span>
-        <strong>Checking the payment…</strong>
-        <span>This usually takes a few seconds.</span>
-      </div>
+      <Empty role="status" aria-live="polite">
+        <EmptyHeader>
+          <EmptyMedia variant="icon">
+            <Skeleton className="size-6 rounded-full" />
+          </EmptyMedia>
+          <EmptyTitle>Checking the payment…</EmptyTitle>
+          <EmptyDescription>This usually takes a few seconds.</EmptyDescription>
+        </EmptyHeader>
+      </Empty>
     );
   }
 
@@ -141,15 +153,21 @@ function ResultCard({ card }: { card: Card }): ReactNode {
   const label = ok ? (hasSession ? "View orders" : "Sign in") : "Back to cart";
 
   return (
-    <div className="rt-empty-card" role="status" aria-live="polite">
-      <span className={`rt-empty-icon${ok ? " is-success" : ""}`}>
-        <Icon name={icon} />
-      </span>
-      <strong>{title}</strong>
-      <span>{copy}</span>
-      <a className="button button-primary" href={href}>
-        <span>{label}</span>
-      </a>
-    </div>
+    <Empty role="status" aria-live="polite">
+      <EmptyHeader>
+        <EmptyMedia variant="icon">
+          <Icon name={icon} />
+        </EmptyMedia>
+        <EmptyTitle>{title}</EmptyTitle>
+        <EmptyDescription>{copy}</EmptyDescription>
+      </EmptyHeader>
+      <EmptyContent>
+        <Button asChild>
+          <a href={href}>
+            <span>{label}</span>
+          </a>
+        </Button>
+      </EmptyContent>
+    </Empty>
   );
 }

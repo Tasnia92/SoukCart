@@ -1,5 +1,6 @@
 import { useNavigate } from "@tanstack/react-router";
 import { useEffect, useState } from "react";
+import { Button } from "@/components/ui/button";
 import { Icon } from "../../components/ui/Icon.tsx";
 import {
   EmptyState,
@@ -209,10 +210,12 @@ export function SupplierProducts({ loadProducts = loadSupplierProducts }: Suppli
         title="My products."
         copy="Add products, set your prices, and control what retailers can order."
         actions={
-          <RouterLink className="button button-primary" to="/supplier/products/new">
-            <Icon name="plus" />
-            <span>New product</span>
-          </RouterLink>
+          <Button asChild>
+            <RouterLink to="/supplier/products/new">
+              <Icon name="plus" />
+              <span>New product</span>
+            </RouterLink>
+          </Button>
         }
       />
       <InlineNotice message={notice?.message} state={notice?.state} />
@@ -249,9 +252,11 @@ export function SupplierProducts({ loadProducts = loadSupplierProducts }: Suppli
               title="No products yet"
               copy="Add your first product and retailers will see it in the catalog."
               action={
-                <RouterLink className="button button-primary" to="/supplier/products/new">
-                  <span>Add product</span>
-                </RouterLink>
+                <Button asChild>
+                  <RouterLink to="/supplier/products/new">
+                    <span>Add product</span>
+                  </RouterLink>
+                </Button>
               }
             />
           )}

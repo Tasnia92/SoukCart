@@ -1,5 +1,5 @@
 import { Brand } from "../ui/Brand.tsx";
-import { Button } from "../ui/Button.tsx";
+import { Button } from "@/components/ui/button";
 import type { AuthFeedback } from "./types.ts";
 
 export type SignedInFallbackProps = {

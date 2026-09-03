@@ -1,14 +1,45 @@
 import type { ComponentPropsWithoutRef, InputHTMLAttributes, ReactNode } from "react";
+import { Alert, AlertDescription } from "@/components/ui/alert";
+import { Button } from "@/components/ui/button";
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import {
+  Empty,
+  EmptyContent,
+  EmptyDescription,
+  EmptyHeader,
+  EmptyMedia,
+  EmptyTitle,
+} from "@/components/ui/empty";
+import { InputGroup, InputGroupAddon, InputGroupInput } from "@/components/ui/input-group";
+import {
+  Sidebar,
+  SidebarContent,
+  SidebarFooter,
+  SidebarGroup,
+  SidebarHeader,
+  SidebarInset,
+  SidebarMenu,
+  SidebarMenuBadge,
+  SidebarMenuButton,
+  SidebarMenuItem,
+  SidebarProvider,
+  SidebarTrigger,
+} from "@/components/ui/sidebar";
+import { Skeleton } from "@/components/ui/skeleton";
 import { Brand } from "./Brand.tsx";
-import { Button } from "./Button.tsx";
 import { Icon, type IconName } from "./Icon.tsx";
 
 export function AppShell({ sidebar, children }: { sidebar: ReactNode; children: ReactNode }) {
   return (
-    <div className="admin-layout">
+    <SidebarProvider>
       {sidebar}
-      <main className="admin-main min-w-0">{children}</main>
-    </div>
+      <SidebarInset className="min-w-0">
+        <div className="flex items-center gap-2 border-b p-2 md:hidden">
+          <SidebarTrigger />
+        </div>
+        <div className="mx-auto w-full max-w-[75rem] px-6 py-8 lg:px-12 lg:pb-16">{children}</div>
+      </SidebarInset>
+    </SidebarProvider>
   );
 }
 
@@ -28,38 +59,51 @@ type SidebarNavProps = {
   onLogout: () => void;
 };
 
+/**
+ * User identity block shared by the anchor- and router-based sidebars. Semantic markup only,
+ * no bespoke class contract: the name and email are the meaningful, asserted content.
+ */
+export function SidebarUser({ userName, userEmail }: { userName: string; userEmail: string }) {
+  return (
+    <div className="flex flex-col gap-0.5 px-2 text-sm">
+      <strong className="truncate">{userName}</strong>
+      <small className="truncate text-muted-foreground">{userEmail}</small>
+    </div>
+  );
+}
+
 export function SidebarNav({ label, items, userName, userEmail, onLogout }: SidebarNavProps) {
   return (
-    <aside className="admin-sidebar">
-      <div className="admin-sidebar-top">
+    <Sidebar collapsible="none">
+      <SidebarHeader>
         <Brand variant="dark" />
-      </div>
-      <nav className="admin-nav" aria-label={label}>
-        {items.map(({ href, icon, label: itemLabel, active, trailing }) => (
-          <a
-            className={`admin-tab${active ? " is-active" : ""}`}
-            href={href}
-            aria-current={active ? "page" : undefined}
-            key={href}
-          >
-            <Icon name={icon} />
-            <span>{itemLabel}</span>
-            {trailing}
-          </a>
-        ))}
-      </nav>
-      <div className="admin-sidebar-footer">
-        <div className="admin-user">
-          <span className="admin-user-info">
-            <strong>{userName}</strong>
-            <small>{userEmail}</small>
-          </span>
-        </div>
-        <Button variant="secondary" block onClick={onLogout}>
+      </SidebarHeader>
+      <SidebarContent>
+        <SidebarGroup>
+          <nav aria-label={label}>
+            <SidebarMenu>
+              {items.map(({ href, icon, label: itemLabel, active, trailing }) => (
+                <SidebarMenuItem key={href}>
+                  <SidebarMenuButton asChild isActive={active}>
+                    <a href={href} aria-current={active ? "page" : undefined}>
+                      <Icon name={icon} />
+                      <span>{itemLabel}</span>
+                    </a>
+                  </SidebarMenuButton>
+                  {trailing ? <SidebarMenuBadge>{trailing}</SidebarMenuBadge> : null}
+                </SidebarMenuItem>
+              ))}
+            </SidebarMenu>
+          </nav>
+        </SidebarGroup>
+      </SidebarContent>
+      <SidebarFooter>
+        <SidebarUser userName={userName} userEmail={userEmail} />
+        <Button variant="secondary" className="w-full" onClick={onLogout}>
           Log out
         </Button>
-      </div>
-    </aside>
+      </SidebarFooter>
+    </Sidebar>
   );
 }
 
@@ -101,11 +145,17 @@ export function StatCard({
   detail?: ReactNode;
 }) {
   return (
-    <article className="admin-stat">
-      <p className="admin-stat-label">{label}</p>
-      <strong>{value}</strong>
-      {detail ? <small>{detail}</small> : null}
-    </article>
+    <Card className="min-h-32 gap-2 border-0 bg-muted py-6 shadow-none">
+      <CardHeader className="gap-1">
+        <CardDescription className="text-xs font-medium tracking-widest uppercase">
+          {label}
+        </CardDescription>
+      </CardHeader>
+      <CardContent className="flex flex-col gap-1">
+        <CardTitle className="text-3xl">{value}</CardTitle>
+        {detail ? <CardDescription>{detail}</CardDescription> : null}
+      </CardContent>
+    </Card>
   );
 }
 
@@ -117,18 +167,24 @@ type SearchToolbarProps = Omit<InputHTMLAttributes<HTMLInputElement>, "type"> & 
 export function SearchToolbar({ label, result, ...inputProps }: SearchToolbarProps) {
   return (
     <div className="admin-toolbar">
-      <label className="admin-search">
-        <Icon name="search" />
-        <span className="sr-only">{label}</span>
-        <input {...inputProps} type="search" />
-      </label>
+      <InputGroup>
+        <InputGroupAddon>
+          <Icon name="search" />
+        </InputGroupAddon>
+        <InputGroupInput {...inputProps} type="search" aria-label={label} />
+      </InputGroup>
       <span className="admin-result-count">{result}</span>
     </div>
   );
 }
 
 export function TableShell({ className, ...props }: ComponentPropsWithoutRef<"div">) {
-  return <div {...props} className={["admin-table-wrap", className].filter(Boolean).join(" ")} />;
+  return (
+    <div
+      {...props}
+      className={["overflow-hidden rounded-xl border bg-card", className].filter(Boolean).join(" ")}
+    />
+  );
 }
 
 export type NoticeState = "info" | "success" | "error";
@@ -141,13 +197,17 @@ export function InlineNotice({
   state?: NoticeState;
 }) {
   return (
-    <p
-      className={`admin-notice${message ? ` is-visible is-${state}` : ""}`}
-      role="status"
-      aria-live="polite"
-    >
-      {message}
-    </p>
+    <div className="mt-4 min-h-5">
+      {message ? (
+        <Alert
+          role="status"
+          aria-live="polite"
+          variant={state === "error" ? "destructive" : "default"}
+        >
+          <AlertDescription>{message}</AlertDescription>
+        </Alert>
+      ) : null}
+    </div>
   );
 }
 
@@ -161,19 +221,31 @@ type EmptyStateProps = {
 
 export function EmptyState({ icon, title, copy, action, role }: EmptyStateProps) {
   return (
-    <div className="rt-empty-card" role={role} aria-live={role ? "polite" : undefined}>
-      <span className="rt-empty-icon">
-        <Icon name={icon} />
-      </span>
-      <strong>{title}</strong>
-      {copy ? <span>{copy}</span> : null}
-      {action}
-    </div>
+    <Empty role={role} aria-live={role ? "polite" : undefined}>
+      <EmptyHeader>
+        <EmptyMedia variant="icon">
+          <Icon name={icon} />
+        </EmptyMedia>
+        <EmptyTitle>{title}</EmptyTitle>
+        {copy ? <EmptyDescription>{copy}</EmptyDescription> : null}
+      </EmptyHeader>
+      {action ? <EmptyContent>{action}</EmptyContent> : null}
+    </Empty>
   );
 }
 
 export function LoadingState({ title, copy }: { title: ReactNode; copy?: ReactNode }) {
-  return <EmptyState icon="clock" title={title} copy={copy} role="status" />;
+  return (
+    <Empty role="status" aria-live="polite">
+      <EmptyHeader>
+        <EmptyMedia variant="icon">
+          <Skeleton className="size-6 rounded-full" />
+        </EmptyMedia>
+        <EmptyTitle>{title}</EmptyTitle>
+        {copy ? <EmptyDescription>{copy}</EmptyDescription> : null}
+      </EmptyHeader>
+    </Empty>
+  );
 }
 
 type WorkspaceErrorProps = {
@@ -198,7 +270,7 @@ export function WorkspaceError({
       <p>{message}</p>
       <div className="admin-error-actions">
         <Button onClick={onRetry}>Try again</Button>
-        <Button variant="subtle" onClick={onLogout}>
+        <Button variant="ghost" onClick={onLogout}>
           Log out
         </Button>
       </div>

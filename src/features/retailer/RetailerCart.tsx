@@ -1,5 +1,6 @@
 import { useNavigate } from "@tanstack/react-router";
 import { useEffect, useState } from "react";
+import { Button } from "@/components/ui/button";
 import { Icon } from "../../components/ui/Icon.tsx";
 import {
   EmptyState,
@@ -211,7 +212,7 @@ export function RetailerCart({
           icon: "cart",
           label: "Cart",
           active: true,
-          trailing: cartCount ? <span className="rt-nav-badge">{cartCount}</span> : undefined,
+          trailing: cartCount || undefined,
         },
         { to: "/retailer/orders", icon: "package", label: "My orders" },
         { to: "/retailer/complaints", icon: "message", label: "Help Center" },
@@ -346,8 +347,8 @@ export function RetailerCart({
                   </span>
                 </label>
               </fieldset>
-              <button
-                className="button button-primary button-block"
+              <Button
+                className="w-full"
                 type="button"
                 disabled={checkingOut}
                 onClick={() => void onCheckout()}
@@ -358,7 +359,7 @@ export function RetailerCart({
                 <span>
                   {cod ? `Place order · ${formatPrice(subtotal)}` : `Pay ${formatPrice(subtotal)}`}
                 </span>
-              </button>
+              </Button>
               <p className="rt-summary-hint">
                 {cod
                   ? "Pay in cash when your order arrives."
@@ -372,9 +373,11 @@ export function RetailerCart({
             title="Your order is empty"
             copy="Browse the catalog and add products to start ordering."
             action={
-              <RouterLink className="button button-primary" to="/retailer/catalog">
-                <span>Browse catalog</span>
-              </RouterLink>
+              <Button asChild>
+                <RouterLink to="/retailer/catalog">
+                  <span>Browse catalog</span>
+                </RouterLink>
+              </Button>
             }
           />
         )

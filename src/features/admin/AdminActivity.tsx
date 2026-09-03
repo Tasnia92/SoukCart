@@ -1,5 +1,22 @@
 import { useEffect, useState } from "react";
-import { Button } from "../../components/ui/Button.tsx";
+import { Field, FieldLabel } from "@/components/ui/field";
+import {
+  Select,
+  SelectContent,
+  SelectGroup,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
+import {
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from "@/components/ui/table";
+import { Button } from "@/components/ui/button";
 import { Icon } from "../../components/ui/Icon.tsx";
 import {
   EmptyState,
@@ -255,7 +272,7 @@ export function AdminActivity({ loadActivity = loadAdminActivity }: AdminActivit
         title="Every order, end to end."
         copy="Approve cancellations, calculate refundable amounts, and record manual refunds."
         actions={
-          <Button variant="subtle" disabled={loading} onClick={retry}>
+          <Button variant="ghost" disabled={loading} onClick={retry}>
             <Icon name="refresh" />
             <span>Refresh</span>
           </Button>
@@ -282,22 +299,22 @@ export function AdminActivity({ loadActivity = loadAdminActivity }: AdminActivit
 
           {orders.length ? (
             <TableShell>
-              <table className="admin-table rt-orders-table">
-                <thead>
-                  <tr>
-                    <th>Order</th>
-                    <th>Placed</th>
-                    <th>Retailer</th>
-                    <th>Units</th>
-                    <th>Total</th>
-                    <th>Payment</th>
-                    <th>Status</th>
-                    <th>
+              <Table className="rt-orders-table">
+                <TableHeader>
+                  <TableRow>
+                    <TableHead>Order</TableHead>
+                    <TableHead>Placed</TableHead>
+                    <TableHead>Retailer</TableHead>
+                    <TableHead>Units</TableHead>
+                    <TableHead>Total</TableHead>
+                    <TableHead>Payment</TableHead>
+                    <TableHead>Status</TableHead>
+                    <TableHead>
                       <span className="sr-only">Order lines</span>
-                    </th>
-                  </tr>
-                </thead>
-                <tbody>
+                    </TableHead>
+                  </TableRow>
+                </TableHeader>
+                <TableBody>
                   {filtered.length ? (
                     filtered.map((order) => (
                       <OrderRow
@@ -306,11 +323,11 @@ export function AdminActivity({ loadActivity = loadAdminActivity }: AdminActivit
                         toggleLabel={`Toggle lines for order #${shortId(order.id)}`}
                         summaryCells={
                           <>
-                            <td>
+                            <TableCell>
                               <strong className="rt-order-id">#{shortId(order.id)}</strong>
-                            </td>
-                            <td>{formatDate(order.created_at)}</td>
-                            <td>
+                            </TableCell>
+                            <TableCell>{formatDate(order.created_at)}</TableCell>
+                            <TableCell>
                               <div className="admin-user-cell">
                                 <span className="admin-avatar">
                                   {initials(order.retailer_name)}
@@ -320,19 +337,21 @@ export function AdminActivity({ loadActivity = loadAdminActivity }: AdminActivit
                                   <small>{order.retailer_email}</small>
                                 </span>
                               </div>
-                            </td>
-                            <td>{order.lines.reduce((sum, line) => sum + line.quantity, 0)}</td>
-                            <td>
+                            </TableCell>
+                            <TableCell>
+                              {order.lines.reduce((sum, line) => sum + line.quantity, 0)}
+                            </TableCell>
+                            <TableCell>
                               <strong>{formatPrice(order.total)}</strong>
-                            </td>
-                            <td>
+                            </TableCell>
+                            <TableCell>
                               <PaymentBadge
                                 paymentStatus={order.payment_status}
                                 paymentMethod={order.payment_method}
                                 showFailed
                               />
-                            </td>
-                            <td>
+                            </TableCell>
+                            <TableCell>
                               <StatusBadge status={order.status} />
                               {order.cancel_requested ? (
                                 <span className="rt-cancel-flag">
@@ -351,7 +370,7 @@ export function AdminActivity({ loadActivity = loadAdminActivity }: AdminActivit
                               {order.manual_refund_status === "completed" ? (
                                 <span className="rt-cancel-flag">Refund completed</span>
                               ) : null}
-                            </td>
+                            </TableCell>
                           </>
                         }
                         detail={
@@ -383,53 +402,62 @@ export function AdminActivity({ loadActivity = loadAdminActivity }: AdminActivit
                               </p>
                             ) : null}
                             <div className="ad-order-admin">
-                              <label className="ad-order-status-field">
-                                <span>Status</span>
-                                <select
-                                  aria-label={`Order status for #${shortId(order.id)}`}
+                              <Field orientation="horizontal" className="w-auto">
+                                <FieldLabel>Status</FieldLabel>
+                                <Select
                                   value={order.status}
                                   disabled={busyId === order.id}
-                                  onChange={(event) => onSelectChange(order, event.target.value)}
+                                  onValueChange={(value) => onSelectChange(order, value)}
                                 >
-                                  {nextStatuses(order).map((value) => (
-                                    <option value={value} key={value}>
-                                      {statusLabel(value)}
-                                    </option>
-                                  ))}
-                                </select>
-                              </label>
+                                  <SelectTrigger
+                                    className="w-auto min-w-32"
+                                    aria-label={`Order status for #${shortId(order.id)}`}
+                                  >
+                                    <SelectValue />
+                                  </SelectTrigger>
+                                  <SelectContent>
+                                    <SelectGroup>
+                                      {nextStatuses(order).map((value) => (
+                                        <SelectItem value={value} key={value}>
+                                          {statusLabel(value)}
+                                        </SelectItem>
+                                      ))}
+                                    </SelectGroup>
+                                  </SelectContent>
+                                </Select>
+                              </Field>
                               {order.cancel_requested ? (
                                 <div className="ad-cancel-request">
                                   <span className="rt-cancel-flag">
                                     Cancellation requested by {order.cancellation_initiator}
                                   </span>
-                                  <button
-                                    className="delete-button"
+                                  <Button
+                                    variant="destructive"
+                                    size="sm"
                                     type="button"
                                     disabled={busyId === order.id}
                                     onClick={() => changeStatus(order, "cancelled")}
                                   >
                                     Approve &amp; cancel
-                                  </button>
-                                  <button
-                                    className="button button-subtle"
+                                  </Button>
+                                  <Button
+                                    variant="ghost"
                                     type="button"
                                     disabled={busyId === order.id}
                                     onClick={() => changeStatus(order, order.status)}
                                   >
                                     <span>Reject request</span>
-                                  </button>
+                                  </Button>
                                 </div>
                               ) : null}
                               {order.manual_refund_status === "pending" ? (
-                                <button
-                                  className="button button-primary"
+                                <Button
                                   type="button"
                                   disabled={busyId === order.id}
                                   onClick={() => onCompleteRefund(order)}
                                 >
                                   <span>Mark manual refund completed</span>
-                                </button>
+                                </Button>
                               ) : null}
                             </div>
                           </>
@@ -437,15 +465,15 @@ export function AdminActivity({ loadActivity = loadAdminActivity }: AdminActivit
                       />
                     ))
                   ) : (
-                    <tr>
-                      <td className="admin-empty" colSpan={8}>
+                    <TableRow>
+                      <TableCell className="admin-empty" colSpan={8}>
                         <strong>No matching orders</strong>
                         <span>Try a different retailer, supplier, or product.</span>
-                      </td>
-                    </tr>
+                      </TableCell>
+                    </TableRow>
                   )}
-                </tbody>
-              </table>
+                </TableBody>
+              </Table>
             </TableShell>
           ) : (
             <EmptyState icon="activity" title="No orders yet" copy="New orders show up here." />

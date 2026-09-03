@@ -1,5 +1,14 @@
 import { useNavigate } from "@tanstack/react-router";
 import { useEffect, useState } from "react";
+import { Button } from "@/components/ui/button";
+import {
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from "@/components/ui/table";
 import { Icon } from "../../components/ui/Icon.tsx";
 import {
   EmptyState,
@@ -70,39 +79,40 @@ function CancelAction({
 
   if (order.status === "delivered" && order.delivery_verified_at) {
     return (
-      <a
-        className="text-button"
-        href={`/retailer/complaints?order=${encodeURIComponent(order.id)}`}
-      >
-        <Icon name="message" />
-        <span>Contact support for cancellation or refund</span>
-      </a>
+      <Button asChild variant="link" className="h-auto p-0">
+        <a href={`/retailer/complaints?order=${encodeURIComponent(order.id)}`}>
+          <Icon name="message" />
+          <span>Contact support for cancellation or refund</span>
+        </a>
+      </Button>
     );
   }
 
   return (
     <>
       {order.status === "delivered" ? (
-        <button
-          className="text-button"
+        <Button
+          variant="link"
+          className="h-auto p-0"
           type="button"
           disabled={disabled}
           onClick={() => onVerifyDelivery(order)}
         >
           <Icon name="check" />
           <span>Verify delivery</span>
-        </button>
+        </Button>
       ) : null}
       {canCancelOrder(order) ? (
-        <button
-          className="text-button rt-cancel-button"
+        <Button
+          variant="ghost"
+          className="rt-cancel-button h-auto p-0 text-destructive hover:text-destructive"
           type="button"
           disabled={disabled}
           onClick={() => onCancel(order)}
         >
           <Icon name="trash" />
           <span>Request cancellation</span>
-        </button>
+        </Button>
       ) : null}
     </>
   );
@@ -255,7 +265,7 @@ export function RetailerOrders({
           to: "/retailer/cart",
           icon: "cart",
           label: "Cart",
-          trailing: cartCount ? <span className="rt-nav-badge">{cartCount}</span> : undefined,
+          trailing: cartCount || undefined,
         },
         { to: "/retailer/orders", icon: "package", label: "My orders", active: true },
         { to: "/retailer/complaints", icon: "message", label: "Help Center" },
@@ -269,10 +279,12 @@ export function RetailerOrders({
         title="My orders."
         copy="Every order you place, from confirmation to delivery."
         actions={
-          <RouterLink className="button button-primary" to="/retailer/catalog">
-            <Icon name="bag" />
-            <span>Place order</span>
-          </RouterLink>
+          <Button asChild>
+            <RouterLink to="/retailer/catalog">
+              <Icon name="bag" />
+              <span>Place order</span>
+            </RouterLink>
+          </Button>
         }
       />
       <InlineNotice message={notice?.message} state={notice?.state} />
@@ -280,20 +292,20 @@ export function RetailerOrders({
       {orders ? (
         orders.length ? (
           <TableShell>
-            <table className="admin-table rt-orders-table">
-              <thead>
-                <tr>
-                  <th>Order</th>
-                  <th>Placed</th>
-                  <th>Items</th>
-                  <th>Total</th>
-                  <th>Status</th>
-                  <th>
+            <Table className="rt-orders-table">
+              <TableHeader>
+                <TableRow>
+                  <TableHead>Order</TableHead>
+                  <TableHead>Placed</TableHead>
+                  <TableHead>Items</TableHead>
+                  <TableHead>Total</TableHead>
+                  <TableHead>Status</TableHead>
+                  <TableHead>
                     <span className="sr-only">Details</span>
-                  </th>
-                </tr>
-              </thead>
-              <tbody>
+                  </TableHead>
+                </TableRow>
+              </TableHeader>
+              <TableBody>
                 {orders.map((order) => (
                   <OrderRow
                     key={order.id}
@@ -301,15 +313,17 @@ export function RetailerOrders({
                     toggleLabel={`Toggle details for order #${shortId(order.id)}`}
                     summaryCells={
                       <>
-                        <td>
+                        <TableCell>
                           <strong className="rt-order-id">#{shortId(order.id)}</strong>
-                        </td>
-                        <td>{formatDate(order.created_at)}</td>
-                        <td>{order.items.reduce((sum, item) => sum + item.quantity, 0)}</td>
-                        <td>
+                        </TableCell>
+                        <TableCell>{formatDate(order.created_at)}</TableCell>
+                        <TableCell>
+                          {order.items.reduce((sum, item) => sum + item.quantity, 0)}
+                        </TableCell>
+                        <TableCell>
                           <strong>{formatPrice(orderTotal(order))}</strong>
-                        </td>
-                        <td>
+                        </TableCell>
+                        <TableCell>
                           <PaymentBadge
                             paymentStatus={order.payment_status}
                             paymentMethod={order.payment_method}
@@ -318,7 +332,7 @@ export function RetailerOrders({
                           {order.delivery_verified_at ? (
                             <span className="rt-cancel-flag">Delivery verified</span>
                           ) : null}
-                        </td>
+                        </TableCell>
                       </>
                     }
                     detail={
@@ -347,25 +361,26 @@ export function RetailerOrders({
                         ) : null}
                         <div className="rt-order-detail-actions">
                           {order.payment_status === "paid" ? (
-                            <RouterLink
-                              className="text-button rt-invoice-link"
-                              to="/retailer/orders/$orderId/invoice"
-                              params={{ orderId: order.id }}
-                            >
-                              <Icon name="download" />
-                              <span>Download invoice</span>
-                            </RouterLink>
+                            <Button asChild variant="link" className="rt-invoice-link h-auto p-0">
+                              <RouterLink
+                                to="/retailer/orders/$orderId/invoice"
+                                params={{ orderId: order.id }}
+                              >
+                                <Icon name="download" />
+                                <span>Download invoice</span>
+                              </RouterLink>
+                            </Button>
                           ) : null}
                           {order.payment_status === "unpaid" && order.tran_id ? (
-                            <button
-                              className="text-button rt-invoice-link"
-                              type="button"
+                            <Button
+                              variant="link"
+                              className="rt-invoice-link h-auto p-0"
                               disabled={busyId === order.id}
                               onClick={() => onVerifyPayment(order)}
                             >
                               <Icon name="refresh" />
                               <span>Verify payment</span>
-                            </button>
+                            </Button>
                           ) : null}
                           <CancelAction
                             order={order}
@@ -378,8 +393,8 @@ export function RetailerOrders({
                     }
                   />
                 ))}
-              </tbody>
-            </table>
+              </TableBody>
+            </Table>
           </TableShell>
         ) : (
           <EmptyState
@@ -387,9 +402,11 @@ export function RetailerOrders({
             title="No orders yet"
             copy="Place your first order and it will show up here."
             action={
-              <RouterLink className="button button-primary" to="/retailer/catalog">
-                <span>Place order</span>
-              </RouterLink>
+              <Button asChild>
+                <RouterLink to="/retailer/catalog">
+                  <span>Place order</span>
+                </RouterLink>
+              </Button>
             }
           />
         )

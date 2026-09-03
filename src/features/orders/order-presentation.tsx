@@ -1,4 +1,7 @@
 import { useId, useState, type ReactNode } from "react";
+import { Badge } from "../../components/ui/badge";
+import { Button } from "../../components/ui/button";
+import { TableCell, TableRow } from "../../components/ui/table";
 import { Icon } from "../../components/ui/Icon.tsx";
 
 export type OrderStatus = "pending" | "confirmed" | "shipped" | "delivered" | "cancelled";
@@ -24,8 +27,24 @@ export function shortId(value: string): string {
   return value.replaceAll("-", "").slice(0, 8).toUpperCase();
 }
 
+// Semantic tone per lifecycle state — tone reinforces the label, it is never the only cue.
+type BadgeVariant = "default" | "secondary" | "destructive" | "outline";
+
+function statusVariant(status: string): BadgeVariant {
+  switch (status) {
+    case "delivered":
+      return "default";
+    case "cancelled":
+      return "destructive";
+    case "pending":
+      return "secondary";
+    default:
+      return "outline";
+  }
+}
+
 export function StatusBadge({ status }: { status: string }) {
-  return <span className={`rt-status rt-status-${status}`}>{statusLabel(status)}</span>;
+  return <Badge variant={statusVariant(status)}>{statusLabel(status)}</Badge>;
 }
 
 export function PaymentBadge({
@@ -37,9 +56,9 @@ export function PaymentBadge({
   paymentMethod: string;
   showFailed?: boolean;
 }) {
-  if (paymentStatus === "paid") return <span className="rt-pay-badge">Paid</span>;
-  if (paymentMethod === "cod") return <span className="rt-pay-badge is-cod">COD</span>;
-  if (showFailed && paymentStatus === "failed") return <span className="admin-muted">Failed</span>;
+  if (paymentStatus === "paid") return <Badge variant="default">Paid</Badge>;
+  if (paymentMethod === "cod") return <Badge variant="secondary">COD</Badge>;
+  if (showFailed && paymentStatus === "failed") return <Badge variant="outline">Failed</Badge>;
   return null;
 }
 
@@ -60,26 +79,26 @@ export function OrderRow({
   const detailId = useId();
   return (
     <>
-      <tr className="rt-order-row">
+      <TableRow className="rt-order-row">
         {summaryCells}
-        <td className="rt-order-toggle">
-          <button
-            type="button"
-            className="rt-order-toggle-button"
+        <TableCell className="rt-order-toggle">
+          <Button
+            variant="ghost"
+            size="icon"
             aria-expanded={open}
             aria-controls={detailId}
             aria-label={toggleLabel}
             onClick={() => setOpen((previous) => !previous)}
           >
             <Icon name={open ? "minus" : "plus"} />
-          </button>
-        </td>
-      </tr>
-      <tr className="rt-order-detail" id={detailId} hidden={!open}>
-        <td colSpan={colSpan}>
+          </Button>
+        </TableCell>
+      </TableRow>
+      <TableRow className="rt-order-detail" id={detailId} hidden={!open}>
+        <TableCell colSpan={colSpan}>
           <div className="rt-order-detail-body">{detail}</div>
-        </td>
-      </tr>
+        </TableCell>
+      </TableRow>
     </>
   );
 }
