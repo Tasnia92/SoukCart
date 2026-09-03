@@ -1,5 +1,6 @@
 import type { ReactNode } from "react";
 import type { LucideIcon } from "lucide-react";
+import { ChevronsUpDown } from "lucide-react";
 import { RouterLink } from "../../components/ui/RouterLink.tsx";
 import {
   Breadcrumb,
@@ -9,6 +10,14 @@ import {
   BreadcrumbPage,
   BreadcrumbSeparator,
 } from "@/components/ui/breadcrumb";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuGroup,
+  DropdownMenuItem,
+  DropdownMenuLabel,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
 import { Separator } from "@/components/ui/separator";
 import {
   Sidebar,
@@ -23,6 +32,7 @@ import {
   SidebarMenuItem,
   SidebarRail,
   SidebarTrigger,
+  useSidebar,
 } from "@/components/ui/sidebar";
 import { AppShell, NavUser } from "../../components/ui/Workspace.tsx";
 import { NotificationsBell } from "../notifications/NotificationsPanel.tsx";
@@ -46,12 +56,19 @@ export type WorkspacePath =
   | "/supplier/products"
   | "/supplier/stock";
 
+export type WorkspaceNavMenuChoice = {
+  id: string;
+  label: string;
+};
+
 export type WorkspaceNavItem = {
-  to: WorkspacePath;
+  to?: WorkspacePath;
   icon: LucideIcon;
   label: string;
   active?: boolean;
   trailing?: ReactNode;
+  menu?: readonly WorkspaceNavMenuChoice[];
+  onSelect?: (id: string) => void;
 };
 
 type WorkspaceShellProps = {
@@ -64,11 +81,106 @@ type WorkspaceShellProps = {
 };
 
 function workspaceRole(items: WorkspaceNavItem[]): { label: string; home: WorkspacePath } {
-  const home = items[0]?.to ?? "/";
+  const home = items.find((item) => item.to)?.to ?? "/";
   if (home.startsWith("/admin")) return { label: "Admin", home: "/admin" };
   if (home.startsWith("/retailer")) return { label: "Retailer", home: "/retailer" };
   if (home.startsWith("/supplier")) return { label: "Seller", home: "/supplier" };
   return { label: "Workspace", home: "/" };
+}
+
+function WorkspaceNavLink({ item }: { item: WorkspaceNavItem }) {
+  const to = item.to;
+  if (!to) return null;
+  const ItemIcon = item.icon;
+
+  return (
+    <SidebarMenuItem>
+      <SidebarMenuButton asChild isActive={item.active}>
+        <RouterLink to={to} aria-current={item.active ? "page" : undefined} title={item.label}>
+          <ItemIcon />
+          <span>{item.label}</span>
+        </RouterLink>
+      </SidebarMenuButton>
+      {item.trailing ? (
+        <SidebarMenuBadge className="rt-nav-badge bg-primary text-primary-foreground">
+          {item.trailing}
+        </SidebarMenuBadge>
+      ) : null}
+    </SidebarMenuItem>
+  );
+}
+
+function WorkspaceNavDropdown({ item }: { item: WorkspaceNavItem }) {
+  const { isMobile, setOpenMobile } = useSidebar();
+  const ItemIcon = item.icon;
+  const choices = item.menu ?? [];
+
+  return (
+    <SidebarMenuItem>
+      <DropdownMenu>
+        <DropdownMenuTrigger asChild>
+          <SidebarMenuButton
+            isActive={item.active}
+            className="data-[state=open]:bg-sidebar-accent data-[state=open]:text-sidebar-accent-foreground"
+            aria-label={item.label}
+            title={item.label}
+          >
+            <ItemIcon />
+            <span>{item.label}</span>
+            <ChevronsUpDown className="ml-auto" />
+          </SidebarMenuButton>
+        </DropdownMenuTrigger>
+        <DropdownMenuContent
+          className="min-w-56"
+          side={isMobile ? "bottom" : "right"}
+          align="start"
+          sideOffset={4}
+        >
+          <DropdownMenuGroup>
+            <DropdownMenuLabel>{item.label}</DropdownMenuLabel>
+            {choices.map((choice) => (
+              <DropdownMenuItem
+                key={choice.id}
+                onClick={() => {
+                  if (isMobile) setOpenMobile(false);
+                  item.onSelect?.(choice.id);
+                }}
+              >
+                {choice.label}
+              </DropdownMenuItem>
+            ))}
+          </DropdownMenuGroup>
+        </DropdownMenuContent>
+      </DropdownMenu>
+      {item.trailing ? (
+        <SidebarMenuBadge className="rt-nav-badge bg-primary text-primary-foreground">
+          {item.trailing}
+        </SidebarMenuBadge>
+      ) : null}
+    </SidebarMenuItem>
+  );
+}
+
+function WorkspaceNavList({
+  items,
+  navigationLabel,
+}: {
+  items: WorkspaceNavItem[];
+  navigationLabel: string;
+}) {
+  return (
+    <nav aria-label={navigationLabel}>
+      <SidebarMenu>
+        {items.map((item) =>
+          item.menu ? (
+            <WorkspaceNavDropdown key={item.label} item={item} />
+          ) : (
+            <WorkspaceNavLink key={item.to ?? item.label} item={item} />
+          ),
+        )}
+      </SidebarMenu>
+    </nav>
+  );
 }
 
 export function WorkspaceShell({
@@ -107,29 +219,7 @@ export function WorkspaceShell({
           <SidebarContent>
             <SidebarGroup>
               <SidebarGroupLabel>{role.label}</SidebarGroupLabel>
-              <nav aria-label={navigationLabel}>
-                <SidebarMenu>
-                  {items.map(({ to, icon: ItemIcon, label, active, trailing }) => (
-                    <SidebarMenuItem key={to}>
-                      <SidebarMenuButton asChild isActive={active}>
-                        <RouterLink
-                          to={to}
-                          aria-current={active ? "page" : undefined}
-                          title={label}
-                        >
-                          <ItemIcon />
-                          <span>{label}</span>
-                        </RouterLink>
-                      </SidebarMenuButton>
-                      {trailing ? (
-                        <SidebarMenuBadge className="rt-nav-badge bg-primary text-primary-foreground">
-                          {trailing}
-                        </SidebarMenuBadge>
-                      ) : null}
-                    </SidebarMenuItem>
-                  ))}
-                </SidebarMenu>
-              </nav>
+              <WorkspaceNavList items={items} navigationLabel={navigationLabel} />
             </SidebarGroup>
           </SidebarContent>
           <SidebarFooter>
