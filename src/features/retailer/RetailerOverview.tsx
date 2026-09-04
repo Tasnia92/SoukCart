@@ -3,7 +3,6 @@ import {
   Activity,
   ArrowRight,
   Check,
-  House,
   MessageSquare,
   Package,
   ShoppingBag,
@@ -46,7 +45,7 @@ import { InlineNotice, PageHeader, WorkspaceError } from "../../components/ui/Wo
 import { useSessionSnapshot, useSessionStore } from "../../session.tsx";
 import { PaymentBadge, shortId, StatusBadge } from "../orders/order-presentation.tsx";
 import { firstName, formatDate, formatPrice } from "../workspace/format.ts";
-import { RouterLink, WorkspaceShell } from "../workspace/WorkspaceShell.tsx";
+import { RouterLink } from "../workspace/WorkspaceShell.tsx";
 import {
   buildRetailerDashboard,
   loadRetailerDashboardInput,
@@ -62,6 +61,7 @@ import {
   reconcileRetailerPayments,
   type ReconciliationResult,
 } from "./retailer-overview-api.ts";
+import { RetailerWorkspaceShell } from "./retailer-shared.tsx";
 
 type LoadedInput = RetailerDashboardInput & { orders: RetailerOrder[] };
 
@@ -137,7 +137,7 @@ const recentColumns: DashboardColumn<RetailerRecentOrder>[] = [
     header: "Action",
     cell: (order) => (
       <Button asChild variant="link" size="sm" className="h-auto p-0">
-        <RouterLink to="/retailer/orders">
+        <RouterLink to="/retailer/orders" search={{ order: order.id }}>
           {order.needsDeliveryConfirmation ? "Confirm delivery" : "View order"}
           <ArrowRight data-icon="inline-end" />
         </RouterLink>
@@ -164,7 +164,10 @@ function NextActionWidget({ action }: { action: RetailerNextAction }) {
       </CardHeader>
       <CardFooter className="justify-end">
         <Button asChild>
-          <RouterLink to={action.to}>
+          <RouterLink
+            to={action.to}
+            search={action.orderId ? { order: action.orderId } : undefined}
+          >
             <ActionIcon data-icon="inline-start" />
             {action.actionLabel}
           </RouterLink>
@@ -258,22 +261,11 @@ export function RetailerOverview({
   const helpFailure = dashboard ? failureFor(dashboard.failures, RETAILER_HELP_SECTION) : null;
 
   return (
-    <WorkspaceShell
-      navigationLabel="Retailer navigation"
-      items={[
-        { to: "/retailer", icon: House, label: "Overview", active: true },
-        { to: "/retailer/catalog", icon: ShoppingBag, label: "Place order" },
-        {
-          to: "/retailer/cart",
-          icon: ShoppingCart,
-          label: "Cart",
-          trailing: cartUnits || undefined,
-        },
-        { to: "/retailer/orders", icon: Package, label: "My orders" },
-        { to: "/retailer/complaints", icon: MessageSquare, label: "Help Center" },
-      ]}
+    <RetailerWorkspaceShell
+      section="overview"
       userName={userName}
       userEmail={state.profile.email}
+      cartCount={cartUnits}
       onLogout={onLogout}
     >
       <PageHeader
@@ -483,6 +475,6 @@ export function RetailerOverview({
       ) : (
         <DashboardSkeleton label="Loading your workspace…" />
       )}
-    </WorkspaceShell>
+    </RetailerWorkspaceShell>
   );
 }

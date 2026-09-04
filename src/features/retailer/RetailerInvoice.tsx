@@ -1,13 +1,5 @@
 import { useNavigate } from "@tanstack/react-router";
-import {
-  Clock,
-  Download,
-  House,
-  MessageSquare,
-  Package,
-  ShoppingBag,
-  ShoppingCart,
-} from "lucide-react";
+import { Clock, Download, Package, ShoppingBag } from "lucide-react";
 import { useEffect, useState } from "react";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -40,7 +32,7 @@ import {
 import { useSessionSnapshot, useSessionStore } from "../../session.tsx";
 import { DeliveryDetails, shortId } from "../orders/order-presentation.tsx";
 import { formatDate, formatDateTime, formatPrice } from "../workspace/format.ts";
-import { RouterLink, WorkspaceShell } from "../workspace/WorkspaceShell.tsx";
+import { RouterLink } from "../workspace/WorkspaceShell.tsx";
 import { loadCartCount } from "./retailer-orders-api.ts";
 import {
   invoiceTotal,
@@ -48,6 +40,7 @@ import {
   type InvoiceOrder,
   type InvoiceResult,
 } from "./retailer-invoice-api.ts";
+import { RetailerWorkspaceShell } from "./retailer-shared.tsx";
 
 type RetailerInvoiceProps = {
   orderId: string;
@@ -116,22 +109,11 @@ export function RetailerInvoice({
 
   return (
     <div className="print:[&_[data-slot=sidebar]]:hidden print:[&_[data-slot=sidebar-gap]]:hidden print:[&_[data-slot=sidebar-inset]>header]:hidden print:[&_[data-slot=sidebar-inset]]:block print:[&_[data-slot=sidebar-inset]>main]:block print:[&_[data-slot=sidebar-inset]>main]:max-w-none print:[&_[data-slot=sidebar-inset]>main]:p-0">
-      <WorkspaceShell
-        navigationLabel="Retailer navigation"
-        items={[
-          { to: "/retailer", icon: House, label: "Overview" },
-          { to: "/retailer/catalog", icon: ShoppingBag, label: "Place order" },
-          {
-            to: "/retailer/cart",
-            icon: ShoppingCart,
-            label: "Cart",
-            trailing: cartCount || undefined,
-          },
-          { to: "/retailer/orders", icon: Package, label: "My orders", active: true },
-          { to: "/retailer/complaints", icon: MessageSquare, label: "Help Center" },
-        ]}
+      <RetailerWorkspaceShell
+        section="orders"
         userName={userName}
         userEmail={state.profile.email}
+        cartCount={cartCount}
         onLogout={onLogout}
       >
         <div className="print:hidden">
@@ -183,7 +165,7 @@ export function RetailerInvoice({
         ) : (
           <LoadingState title="Loading the invoice…" />
         )}
-      </WorkspaceShell>
+      </RetailerWorkspaceShell>
     </div>
   );
 }

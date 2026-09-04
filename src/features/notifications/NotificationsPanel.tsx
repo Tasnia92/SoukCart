@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useState } from "react";
+import { useNavigate } from "@tanstack/react-router";
 import {
   BadgeCheck,
   Ban,
@@ -22,6 +23,7 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import { RouterLink } from "../../components/ui/RouterLink.tsx";
+import { useSessionSnapshot } from "../../session.tsx";
 import { useTableChanges } from "../../workspace-realtime.ts";
 import { formatDateTime } from "../workspace/format.ts";
 import {
@@ -56,14 +58,48 @@ function notificationIcon(type: string): LucideIcon {
   }
 }
 
+function notificationHref(
+  notification: OrderNotification,
+  role: "retailer" | "seller" | "admin" | null,
+): { to: string; search?: Record<string, string> } | null {
+  if (notification.order_id) {
+    if (role === "seller") {
+      return { to: "/supplier/orders", search: { order: notification.order_id } };
+    }
+    if (role === "retailer") {
+      return { to: "/retailer/orders", search: { order: notification.order_id } };
+    }
+    if (role === "admin") {
+      return { to: "/admin/activity", search: { order: notification.order_id } };
+    }
+  }
+
+  if (notification.type === "supplier_verified" && role === "seller") {
+    return { to: "/supplier/settings" };
+  }
+
+  if (notification.type === "payout_paid" && role === "seller") {
+    return { to: "/supplier/earnings" };
+  }
+
+  return null;
+}
+
 export function NotificationsBell({
   viewAllTo,
 }: {
-  viewAllTo?: "/supplier/notifications";
+  viewAllTo?: "/supplier/notifications" | "/retailer/notifications";
 } = {}) {
+  const navigate = useNavigate();
+  const { state } = useSessionSnapshot();
   const [notifications, setNotifications] = useState<OrderNotification[]>([]);
   const [loadVersion, setLoadVersion] = useState(0);
   const reload = useCallback(() => setLoadVersion((version) => version + 1), []);
+
+  const role =
+    state.status === "retailer" || state.status === "seller" || state.status === "admin"
+      ? state.status
+      : null;
 
   useEffect(() => {
     let current = true;
@@ -93,6 +129,13 @@ export function NotificationsBell({
         items.map((item) => (item.id === notification.id ? { ...item, read_at: readAt } : item)),
       );
     });
+  };
+
+  const openNotification = (notification: OrderNotification) => {
+    markRead(notification);
+    const href = notificationHref(notification, role);
+    if (!href) return;
+    void navigate({ to: href.to as never, search: (href.search ?? {}) as never });
   };
 
   const unread = notifications.filter((notification) => !notification.read_at).length;
@@ -127,10 +170,7 @@ export function NotificationsBell({
                 <DropdownMenuItem
                   key={notification.id}
                   className="items-start"
-                  onSelect={(event) => {
-                    event.preventDefault();
-                    markRead(notification);
-                  }}
+                  onSelect={() => openNotification(notification)}
                 >
                   <Icon />
                   <span className="flex min-w-0 flex-col gap-1">

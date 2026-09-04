@@ -1,17 +1,14 @@
-import { useNavigate } from "@tanstack/react-router";
+import { useNavigate, useRouterState } from "@tanstack/react-router";
+import { useEffect, useMemo, useState } from "react";
 import {
   Check,
   Download,
-  House,
   MessageSquare,
   Package,
   RefreshCw,
   ShoppingBag,
-  ShoppingCart,
-  Store,
   Trash2,
 } from "lucide-react";
-import { useEffect, useState } from "react";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -23,6 +20,7 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
+import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import {
   EmptyState,
   InlineNotice,
@@ -32,8 +30,9 @@ import {
   WorkspaceError,
   type NoticeState,
 } from "../../components/ui/Workspace.tsx";
+import { RouterLink } from "../../components/ui/RouterLink.tsx";
 import { useSessionSnapshot, useSessionStore } from "../../session.tsx";
-import { NotificationsPanel } from "../notifications/NotificationsPanel.tsx";
+import { OrderTrackingPanel } from "../orders/OrderTracking.tsx";
 import {
   DeliveryDetails,
   OrderRow,
@@ -41,8 +40,8 @@ import {
   shortId,
   StatusBadge,
 } from "../orders/order-presentation.tsx";
+import { searchParam } from "../workspace/search.ts";
 import { formatDate, formatPrice } from "../workspace/format.ts";
-import { RouterLink, WorkspaceShell } from "../workspace/WorkspaceShell.tsx";
 import {
   canCancelOrder,
   canRequestCodDeliveryRefund,
@@ -58,6 +57,8 @@ import {
   requestOrderCancellation,
   type RetailerOrder,
 } from "./retailer-orders-api.ts";
+import { needsDeliveryConfirmation } from "./retailer-dashboard-api.ts";
+import { RetailerWorkspaceShell } from "./retailer-shared.tsx";
 
 type RetailerOrdersProps = {
   loadOrders?: (retailerId: string) => Promise<RetailerOrder[]>;
@@ -65,6 +66,51 @@ type RetailerOrdersProps = {
 };
 
 type Notice = { message: string; state: NoticeState } | null;
+
+type OrderFilter = "action" | "active" | "delivered" | "cancelled" | "all";
+
+const ORDER_FILTERS: { id: OrderFilter; label: string }[] = [
+  { id: "action", label: "Needs action" },
+  { id: "active", label: "Active" },
+  { id: "delivered", label: "Delivered" },
+  { id: "cancelled", label: "Cancelled" },
+  { id: "all", label: "All" },
+];
+
+function parseOrderFilter(value: string | null): OrderFilter {
+  if (
+    value === "action" ||
+    value === "active" ||
+    value === "delivered" ||
+    value === "cancelled" ||
+    value === "all"
+  ) {
+    return value;
+  }
+  return "all";
+}
+
+function needsAction(order: RetailerOrder): boolean {
+  return (
+    needsDeliveryConfirmation(order) ||
+    needsGatewayPaymentVerification(order) ||
+    order.cancel_requested ||
+    canRequestCodDeliveryRefund(order)
+  );
+}
+
+function isActive(order: RetailerOrder): boolean {
+  return order.status === "pending" || order.status === "confirmed" || order.status === "shipped";
+}
+
+function matchesFilter(order: RetailerOrder, filter: OrderFilter): boolean {
+  if (filter === "all") return true;
+  if (filter === "action") return needsAction(order);
+  if (filter === "active") return isActive(order);
+  if (filter === "delivered") return order.status === "delivered";
+  if (filter === "cancelled") return order.status === "cancelled";
+  return true;
+}
 
 function CancelAction({
   order,
@@ -131,10 +177,10 @@ function CancelAction({
   if (order.status === "delivered" && order.delivery_verified_at) {
     return (
       <Button asChild variant="outline" size="sm">
-        <a href={`/retailer/complaints?order=${encodeURIComponent(order.id)}`}>
+        <RouterLink to="/retailer/complaints" search={{ order: order.id }}>
           <MessageSquare data-icon="inline-start" />
           Contact support for cancellation or refund
-        </a>
+        </RouterLink>
       </Button>
     );
   }
@@ -176,6 +222,9 @@ export function RetailerOrders({
   const { state } = useSessionSnapshot();
   const store = useSessionStore();
   const navigate = useNavigate({ from: "/retailer/orders" });
+  const searchStr = useRouterState({ select: (routerState) => routerState.location.searchStr });
+  const filter = parseOrderFilter(searchParam(searchStr, "filter"));
+  const focusOrderId = searchParam(searchStr, "order");
   const [orders, setOrders] = useState<RetailerOrder[] | null>(null);
   const [cartCount, setCartCount] = useState(0);
   const [error, setError] = useState<string | null>(null);
@@ -207,6 +256,28 @@ export function RetailerOrders({
     };
   }, [loadCart, loadOrders, loadVersion, retailerId]);
 
+  useEffect(() => {
+    if (!focusOrderId || !orders) return;
+    const el = document.getElementById(`order-${focusOrderId}`);
+    if (el) el.scrollIntoView({ behavior: "smooth", block: "center" });
+  }, [focusOrderId, orders]);
+
+  const counts = useMemo(() => {
+    const list = orders ?? [];
+    return {
+      action: list.filter(needsAction).length,
+      active: list.filter(isActive).length,
+      delivered: list.filter((order) => order.status === "delivered").length,
+      cancelled: list.filter((order) => order.status === "cancelled").length,
+      all: list.length,
+    };
+  }, [orders]);
+
+  const filtered = useMemo(
+    () => (orders ? orders.filter((order) => matchesFilter(order, filter)) : []),
+    [orders, filter],
+  );
+
   if (state.status !== "retailer") return null;
 
   const onLogout = () => {
@@ -228,6 +299,14 @@ export function RetailerOrders({
       />
     );
   }
+
+  const setFilter = (value: OrderFilter) => {
+    void navigate({
+      to: "/retailer/orders",
+      search: (value === "all" ? {} : { filter: value }) as never,
+      replace: true,
+    });
+  };
 
   const updateOrder = (orderId: string, patch: Partial<RetailerOrder>) => {
     setOrders((prev) => prev?.map((o) => (o.id === orderId ? { ...o, ...patch } : o)) ?? prev);
@@ -362,28 +441,17 @@ export function RetailerOrders({
   };
 
   return (
-    <WorkspaceShell
-      navigationLabel="Retailer navigation"
-      items={[
-        { to: "/retailer", icon: House, label: "Overview" },
-        { to: "/retailer/catalog", icon: ShoppingBag, label: "Place order" },
-        {
-          to: "/retailer/cart",
-          icon: ShoppingCart,
-          label: "Cart",
-          trailing: cartCount || undefined,
-        },
-        { to: "/retailer/orders", icon: Package, label: "My orders", active: true },
-        { to: "/retailer/complaints", icon: MessageSquare, label: "Help Center" },
-      ]}
+    <RetailerWorkspaceShell
+      section="orders"
       userName={userName}
       userEmail={state.profile.email}
+      cartCount={cartCount}
       onLogout={onLogout}
     >
       <PageHeader
         eyebrow="Order history"
         title="My orders."
-        copy="Every order you place, from confirmation to delivery."
+        copy="Track deliveries, confirm receipt, and manage cancellations in one place."
         actions={
           <Button asChild>
             <RouterLink to="/retailer/catalog">
@@ -394,174 +462,216 @@ export function RetailerOrders({
         }
       />
       <InlineNotice message={notice?.message} state={notice?.state} />
-      <NotificationsPanel />
+
       {orders ? (
         orders.length ? (
-          <TableShell>
-            <Table>
-              <TableHeader>
-                <TableRow>
-                  <TableHead>Order</TableHead>
-                  <TableHead>Placed</TableHead>
-                  <TableHead>Items</TableHead>
-                  <TableHead>Total</TableHead>
-                  <TableHead>Status</TableHead>
-                  <TableHead>
-                    <span className="sr-only">Details</span>
-                  </TableHead>
-                </TableRow>
-              </TableHeader>
-              <TableBody>
-                {orders.map((order) => (
-                  <OrderRow
-                    key={order.id}
-                    colSpan={6}
-                    toggleLabel={`Toggle details for order #${shortId(order.id)}`}
-                    summaryCells={
-                      <>
-                        <TableCell>
-                          <strong className="font-medium">#{shortId(order.id)}</strong>
-                        </TableCell>
-                        <TableCell>{formatDate(order.created_at)}</TableCell>
-                        <TableCell>
-                          {order.items.reduce((sum, item) => sum + item.quantity, 0)}
-                        </TableCell>
-                        <TableCell>
-                          <strong>{formatPrice(orderTotal(order))}</strong>
-                        </TableCell>
-                        <TableCell>
-                          <div className="flex flex-wrap gap-2">
-                            <PaymentBadge
-                              paymentStatus={order.payment_status}
-                              paymentMethod={order.payment_method}
-                            />
-                            <StatusBadge status={order.status} />
-                            {order.delivery_verified_at ? (
-                              <Badge variant="secondary">Delivery verified</Badge>
-                            ) : null}
-                          </div>
-                        </TableCell>
-                      </>
-                    }
-                    detail={
-                      <div className="flex flex-col gap-4">
-                        <ul className="flex flex-col gap-2">
-                          {order.items.map((item) => (
-                            <li
-                              className="grid gap-1 text-sm sm:grid-cols-[1fr_auto_auto] sm:gap-4"
-                              key={item.id}
-                            >
-                              <span className="font-medium">{item.product_name}</span>
-                              <span className="text-muted-foreground">
-                                {item.quantity} × {formatPrice(item.unit_price)}
-                              </span>
-                              <strong className="sm:text-right">
-                                {formatPrice(item.unit_price * item.quantity)}
-                              </strong>
-                            </li>
-                          ))}
-                        </ul>
-                        <dl className="grid grid-cols-2 gap-2 text-sm sm:max-w-sm">
-                          <dt className="text-muted-foreground">Subtotal</dt>
-                          <dd className="text-right tabular-nums">
-                            {formatPrice(orderMerchandiseTotal(order))}
-                          </dd>
-                          <dt className="text-muted-foreground">Delivery</dt>
-                          <dd className="text-right tabular-nums">
-                            {formatPrice(order.delivery_charge)}
-                          </dd>
-                          <dt className="font-medium">Total</dt>
-                          <dd className="text-right font-medium tabular-nums">
-                            {formatPrice(orderTotal(order))}
-                          </dd>
-                          {order.payment_method === "cod" ? (
-                            <>
-                              <dt className="text-muted-foreground">Delivery payment</dt>
-                              <dd className="text-right">
-                                {order.delivery_payment_status === "paid"
-                                  ? "Paid online"
-                                  : order.delivery_payment_status === "failed"
-                                    ? "Failed"
-                                    : order.delivery_payment_status === "cancelled"
-                                      ? "Cancelled"
-                                      : "Unpaid"}
-                              </dd>
-                              <dt className="text-muted-foreground">Products</dt>
-                              <dd className="text-right">
-                                {order.payment_status === "paid"
-                                  ? "Cash collected"
-                                  : "Pay in cash on arrival"}
-                              </dd>
-                            </>
-                          ) : null}
-                        </dl>
-                        <DeliveryDetails
-                          phone={order.delivery_phone}
-                          address={order.delivery_address}
-                          city={order.delivery_city}
-                          postcode={order.delivery_postcode}
-                        />
-                        {order.notes ? (
-                          <Alert role="note">
-                            <MessageSquare />
-                            <AlertTitle>Order notes</AlertTitle>
-                            <AlertDescription>{order.notes}</AlertDescription>
-                          </Alert>
-                        ) : null}
-                        {order.status === "cancelled" &&
-                        order.manual_refund_status !== "not_required" ? (
-                          <Alert role="note">
-                            <RefreshCw />
-                            <AlertTitle>Refund details</AlertTitle>
-                            <AlertDescription>
-                              {formatPrice(order.refund_amount)} · platform charge{" "}
-                              {formatPrice(order.platform_charge)} · delivery charge{" "}
-                              {formatPrice(order.delivery_charge)}
-                            </AlertDescription>
-                          </Alert>
-                        ) : null}
-                        <div className="flex flex-wrap items-center gap-2">
-                          {order.payment_status === "paid" ? (
-                            <Button asChild variant="outline" size="sm">
-                              <RouterLink
-                                to="/retailer/orders/$orderId/invoice"
-                                params={{ orderId: order.id }}
-                              >
-                                <Download data-icon="inline-start" />
-                                Download invoice
-                              </RouterLink>
-                            </Button>
-                          ) : null}
-                          {needsGatewayPaymentVerification(order) ? (
-                            <Button
-                              type="button"
-                              variant="outline"
-                              size="sm"
-                              disabled={busyId === order.id}
-                              onClick={() => onVerifyPayment(order)}
-                            >
-                              <RefreshCw data-icon="inline-start" />
-                              Verify payment
-                            </Button>
-                          ) : null}
-                          <CancelAction
-                            order={order}
-                            disabled={busyId === order.id}
-                            onCancel={onCancel}
-                            onVerifyDelivery={onVerifyDelivery}
-                            onRequestDeliveryRefund={onRequestDeliveryRefund}
-                          />
-                        </div>
-                      </div>
-                    }
-                  />
+          <div className="flex flex-col gap-4">
+            <Tabs value={filter} onValueChange={(value) => setFilter(parseOrderFilter(value))}>
+              <TabsList variant="line" className="h-auto w-full flex-wrap justify-start">
+                {ORDER_FILTERS.map((item) => (
+                  <TabsTrigger key={item.id} value={item.id}>
+                    {item.label}
+                    <Badge variant="secondary" className="ml-2">
+                      {counts[item.id]}
+                    </Badge>
+                  </TabsTrigger>
                 ))}
-              </TableBody>
-            </Table>
-          </TableShell>
+              </TabsList>
+            </Tabs>
+
+            {filtered.length ? (
+              <TableShell>
+                <Table>
+                  <TableHeader>
+                    <TableRow>
+                      <TableHead>Order</TableHead>
+                      <TableHead>Placed</TableHead>
+                      <TableHead>Items</TableHead>
+                      <TableHead>Total</TableHead>
+                      <TableHead>Status</TableHead>
+                      <TableHead>
+                        <span className="sr-only">Details</span>
+                      </TableHead>
+                    </TableRow>
+                  </TableHeader>
+                  <TableBody>
+                    {filtered.map((order) => (
+                      <OrderRow
+                        key={order.id}
+                        rowId={`order-${order.id}`}
+                        colSpan={6}
+                        defaultOpen={focusOrderId === order.id}
+                        highlight={focusOrderId === order.id}
+                        toggleLabel={`Toggle details for order #${shortId(order.id)}`}
+                        summaryCells={
+                          <>
+                            <TableCell>
+                              <strong className="font-medium">#{shortId(order.id)}</strong>
+                            </TableCell>
+                            <TableCell>{formatDate(order.created_at)}</TableCell>
+                            <TableCell>
+                              {order.items.reduce((sum, item) => sum + item.quantity, 0)}
+                            </TableCell>
+                            <TableCell>
+                              <strong>{formatPrice(orderTotal(order))}</strong>
+                            </TableCell>
+                            <TableCell>
+                              <div className="flex flex-wrap gap-2">
+                                <PaymentBadge
+                                  paymentStatus={order.payment_status}
+                                  paymentMethod={order.payment_method}
+                                />
+                                <StatusBadge status={order.status} />
+                                {order.delivery_verified_at ? (
+                                  <Badge variant="secondary">Delivery verified</Badge>
+                                ) : null}
+                                {needsAction(order) ? (
+                                  <Badge variant="outline">Needs action</Badge>
+                                ) : null}
+                              </div>
+                            </TableCell>
+                          </>
+                        }
+                        detail={
+                          <div className="flex flex-col gap-4">
+                            <ul className="flex flex-col gap-2">
+                              {order.items.map((item) => (
+                                <li
+                                  className="grid gap-1 text-sm sm:grid-cols-[1fr_auto_auto] sm:gap-4"
+                                  key={item.id}
+                                >
+                                  <span className="font-medium">{item.product_name}</span>
+                                  <span className="text-muted-foreground">
+                                    {item.quantity} × {formatPrice(item.unit_price)}
+                                  </span>
+                                  <strong className="sm:text-right">
+                                    {formatPrice(item.unit_price * item.quantity)}
+                                  </strong>
+                                </li>
+                              ))}
+                            </ul>
+                            <dl className="grid grid-cols-2 gap-2 text-sm sm:max-w-sm">
+                              <dt className="text-muted-foreground">Subtotal</dt>
+                              <dd className="text-right tabular-nums">
+                                {formatPrice(orderMerchandiseTotal(order))}
+                              </dd>
+                              <dt className="text-muted-foreground">Delivery</dt>
+                              <dd className="text-right tabular-nums">
+                                {formatPrice(order.delivery_charge)}
+                              </dd>
+                              <dt className="font-medium">Total</dt>
+                              <dd className="text-right font-medium tabular-nums">
+                                {formatPrice(orderTotal(order))}
+                              </dd>
+                              {order.payment_method === "cod" ? (
+                                <>
+                                  <dt className="text-muted-foreground">Delivery payment</dt>
+                                  <dd className="text-right">
+                                    {order.delivery_payment_status === "paid"
+                                      ? "Paid online"
+                                      : order.delivery_payment_status === "failed"
+                                        ? "Failed"
+                                        : order.delivery_payment_status === "cancelled"
+                                          ? "Cancelled"
+                                          : "Unpaid"}
+                                  </dd>
+                                  <dt className="text-muted-foreground">Products</dt>
+                                  <dd className="text-right">
+                                    {order.payment_status === "paid"
+                                      ? "Cash collected"
+                                      : "Pay in cash on arrival"}
+                                  </dd>
+                                </>
+                              ) : null}
+                            </dl>
+                            <DeliveryDetails
+                              phone={order.delivery_phone}
+                              address={order.delivery_address}
+                              city={order.delivery_city}
+                              postcode={order.delivery_postcode}
+                            />
+                            {order.status === "shipped" ||
+                            order.status === "delivered" ||
+                            order.shipment ? (
+                              <div className="flex flex-col gap-2">
+                                <p className="text-sm font-medium">Shipment tracking</p>
+                                <OrderTrackingPanel shipment={order.shipment} />
+                              </div>
+                            ) : null}
+                            {order.notes ? (
+                              <Alert role="note">
+                                <MessageSquare />
+                                <AlertTitle>Order notes</AlertTitle>
+                                <AlertDescription>{order.notes}</AlertDescription>
+                              </Alert>
+                            ) : null}
+                            {order.status === "cancelled" &&
+                            order.manual_refund_status !== "not_required" ? (
+                              <Alert role="note">
+                                <RefreshCw />
+                                <AlertTitle>Refund details</AlertTitle>
+                                <AlertDescription>
+                                  {formatPrice(order.refund_amount)} · platform charge{" "}
+                                  {formatPrice(order.platform_charge)} · delivery charge{" "}
+                                  {formatPrice(order.delivery_charge)}
+                                </AlertDescription>
+                              </Alert>
+                            ) : null}
+                            <div className="flex flex-wrap items-center gap-2">
+                              {order.payment_status === "paid" ? (
+                                <Button asChild variant="outline" size="sm">
+                                  <RouterLink
+                                    to="/retailer/orders/$orderId/invoice"
+                                    params={{ orderId: order.id }}
+                                  >
+                                    <Download data-icon="inline-start" />
+                                    Download invoice
+                                  </RouterLink>
+                                </Button>
+                              ) : null}
+                              {needsGatewayPaymentVerification(order) ? (
+                                <Button
+                                  type="button"
+                                  variant="outline"
+                                  size="sm"
+                                  disabled={busyId === order.id}
+                                  onClick={() => onVerifyPayment(order)}
+                                >
+                                  <RefreshCw data-icon="inline-start" />
+                                  Verify payment
+                                </Button>
+                              ) : null}
+                              <CancelAction
+                                order={order}
+                                disabled={busyId === order.id}
+                                onCancel={onCancel}
+                                onVerifyDelivery={onVerifyDelivery}
+                                onRequestDeliveryRefund={onRequestDeliveryRefund}
+                              />
+                            </div>
+                          </div>
+                        }
+                      />
+                    ))}
+                  </TableBody>
+                </Table>
+              </TableShell>
+            ) : (
+              <EmptyState
+                icon={Package}
+                title="No orders in this filter"
+                copy="Try another status tab, or place a new order."
+                action={
+                  <Button asChild>
+                    <RouterLink to="/retailer/catalog">Place order</RouterLink>
+                  </Button>
+                }
+              />
+            )}
+          </div>
         ) : (
           <EmptyState
-            icon={Store}
+            icon={Package}
             title="No orders yet"
             copy="Place your first order and it will show up here."
             action={
@@ -574,6 +684,6 @@ export function RetailerOrders({
       ) : (
         <LoadingState title="Loading your orders…" />
       )}
-    </WorkspaceShell>
+    </RetailerWorkspaceShell>
   );
 }

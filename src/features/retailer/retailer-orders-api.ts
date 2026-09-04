@@ -15,6 +15,30 @@ export type RetailerOrderItem = {
   product_name: string;
 };
 
+export type RetailerShipmentEvent = {
+  id: string;
+  event_type: string;
+  message: string;
+  occurred_at: string;
+};
+
+export type RetailerShipment = {
+  id: string;
+  carrier: string;
+  tracking_number: string;
+  tracking_url: string;
+  status: string;
+  notes: string;
+  shipped_at: string;
+  updated_at: string;
+  provider: "manual" | "pathao";
+  consignment_id: string | null;
+  pathao_status: string | null;
+  pathao_delivery_fee: number | null;
+  collected_amount: number;
+  events: RetailerShipmentEvent[];
+};
+
 export type RetailerOrder = {
   id: string;
   status: RetailerOrderStatus;
@@ -37,10 +61,11 @@ export type RetailerOrder = {
   platform_charge: number;
   delivery_charge: number;
   items: RetailerOrderItem[];
+  shipment: RetailerShipment | null;
 };
 
 const ORDERS_SELECT =
-  "id, status, cancel_requested, cancellation_initiator, payment_status, payment_method, tran_id, notes, created_at, delivery_verified_at, delivery_phone, delivery_address, delivery_city, delivery_postcode, delivery_payment_status, delivery_paid_at, manual_refund_status, refund_amount, platform_charge, delivery_charge, order_items(id, product_id, quantity, unit_price, products(name))";
+  "id, status, cancel_requested, cancellation_initiator, payment_status, payment_method, tran_id, notes, created_at, delivery_verified_at, delivery_phone, delivery_address, delivery_city, delivery_postcode, delivery_payment_status, delivery_paid_at, manual_refund_status, refund_amount, platform_charge, delivery_charge, order_items(id, product_id, quantity, unit_price, products(name)), order_shipments(id, carrier, tracking_number, tracking_url, status, notes, shipped_at, updated_at, provider, consignment_id, pathao_status, pathao_delivery_fee, collected_amount, shipment_events(id, event_type, message, occurred_at))";
 
 type OrderItemRow = {
   id: string;
@@ -48,6 +73,30 @@ type OrderItemRow = {
   quantity: number;
   unit_price: number | string;
   products: { name: string } | { name: string }[] | null;
+};
+
+type ShipmentEventRow = {
+  id: string;
+  event_type: string;
+  message: string;
+  occurred_at: string;
+};
+
+type ShipmentRow = {
+  id: string;
+  carrier: string;
+  tracking_number: string;
+  tracking_url: string | null;
+  status: string;
+  notes: string | null;
+  shipped_at: string;
+  updated_at: string;
+  provider?: string | null;
+  consignment_id?: string | null;
+  pathao_status?: string | null;
+  pathao_delivery_fee?: number | string | null;
+  collected_amount?: number | string | null;
+  shipment_events?: ShipmentEventRow[] | null;
 };
 
 type OrderRow = {
@@ -72,11 +121,38 @@ type OrderRow = {
   platform_charge: number | string | null;
   delivery_charge: number | string | null;
   order_items: OrderItemRow[] | null;
+  order_shipments?: ShipmentRow[] | ShipmentRow | null;
 };
 
 function productName(relation: OrderItemRow["products"]): string {
   if (Array.isArray(relation)) return relation[0]?.name ?? "Unknown product";
   return relation?.name ?? "Unknown product";
+}
+
+function normalizeShipment(shipments: OrderRow["order_shipments"]): RetailerShipment | null {
+  const list = Array.isArray(shipments) ? shipments : shipments ? [shipments] : [];
+  const shipment = list[0];
+  if (!shipment?.id) return null;
+  const events = [...(shipment.shipment_events ?? [])].sort(
+    (left, right) => Date.parse(right.occurred_at) - Date.parse(left.occurred_at),
+  );
+  return {
+    id: shipment.id,
+    carrier: shipment.carrier ?? "",
+    tracking_number: shipment.tracking_number ?? "",
+    tracking_url: shipment.tracking_url ?? "",
+    status: shipment.status ?? "shipped",
+    notes: shipment.notes ?? "",
+    shipped_at: shipment.shipped_at,
+    updated_at: shipment.updated_at,
+    provider: shipment.provider === "pathao" ? "pathao" : "manual",
+    consignment_id: shipment.consignment_id ?? null,
+    pathao_status: shipment.pathao_status ?? null,
+    pathao_delivery_fee:
+      shipment.pathao_delivery_fee == null ? null : Number(shipment.pathao_delivery_fee),
+    collected_amount: Number(shipment.collected_amount ?? 0),
+    events,
+  };
 }
 
 function normalizeOrder(row: OrderRow): RetailerOrder {
@@ -108,6 +184,7 @@ function normalizeOrder(row: OrderRow): RetailerOrder {
       unit_price: Number(item.unit_price),
       product_name: productName(item.products),
     })),
+    shipment: normalizeShipment(row.order_shipments),
   };
 }
 

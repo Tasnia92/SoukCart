@@ -1,15 +1,5 @@
 import { useRouterState } from "@tanstack/react-router";
-import {
-  Check,
-  Clock,
-  House,
-  MessageSquare,
-  Minus,
-  Package,
-  ShoppingBag,
-  ShoppingCart,
-  type LucideIcon,
-} from "lucide-react";
+import { Check, Clock, Minus, type LucideIcon } from "lucide-react";
 import { useEffect, useState, type ReactNode } from "react";
 import { Button } from "@/components/ui/button";
 import {
@@ -24,7 +14,6 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { Brand } from "../../components/ui/Brand.tsx";
 import { PageHeader } from "../../components/ui/Workspace.tsx";
 import { useSessionSnapshot, useSessionStore } from "../../session.tsx";
-import { WorkspaceShell } from "../workspace/WorkspaceShell.tsx";
 import {
   clearCart,
   completePayment,
@@ -32,6 +21,7 @@ import {
   paymentSuccessPath,
 } from "./payment-return-api.ts";
 import { RETAILER_NOTICE_KEY } from "./retailer-flash.ts";
+import { RetailerWorkspaceShell } from "./retailer-shared.tsx";
 
 type CheckoutKind = "success" | "failed" | "cancelled";
 
@@ -113,21 +103,14 @@ export function CheckoutResult() {
 
   if (state.status === "retailer") {
     return (
-      <WorkspaceShell
-        navigationLabel="Retailer navigation"
-        items={[
-          { to: "/retailer", icon: House, label: "Overview", active: true },
-          { to: "/retailer/catalog", icon: ShoppingBag, label: "Place order" },
-          { to: "/retailer/cart", icon: ShoppingCart, label: "Cart" },
-          { to: "/retailer/orders", icon: Package, label: "My orders" },
-          { to: "/retailer/complaints", icon: MessageSquare, label: "Help Center" },
-        ]}
+      <RetailerWorkspaceShell
+        section="orders"
         userName={state.profile.name || state.profile.email}
         userEmail={state.profile.email}
         onLogout={() => void store.signOut()}
       >
         {body}
-      </WorkspaceShell>
+      </RetailerWorkspaceShell>
     );
   }
 

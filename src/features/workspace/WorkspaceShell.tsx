@@ -54,8 +54,11 @@ export type WorkspacePath =
   | "/retailer"
   | "/retailer/catalog"
   | "/retailer/cart"
+  | "/retailer/checkout"
   | "/retailer/orders"
   | "/retailer/complaints"
+  | "/retailer/notifications"
+  | "/retailer/settings"
   | "/supplier"
   | "/supplier/orders"
   | "/supplier/products"
@@ -387,7 +390,13 @@ export function WorkspaceShell({
           <WorkspaceBreadcrumb items={items} />
           <div className="ml-auto flex items-center gap-1">
             <NotificationsBell
-              viewAllTo={role.home === "/supplier" ? "/supplier/notifications" : undefined}
+              viewAllTo={
+                role.home === "/supplier"
+                  ? "/supplier/notifications"
+                  : role.home === "/retailer"
+                    ? "/retailer/notifications"
+                    : undefined
+              }
             />
           </div>
         </header>

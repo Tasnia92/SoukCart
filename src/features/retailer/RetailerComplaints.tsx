@@ -1,13 +1,5 @@
 import { useNavigate } from "@tanstack/react-router";
-import {
-  Download,
-  House,
-  MessageSquare,
-  Package,
-  ShoppingBag,
-  ShoppingCart,
-  Store,
-} from "lucide-react";
+import { Download, MessageSquare, Store } from "lucide-react";
 import { useEffect, useRef, useState, type FormEvent } from "react";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Badge } from "@/components/ui/badge";
@@ -34,7 +26,7 @@ import {
 import { useSessionSnapshot, useSessionStore } from "../../session.tsx";
 import { shortId } from "../orders/order-presentation.tsx";
 import { formatDateTime } from "../workspace/format.ts";
-import { RouterLink, WorkspaceShell } from "../workspace/WorkspaceShell.tsx";
+import { RouterLink } from "../workspace/WorkspaceShell.tsx";
 import { loadCartCount } from "./retailer-orders-api.ts";
 import {
   fileComplaint,
@@ -43,6 +35,7 @@ import {
   type FileComplaintInput,
   type RetailerComplaint,
 } from "./retailer-complaints-api.ts";
+import { RetailerWorkspaceShell } from "./retailer-shared.tsx";
 
 type RetailerComplaintsProps = {
   loadComplaints?: (retailerId: string) => Promise<RetailerComplaint[]>;
@@ -221,22 +214,11 @@ export function RetailerComplaints({
   };
 
   return (
-    <WorkspaceShell
-      navigationLabel="Retailer navigation"
-      items={[
-        { to: "/retailer", icon: House, label: "Overview" },
-        { to: "/retailer/catalog", icon: ShoppingBag, label: "Place order" },
-        {
-          to: "/retailer/cart",
-          icon: ShoppingCart,
-          label: "Cart",
-          trailing: cartCount || undefined,
-        },
-        { to: "/retailer/orders", icon: Package, label: "My orders" },
-        { to: "/retailer/complaints", icon: MessageSquare, label: "Help Center", active: true },
-      ]}
+    <RetailerWorkspaceShell
+      section="complaints"
       userName={userName}
       userEmail={state.profile.email}
+      cartCount={cartCount}
       onLogout={onLogout}
     >
       <PageHeader
@@ -348,6 +330,6 @@ export function RetailerComplaints({
           </Card>
         </form>
       </div>
-    </WorkspaceShell>
+    </RetailerWorkspaceShell>
   );
 }

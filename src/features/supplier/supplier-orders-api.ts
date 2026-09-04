@@ -35,6 +35,11 @@ export type SupplierShipment = {
   notes: string;
   shipped_at: string;
   updated_at: string;
+  provider: "manual" | "pathao";
+  consignment_id: string | null;
+  pathao_status: string | null;
+  pathao_delivery_fee: number | null;
+  collected_amount: number;
   events: ShipmentEvent[];
 };
 
@@ -101,7 +106,20 @@ type SupplierOrderRow = Omit<
   cancel_requested: boolean | null;
   accepted_at: string | null;
   shipment?:
-    | (Omit<SupplierShipment, "events"> & {
+    | (Omit<
+        SupplierShipment,
+        | "events"
+        | "provider"
+        | "consignment_id"
+        | "pathao_status"
+        | "pathao_delivery_fee"
+        | "collected_amount"
+      > & {
+        provider?: string | null;
+        consignment_id?: string | null;
+        pathao_status?: string | null;
+        pathao_delivery_fee?: number | string | null;
+        collected_amount?: number | string | null;
         events?: ShipmentEvent[] | null;
       })
     | null;
@@ -122,6 +140,12 @@ function normalizeShipment(shipment: SupplierOrderRow["shipment"]): SupplierShip
     notes: shipment.notes ?? "",
     shipped_at: shipment.shipped_at,
     updated_at: shipment.updated_at,
+    provider: shipment.provider === "pathao" ? "pathao" : "manual",
+    consignment_id: shipment.consignment_id ?? null,
+    pathao_status: shipment.pathao_status ?? null,
+    pathao_delivery_fee:
+      shipment.pathao_delivery_fee == null ? null : Number(shipment.pathao_delivery_fee),
+    collected_amount: Number(shipment.collected_amount ?? 0),
     events: Array.isArray(shipment.events) ? shipment.events : [],
   };
 }
@@ -190,6 +214,69 @@ export async function shipSupplierOrder(orderId: string, input: ShipOrderInput):
     data.status !== "shipped"
   ) {
     throw new Error("Shipment was not created.");
+  }
+}
+
+export type PathaoShipInput = {
+  itemWeight?: number;
+  notes?: string;
+};
+
+async function pathaoFunctionError(
+  error: { message?: string; context?: Response } | null,
+  data: { error?: string } | null | undefined,
+  fallback: string,
+): Promise<string> {
+  if (data?.error) return data.error;
+  const context = error?.context;
+  if (context && typeof context.json === "function") {
+    try {
+      const body = (await context.clone().json()) as { error?: string };
+      if (body?.error) return body.error;
+    } catch {
+      // Fall through to the generic message.
+    }
+  }
+  return error?.message || fallback;
+}
+
+export async function shipSupplierOrderWithPathao(
+  orderId: string,
+  input: PathaoShipInput = {},
+): Promise<{ consignmentId: string }> {
+  const { data, error } = await supabase.functions.invoke<{
+    error?: string;
+    consignmentId?: string;
+    status?: string;
+  }>("pathao-courier", {
+    body: {
+      action: "ship",
+      orderId,
+      itemWeight: input.itemWeight ?? 0.5,
+      notes: input.notes?.trim() || "",
+    },
+  });
+
+  if (error || data?.error) {
+    throw new Error(await pathaoFunctionError(error, data, "Pathao could not book this shipment."));
+  }
+  if (!data?.consignmentId || data.status !== "shipped") {
+    throw new Error("Pathao did not confirm the shipment.");
+  }
+  return { consignmentId: data.consignmentId };
+}
+
+export async function syncPathaoShipment(orderId: string): Promise<void> {
+  const { data, error } = await supabase.functions.invoke<{ error?: string; status?: string }>(
+    "pathao-courier",
+    {
+      body: { action: "sync", orderId },
+    },
+  );
+  if (error || data?.error) {
+    throw new Error(
+      await pathaoFunctionError(error, data, "Pathao status could not be refreshed."),
+    );
   }
 }
 

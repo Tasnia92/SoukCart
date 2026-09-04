@@ -21,10 +21,13 @@ import { CheckoutResult } from "./features/retailer/CheckoutResult.tsx";
 import { PaymentReturn } from "./features/retailer/PaymentReturn.tsx";
 import { RetailerCart } from "./features/retailer/RetailerCart.tsx";
 import { RetailerCatalog } from "./features/retailer/RetailerCatalog.tsx";
+import { RetailerCheckout } from "./features/retailer/RetailerCheckout.tsx";
 import { RetailerComplaints } from "./features/retailer/RetailerComplaints.tsx";
 import { RetailerInvoice } from "./features/retailer/RetailerInvoice.tsx";
+import { RetailerNotifications } from "./features/retailer/RetailerNotifications.tsx";
 import { RetailerOrders } from "./features/retailer/RetailerOrders.tsx";
 import { RetailerOverview } from "./features/retailer/RetailerOverview.tsx";
+import { RetailerSettings } from "./features/retailer/RetailerSettings.tsx";
 import { SupplierCustomers } from "./features/supplier/SupplierCustomers.tsx";
 import { SupplierEarnings } from "./features/supplier/SupplierEarnings.tsx";
 import { SupplierNotifications } from "./features/supplier/SupplierNotifications.tsx";
@@ -62,9 +65,12 @@ export const routeContract = [
   { path: "/retailer", target: "retailer" },
   { path: "/retailer/catalog", target: "retailer" },
   { path: "/retailer/cart", target: "retailer" },
+  { path: "/retailer/checkout", target: "retailer" },
   { path: "/retailer/orders", target: "retailer" },
   { path: "/retailer/orders/$orderId/invoice", target: "retailer" },
   { path: "/retailer/complaints", target: "retailer" },
+  { path: "/retailer/notifications", target: "retailer" },
+  { path: "/retailer/settings", target: "retailer" },
   { path: "/retailer/checkout/success", target: "retailer" },
   { path: "/retailer/checkout/failed", target: "retailer" },
   { path: "/retailer/checkout/cancelled", target: "retailer" },
@@ -218,8 +224,11 @@ function RetailerRoute(): ReactElement | null {
   if (pathname === "/retailer") return <RetailerOverview />;
   if (pathname === "/retailer/catalog") return <RetailerCatalog />;
   if (pathname === "/retailer/cart") return <RetailerCart />;
+  if (pathname === "/retailer/checkout") return <RetailerCheckout />;
   if (pathname === "/retailer/orders") return <RetailerOrders />;
   if (pathname === "/retailer/complaints") return <RetailerComplaints />;
+  if (pathname === "/retailer/notifications") return <RetailerNotifications />;
+  if (pathname === "/retailer/settings") return <RetailerSettings />;
   const invoiceMatch = RETAILER_INVOICE_PATTERN.exec(pathname);
   if (invoiceMatch) return <RetailerInvoice orderId={invoiceMatch[1]} />;
   return null;

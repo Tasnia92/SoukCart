@@ -66,6 +66,7 @@ import {
 } from "../../components/ui/Workspace.tsx";
 import { useSessionSnapshot, useSessionStore } from "../../session.tsx";
 import { useTableChanges } from "../../workspace-realtime.ts";
+import { OrderTrackingPanel } from "../orders/OrderTracking.tsx";
 import {
   DeliveryDetails,
   OrderRow,
@@ -88,7 +89,9 @@ import {
   requestSupplierCancellation,
   setSupplierOrderStatus,
   shipSupplierOrder,
+  shipSupplierOrderWithPathao,
   SHIPMENT_CARRIERS,
+  syncPathaoShipment,
   trackingNumberValidationError,
   trackingUrlValidationError,
   updateSupplierShipment,
@@ -127,7 +130,7 @@ const ORDER_FILTERS = new Set<OrderFilter>([
   "all",
 ]);
 
-const ORDERS_LIVE_TABLES = ["orders"] as const;
+const ORDERS_LIVE_TABLES = ["orders", "order_shipments"] as const;
 
 function parseOrderFilter(value: string | null): OrderFilter {
   if (value && ORDER_FILTERS.has(value as OrderFilter)) return value as OrderFilter;
@@ -245,26 +248,25 @@ function fulfillCopy(action: Exclude<FulfillAction, "shipped">): {
   };
 }
 
-function ShipmentSummary({ order }: { order: SupplierOrder }) {
+function ShipmentSummary({
+  order,
+  onRefresh,
+  refreshing,
+}: {
+  order: SupplierOrder;
+  onRefresh?: (order: SupplierOrder) => void;
+  refreshing?: boolean;
+}) {
   if (!order.shipment) return null;
-  const shipment = order.shipment;
   return (
-    <div className="rounded-lg border border-border/60 bg-muted/30 px-3 py-2 text-xs text-muted-foreground">
-      <p className="font-medium text-foreground">
-        {shipment.carrier} · {shipment.tracking_number}
-      </p>
-      <p className="capitalize">{shipment.status.replaceAll("_", " ")}</p>
-      {shipment.tracking_url ? (
-        <a
-          href={shipment.tracking_url}
-          target="_blank"
-          rel="noreferrer"
-          className="text-primary underline-offset-2 hover:underline"
-        >
-          Open tracking link
-        </a>
-      ) : null}
-    </div>
+    <OrderTrackingPanel
+      shipment={order.shipment}
+      compact
+      refreshing={refreshing}
+      onRefresh={
+        order.shipment.provider === "pathao" && onRefresh ? () => onRefresh(order) : undefined
+      }
+    />
   );
 }
 
@@ -360,7 +362,7 @@ function OrderActions({
           disabled={disabled}
           onClick={() => onTrack(order)}
         >
-          Update tracking
+          {order.shipment?.provider === "pathao" ? "View tracking" : "Update tracking"}
         </Button>
       ) : null}
       {canOpenReturn(order) ? (
@@ -405,6 +407,7 @@ function OrderMobileCard({
   onFulfill,
   onCancel,
   onTrack,
+  onRefreshPathao,
   onReturn,
 }: {
   order: SupplierOrder;
@@ -413,6 +416,7 @@ function OrderMobileCard({
   onFulfill: (order: SupplierOrder, action: FulfillAction) => void;
   onCancel: (order: SupplierOrder) => void;
   onTrack: (order: SupplierOrder) => void;
+  onRefreshPathao: (order: SupplierOrder) => void;
   onReturn: (order: SupplierOrder) => void;
 }) {
   return (
@@ -436,7 +440,7 @@ function OrderMobileCard({
       {order.cancel_requested ? (
         <Badge variant="destructive">Cancel requested by {order.cancellation_initiator}</Badge>
       ) : null}
-      <ShipmentSummary order={order} />
+      <ShipmentSummary order={order} refreshing={busy} onRefresh={onRefreshPathao} />
       <OrderActions
         order={order}
         disabled={busy}
@@ -471,14 +475,17 @@ export function SupplierOrders({ loadOrders = loadSupplierOrders }: SupplierOrde
     action: Exclude<FulfillAction, "shipped">;
   } | null>(null);
   const [shipTarget, setShipTarget] = useState<SupplierOrder | null>(null);
+  const [shipMode, setShipMode] = useState<"pathao" | "manual">("pathao");
   const [shipCarrier, setShipCarrier] = useState<string>(SHIPMENT_CARRIERS[0]);
   const [shipTracking, setShipTracking] = useState("");
   const [shipUrl, setShipUrl] = useState("");
   const [shipNotes, setShipNotes] = useState("");
+  const [shipWeight, setShipWeight] = useState("0.5");
   const [shipErrors, setShipErrors] = useState<{
     carrier?: string;
     tracking?: string;
     url?: string;
+    weight?: string;
   }>({});
   const [trackTarget, setTrackTarget] = useState<SupplierOrder | null>(null);
   const [trackStatus, setTrackStatus] = useState<ShipmentStatus>("in_transit");
@@ -579,10 +586,12 @@ export function SupplierOrders({ loadOrders = loadSupplierOrders }: SupplierOrde
 
   const openFulfill = (order: SupplierOrder, action: FulfillAction) => {
     if (action === "shipped") {
+      setShipMode("pathao");
       setShipCarrier(SHIPMENT_CARRIERS[0]);
       setShipTracking("");
       setShipUrl("");
       setShipNotes("");
+      setShipWeight("0.5");
       setShipErrors({});
       setShipTarget(order);
       return;
@@ -649,6 +658,39 @@ export function SupplierOrders({ loadOrders = loadSupplierOrders }: SupplierOrde
   const confirmShip = () => {
     const order = shipTarget;
     if (!order) return;
+
+    if (shipMode === "pathao") {
+      const weight = Number(shipWeight);
+      if (!Number.isFinite(weight) || weight < 0.5 || weight > 10) {
+        setShipErrors({ weight: "Parcel weight must be between 0.5 and 10 kg." });
+        return;
+      }
+      setShipTarget(null);
+      setBusyId(order.id);
+      void shipSupplierOrderWithPathao(order.id, {
+        itemWeight: weight,
+        notes: shipNotes,
+      })
+        .then((result) => {
+          setNotice({
+            message: `Order #${shortId(order.id)} booked with Pathao · ${result.consignmentId}.`,
+            state: "success",
+          });
+          retry();
+        })
+        .catch((shipError: unknown) => {
+          setNotice({
+            message:
+              shipError instanceof Error
+                ? shipError.message
+                : "Pathao could not book this shipment.",
+            state: "error",
+          });
+        })
+        .finally(() => setBusyId(null));
+      return;
+    }
+
     const carrierError = carrierValidationError(shipCarrier);
     const trackingError = trackingNumberValidationError(shipTracking);
     const urlError = trackingUrlValidationError(shipUrl);
@@ -685,9 +727,36 @@ export function SupplierOrders({ loadOrders = loadSupplierOrders }: SupplierOrde
       .finally(() => setBusyId(null));
   };
 
+  const refreshPathaoTracking = (order: SupplierOrder) => {
+    setBusyId(order.id);
+    void syncPathaoShipment(order.id)
+      .then(() => {
+        setNotice({
+          message: `Pathao status refreshed for #${shortId(order.id)}.`,
+          state: "success",
+        });
+        retry();
+      })
+      .catch((syncError: unknown) => {
+        setNotice({
+          message:
+            syncError instanceof Error
+              ? syncError.message
+              : "Pathao status could not be refreshed.",
+          state: "error",
+        });
+      })
+      .finally(() => setBusyId(null));
+  };
+
   const confirmTrackUpdate = () => {
     const order = trackTarget;
     if (!order) return;
+    if (order.shipment?.provider === "pathao") {
+      setTrackTarget(null);
+      refreshPathaoTracking(order);
+      return;
+    }
     setTrackTarget(null);
     setBusyId(order.id);
     void updateSupplierShipment(order.id, { status: trackStatus })
@@ -918,6 +987,7 @@ export function SupplierOrders({ loadOrders = loadSupplierOrders }: SupplierOrde
                         onFulfill={openFulfill}
                         onCancel={openCancel}
                         onTrack={openTrack}
+                        onRefreshPathao={refreshPathaoTracking}
                         onReturn={openReturn}
                       />
                     ))}
@@ -1033,7 +1103,11 @@ export function SupplierOrders({ loadOrders = loadSupplierOrders }: SupplierOrde
                                   {order.cancellation_reason}
                                 </p>
                               ) : null}
-                              <ShipmentSummary order={order} />
+                              <ShipmentSummary
+                                order={order}
+                                refreshing={busyId === order.id}
+                                onRefresh={refreshPathaoTracking}
+                              />
                               <OrderActions
                                 order={order}
                                 disabled={busyId === order.id}
@@ -1105,60 +1179,115 @@ export function SupplierOrders({ loadOrders = loadSupplierOrders }: SupplierOrde
           <DialogHeader>
             <DialogTitle>Ship order{shipTarget ? ` #${shortId(shipTarget.id)}` : ""}</DialogTitle>
             <DialogDescription>
-              Hand the parcel to the SoukCart delivery partner assigned to collect it. For cash on
-              delivery, the partner collects payment and settles with SoukCart—not with you.
+              Book Pathao pickup by default. Pathao collects COD cash and settles with SoukCart—not
+              with you. Manual carriers remain available as a fallback.
             </DialogDescription>
           </DialogHeader>
           <FieldGroup>
-            <Field data-invalid={shipErrors.carrier ? true : undefined}>
-              <FieldLabel htmlFor="ship-carrier">Carrier</FieldLabel>
-              <Select value={shipCarrier} onValueChange={setShipCarrier}>
-                <SelectTrigger id="ship-carrier" className="w-full">
-                  <SelectValue placeholder="Select carrier" />
+            <Field>
+              <FieldLabel htmlFor="ship-mode">Shipping method</FieldLabel>
+              <Select
+                value={shipMode}
+                onValueChange={(value) => setShipMode(value as "pathao" | "manual")}
+              >
+                <SelectTrigger id="ship-mode" className="w-full">
+                  <SelectValue />
                 </SelectTrigger>
                 <SelectContent>
                   <SelectGroup>
-                    {SHIPMENT_CARRIERS.map((carrier) => (
-                      <SelectItem key={carrier} value={carrier}>
-                        {carrier}
-                      </SelectItem>
-                    ))}
+                    <SelectItem value="pathao">Pathao (recommended)</SelectItem>
+                    <SelectItem value="manual">Manual carrier / tracking</SelectItem>
                   </SelectGroup>
                 </SelectContent>
               </Select>
-              {shipErrors.carrier ? (
-                <p className="text-sm text-destructive">{shipErrors.carrier}</p>
-              ) : null}
             </Field>
-            <Field data-invalid={shipErrors.tracking ? true : undefined}>
-              <FieldLabel htmlFor="ship-tracking">Tracking number</FieldLabel>
-              <Input
-                id="ship-tracking"
-                value={shipTracking}
-                aria-invalid={shipErrors.tracking ? true : undefined}
-                onChange={(event) => {
-                  setShipTracking(event.target.value);
-                  if (event.target.value.trim()) {
-                    setShipErrors((prev) => ({ ...prev, tracking: undefined }));
-                  }
-                }}
-                placeholder="e.g. SF123456789BD"
-              />
-              {shipErrors.tracking ? (
-                <p className="text-sm text-destructive">{shipErrors.tracking}</p>
-              ) : null}
-            </Field>
-            <Field data-invalid={shipErrors.url ? true : undefined}>
-              <FieldLabel htmlFor="ship-url">Tracking URL (optional)</FieldLabel>
-              <Input
-                id="ship-url"
-                value={shipUrl}
-                aria-invalid={shipErrors.url ? true : undefined}
-                onChange={(event) => setShipUrl(event.target.value)}
-                placeholder="https://"
-              />
-              {shipErrors.url ? <p className="text-sm text-destructive">{shipErrors.url}</p> : null}
-            </Field>
+            {shipMode === "pathao" ? (
+              <>
+                {shipTarget?.payment_method === "cod" ? (
+                  <p className="text-sm text-muted-foreground">
+                    COD collect amount: {formatPrice(shipTarget.supplier_total)} (merchandise only;
+                    delivery is already prepaid).
+                  </p>
+                ) : (
+                  <p className="text-sm text-muted-foreground">
+                    Online order — Pathao will deliver with no cash collection.
+                  </p>
+                )}
+                <Field data-invalid={shipErrors.weight ? true : undefined}>
+                  <FieldLabel htmlFor="ship-weight">Parcel weight (kg)</FieldLabel>
+                  <Input
+                    id="ship-weight"
+                    type="number"
+                    min={0.5}
+                    max={10}
+                    step={0.1}
+                    value={shipWeight}
+                    aria-invalid={shipErrors.weight ? true : undefined}
+                    onChange={(event) => {
+                      setShipWeight(event.target.value);
+                      setShipErrors((prev) => ({ ...prev, weight: undefined }));
+                    }}
+                  />
+                  {shipErrors.weight ? (
+                    <p className="text-sm text-destructive">{shipErrors.weight}</p>
+                  ) : null}
+                </Field>
+              </>
+            ) : (
+              <>
+                <Field data-invalid={shipErrors.carrier ? true : undefined}>
+                  <FieldLabel htmlFor="ship-carrier">Carrier</FieldLabel>
+                  <Select value={shipCarrier} onValueChange={setShipCarrier}>
+                    <SelectTrigger id="ship-carrier" className="w-full">
+                      <SelectValue placeholder="Select carrier" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectGroup>
+                        {SHIPMENT_CARRIERS.map((carrier) => (
+                          <SelectItem key={carrier} value={carrier}>
+                            {carrier}
+                          </SelectItem>
+                        ))}
+                      </SelectGroup>
+                    </SelectContent>
+                  </Select>
+                  {shipErrors.carrier ? (
+                    <p className="text-sm text-destructive">{shipErrors.carrier}</p>
+                  ) : null}
+                </Field>
+                <Field data-invalid={shipErrors.tracking ? true : undefined}>
+                  <FieldLabel htmlFor="ship-tracking">Tracking number</FieldLabel>
+                  <Input
+                    id="ship-tracking"
+                    value={shipTracking}
+                    aria-invalid={shipErrors.tracking ? true : undefined}
+                    onChange={(event) => {
+                      setShipTracking(event.target.value);
+                      if (event.target.value.trim()) {
+                        setShipErrors((prev) => ({ ...prev, tracking: undefined }));
+                      }
+                    }}
+                    placeholder="e.g. SF123456789BD"
+                  />
+                  {shipErrors.tracking ? (
+                    <p className="text-sm text-destructive">{shipErrors.tracking}</p>
+                  ) : null}
+                </Field>
+                <Field data-invalid={shipErrors.url ? true : undefined}>
+                  <FieldLabel htmlFor="ship-url">Tracking URL (optional)</FieldLabel>
+                  <Input
+                    id="ship-url"
+                    value={shipUrl}
+                    aria-invalid={shipErrors.url ? true : undefined}
+                    onChange={(event) => setShipUrl(event.target.value)}
+                    placeholder="https://"
+                  />
+                  {shipErrors.url ? (
+                    <p className="text-sm text-destructive">{shipErrors.url}</p>
+                  ) : null}
+                </Field>
+              </>
+            )}
             <Field>
               <FieldLabel htmlFor="ship-notes">Notes (optional)</FieldLabel>
               <Textarea
@@ -1174,7 +1303,7 @@ export function SupplierOrders({ loadOrders = loadSupplierOrders }: SupplierOrde
               Back
             </Button>
             <Button type="button" onClick={confirmShip}>
-              Mark shipped
+              {shipMode === "pathao" ? "Book Pathao shipment" : "Mark shipped"}
             </Button>
           </DialogFooter>
         </DialogContent>
@@ -1189,45 +1318,48 @@ export function SupplierOrders({ loadOrders = loadSupplierOrders }: SupplierOrde
         <DialogContent>
           <DialogHeader>
             <DialogTitle>
-              Update tracking{trackTarget ? ` #${shortId(trackTarget.id)}` : ""}
+              {trackTarget?.shipment?.provider === "pathao" ? "Pathao tracking" : "Update tracking"}
+              {trackTarget ? ` #${shortId(trackTarget.id)}` : ""}
             </DialogTitle>
             <DialogDescription>
-              Record the latest carrier status for this shipment.
+              {trackTarget?.shipment?.provider === "pathao"
+                ? "Pathao updates this timeline automatically. Refresh to pull the latest courier status."
+                : "Record the latest carrier status for this shipment."}
             </DialogDescription>
           </DialogHeader>
-          <FieldGroup>
-            <Field>
-              <FieldLabel htmlFor="track-status">Shipment status</FieldLabel>
-              <Select
-                value={trackStatus}
-                onValueChange={(value) => setTrackStatus(value as ShipmentStatus)}
-              >
-                <SelectTrigger id="track-status" className="w-full">
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectGroup>
-                    <SelectItem value="shipped">Shipped</SelectItem>
-                    <SelectItem value="in_transit">In transit</SelectItem>
-                    <SelectItem value="out_for_delivery">Out for delivery</SelectItem>
-                    <SelectItem value="delivered">Delivered (carrier)</SelectItem>
-                    <SelectItem value="exception">Exception</SelectItem>
-                  </SelectGroup>
-                </SelectContent>
-              </Select>
-            </Field>
-            {trackTarget?.shipment ? (
-              <p className="text-sm text-muted-foreground">
-                Current: {trackTarget.shipment.carrier} · {trackTarget.shipment.tracking_number}
-              </p>
-            ) : null}
-          </FieldGroup>
+          {trackTarget?.shipment ? <OrderTrackingPanel shipment={trackTarget.shipment} /> : null}
+          {trackTarget?.shipment?.provider === "pathao" ? null : (
+            <FieldGroup>
+              <Field>
+                <FieldLabel htmlFor="track-status">Shipment status</FieldLabel>
+                <Select
+                  value={trackStatus}
+                  onValueChange={(value) => setTrackStatus(value as ShipmentStatus)}
+                >
+                  <SelectTrigger id="track-status" className="w-full">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectGroup>
+                      <SelectItem value="shipped">Shipped</SelectItem>
+                      <SelectItem value="in_transit">In transit</SelectItem>
+                      <SelectItem value="out_for_delivery">Out for delivery</SelectItem>
+                      <SelectItem value="delivered">Delivered (carrier)</SelectItem>
+                      <SelectItem value="exception">Exception</SelectItem>
+                    </SelectGroup>
+                  </SelectContent>
+                </Select>
+              </Field>
+            </FieldGroup>
+          )}
           <DialogFooter>
             <Button variant="outline" type="button" onClick={() => setTrackTarget(null)}>
               Back
             </Button>
             <Button type="button" onClick={confirmTrackUpdate}>
-              Save tracking
+              {trackTarget?.shipment?.provider === "pathao"
+                ? "Refresh from Pathao"
+                : "Save tracking"}
             </Button>
           </DialogFooter>
         </DialogContent>

@@ -1,14 +1,5 @@
 import { useNavigate } from "@tanstack/react-router";
-import {
-  Check,
-  House,
-  MessageSquare,
-  Minus,
-  Package,
-  Plus,
-  ShoppingBag,
-  ShoppingCart,
-} from "lucide-react";
+import { Check, Minus, Plus, ShoppingBag, ShoppingCart } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -34,7 +25,7 @@ import {
 import { useProductChanges } from "../../product-realtime.ts";
 import { useSessionSnapshot, useSessionStore } from "../../session.tsx";
 import { formatPrice } from "../workspace/format.ts";
-import { RouterLink, WorkspaceShell } from "../workspace/WorkspaceShell.tsx";
+import { RouterLink } from "../workspace/WorkspaceShell.tsx";
 import {
   cartSupplierConflict,
   filterProducts,
@@ -46,6 +37,7 @@ import {
   type RetailerProduct,
 } from "./retailer-catalog-api.ts";
 import { consumeRetailerNotice } from "./retailer-flash.ts";
+import { RetailerWorkspaceShell } from "./retailer-shared.tsx";
 
 type RetailerCatalogProps = {
   loadProducts?: () => Promise<RetailerProduct[]>;
@@ -84,7 +76,7 @@ export function RetailerCatalog({
   const [notice, setNotice] = useState<Notice>(() => consumeRetailerNotice());
   const [addingId, setAddingId] = useState<string | null>(null);
   const [addedId, setAddedId] = useState<string | null>(null);
-  const [popKey, setPopKey] = useState(0);
+
   const addedTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   const retailerId = state.status === "retailer" ? state.session.user.id : "";
@@ -184,7 +176,6 @@ export function RetailerCatalog({
       await addToCart(retailerId, product.id, wanted);
       setCart((prev) => ({ ...prev, [product.id]: wanted }));
       setQuantities((prev) => ({ ...prev, [product.id]: 1 }));
-      setPopKey((key) => key + 1);
       setAddedId(product.id);
       if (addedTimer.current) clearTimeout(addedTimer.current);
       addedTimer.current = setTimeout(() => {
@@ -204,26 +195,11 @@ export function RetailerCatalog({
   const categories = products ? getCategoryCounts(products) : [];
 
   return (
-    <WorkspaceShell
-      navigationLabel="Retailer navigation"
-      items={[
-        { to: "/retailer", icon: House, label: "Overview" },
-        { to: "/retailer/catalog", icon: ShoppingBag, label: "Place order", active: true },
-        {
-          to: "/retailer/cart",
-          icon: ShoppingCart,
-          label: "Cart",
-          trailing: cartCount ? (
-            <span className="animate-in zoom-in" key={popKey}>
-              {cartCount}
-            </span>
-          ) : undefined,
-        },
-        { to: "/retailer/orders", icon: Package, label: "My orders" },
-        { to: "/retailer/complaints", icon: MessageSquare, label: "Help Center" },
-      ]}
+    <RetailerWorkspaceShell
+      section="catalog"
       userName={userName}
       userEmail={state.profile.email}
+      cartCount={cartCount}
       onLogout={onLogout}
     >
       <PageHeader
@@ -305,7 +281,7 @@ export function RetailerCatalog({
       ) : (
         <LoadingState title="Loading the catalog…" />
       )}
-    </WorkspaceShell>
+    </RetailerWorkspaceShell>
   );
 }
 
