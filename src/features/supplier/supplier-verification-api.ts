@@ -1,9 +1,8 @@
 import { supabase } from "../../supabase.ts";
 
 export const TRADE_LICENSES_BUCKET = "trade-licenses";
-export const MAX_TRADE_LICENSE_BYTES = 5 * 1024 * 1024;
-export const ACCEPTED_TRADE_LICENSE_TYPES = [
-  "application/pdf",
+export const MAX_NID_CARD_BYTES = 5 * 1024 * 1024;
+export const ACCEPTED_NID_CARD_TYPES = [
   "image/png",
   "image/jpeg",
   "image/jpg",
@@ -11,7 +10,7 @@ export const ACCEPTED_TRADE_LICENSE_TYPES = [
 ] as const;
 
 export const SUPPLIER_VERIFICATION_COLUMNS =
-  "user_id, shop_name, shop_details, location, trade_license_path, status, review_note, reviewed_at, created_at, updated_at";
+  "user_id, shop_name, shop_details, location, trade_license_number, nid_front_path, nid_back_path, contact_phone, status, review_note, reviewed_at, created_at, updated_at";
 
 export type VerificationStatus = "pending" | "approved" | "rejected";
 
@@ -20,7 +19,10 @@ export type SupplierVerification = {
   shop_name: string;
   shop_details: string;
   location: string;
-  trade_license_path: string;
+  trade_license_number: string;
+  nid_front_path: string;
+  nid_back_path: string;
+  contact_phone: string;
   status: VerificationStatus;
   review_note: string | null;
   reviewed_at: string | null;
@@ -32,6 +34,23 @@ export type SupplierApplicationInput = {
   shopName: string;
   shopDetails: string;
   location: string;
+  tradeLicenseNumber: string;
+  contactPhone: string;
+};
+
+export type SupplierApplicationFiles = {
+  nidFront: File | null;
+  nidBack: File | null;
+};
+
+export type ExistingSupplierDocuments = {
+  nidFront: boolean;
+  nidBack: boolean;
+};
+
+export type SupplierApplicationDocuments = {
+  nidFrontPath: string;
+  nidBackPath: string;
 };
 
 /** The screen a seller should see, derived from their application row. */
@@ -44,25 +63,47 @@ export function resolveSupplierGate(verification: SupplierVerification | null): 
   return "pending";
 }
 
-export function tradeLicenseValidationError(file: File | null): string | null {
-  if (!file) return "Attach your trade licence to continue.";
-  if (!(ACCEPTED_TRADE_LICENSE_TYPES as readonly string[]).includes(file.type)) {
-    return "Upload the trade licence as a PDF or an image (PNG, JPG, or WebP).";
+export function nidCardValidationError(file: File | null, side: "front" | "back"): string | null {
+  const label = side === "front" ? "front" : "back";
+  if (!file) return `Attach the ${label} of your NID card to continue.`;
+  if (!(ACCEPTED_NID_CARD_TYPES as readonly string[]).includes(file.type)) {
+    return `Upload the NID card ${label} as an image (PNG, JPG, or WebP).`;
   }
-  if (file.size > MAX_TRADE_LICENSE_BYTES) {
-    return "The trade licence must be 5 MB or smaller.";
+  if (file.size > MAX_NID_CARD_BYTES) {
+    return `The NID card ${label} must be 5 MB or smaller.`;
   }
   return null;
 }
 
+export function tradeLicenseNumberValidationError(value: string): string | null {
+  const number = value.trim();
+  if (number.length < 4 || number.length > 60) {
+    return "Enter your trade licence number (4–60 characters).";
+  }
+  return null;
+}
+
+export function contactPhoneValidationError(value: string): string | null {
+  const digits = value.replace(/\D/g, "");
+  if (digits.length < 10 || digits.length > 15) {
+    return "Enter a valid contact phone number.";
+  }
+  return null;
+}
+
+const NO_EXISTING_DOCUMENTS: ExistingSupplierDocuments = {
+  nidFront: false,
+  nidBack: false,
+};
+
 /**
- * Validates the whole onboarding submission. `hasExistingLicense` lets a seller
- * resubmit after a rejection without re-uploading the same document.
+ * Validates the whole onboarding submission. `existing` lets a seller
+ * resubmit after a rejection without re-uploading documents that are already on file.
  */
 export function applicationValidationError(
   input: SupplierApplicationInput,
-  file: File | null,
-  hasExistingLicense = false,
+  files: SupplierApplicationFiles,
+  existing: ExistingSupplierDocuments = NO_EXISTING_DOCUMENTS,
 ): string | null {
   const shopName = input.shopName.trim();
   const shopDetails = input.shopDetails.trim();
@@ -77,10 +118,29 @@ export function applicationValidationError(
   if (location.length < 2 || location.length > 200) {
     return "Enter your shop location (2–200 characters).";
   }
-  if (!file && !hasExistingLicense) {
-    return "Attach your trade licence to continue.";
+
+  const licenseNumberError = tradeLicenseNumberValidationError(input.tradeLicenseNumber);
+  if (licenseNumberError) return licenseNumberError;
+
+  const phoneError = contactPhoneValidationError(input.contactPhone);
+  if (phoneError) return phoneError;
+
+  if (!files.nidFront && !existing.nidFront) {
+    return "Attach the front of your NID card to continue.";
   }
-  if (file) return tradeLicenseValidationError(file);
+  if (files.nidFront) {
+    const nidFrontError = nidCardValidationError(files.nidFront, "front");
+    if (nidFrontError) return nidFrontError;
+  }
+
+  if (!files.nidBack && !existing.nidBack) {
+    return "Attach the back of your NID card to continue.";
+  }
+  if (files.nidBack) {
+    const nidBackError = nidCardValidationError(files.nidBack, "back");
+    if (nidBackError) return nidBackError;
+  }
+
   return null;
 }
 
@@ -119,8 +179,12 @@ export async function loadSupplierVerification(
   return data ?? null;
 }
 
-export async function uploadTradeLicense(userId: string, file: File): Promise<string> {
-  const validationError = tradeLicenseValidationError(file);
+export async function uploadSupplierDocument(
+  userId: string,
+  file: File,
+  kind: "nid-front" | "nid-back",
+): Promise<string> {
+  const validationError = nidCardValidationError(file, kind === "nid-front" ? "front" : "back");
   if (validationError) throw new Error(validationError);
 
   const extension = fileExtension(file);
@@ -128,14 +192,17 @@ export async function uploadTradeLicense(userId: string, file: File): Promise<st
   const { error } = await supabase.storage
     .from(TRADE_LICENSES_BUCKET)
     .upload(objectPath, file, { contentType: file.type, cacheControl: "3600", upsert: false });
-  if (error) throw new Error(`The trade licence could not be uploaded. ${error.message}`);
+  if (error) {
+    const label = kind === "nid-front" ? "NID card front" : "NID card back";
+    throw new Error(`The ${label} could not be uploaded. ${error.message}`);
+  }
   return objectPath;
 }
 
 export async function submitSupplierApplication(
   userId: string,
   input: SupplierApplicationInput,
-  tradeLicensePath: string,
+  documents: SupplierApplicationDocuments,
   gateway: SupplierVerificationGateway = verificationGateway,
 ): Promise<void> {
   const { error } = await gateway.from("supplier_profiles").upsert(
@@ -144,7 +211,10 @@ export async function submitSupplierApplication(
       shop_name: input.shopName.trim(),
       shop_details: input.shopDetails.trim(),
       location: input.location.trim(),
-      trade_license_path: tradeLicensePath,
+      trade_license_number: input.tradeLicenseNumber.trim(),
+      nid_front_path: documents.nidFrontPath,
+      nid_back_path: documents.nidBackPath,
+      contact_phone: input.contactPhone.trim(),
       status: "pending",
       review_note: null,
       reviewed_by: null,
@@ -156,7 +226,6 @@ export async function submitSupplierApplication(
 }
 
 function fileExtension(file: File): string {
-  if (file.type === "application/pdf") return "pdf";
   const subtype = file.type.split("/")[1] ?? "";
   if (subtype) return subtype.replace("jpeg", "jpg");
   const nameExt = file.name.split(".").pop();

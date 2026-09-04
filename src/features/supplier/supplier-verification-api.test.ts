@@ -1,11 +1,15 @@
 import { describe, expect, it } from "vite-plus/test";
 import {
   applicationValidationError,
+  contactPhoneValidationError,
   loadSupplierVerification,
+  nidCardValidationError,
   resolveSupplierGate,
   submitSupplierApplication,
   SUPPLIER_VERIFICATION_COLUMNS,
-  tradeLicenseValidationError,
+  tradeLicenseNumberValidationError,
+  type SupplierApplicationFiles,
+  type SupplierApplicationInput,
   type SupplierVerification,
   type SupplierVerificationGateway,
 } from "./supplier-verification-api.ts";
@@ -16,7 +20,10 @@ function verification(overrides: Partial<SupplierVerification> = {}): SupplierVe
     shop_name: "Rahman Traders",
     shop_details: "Wholesale rice and pulses since 2004.",
     location: "Karwan Bazar, Dhaka",
-    trade_license_path: "seller-1/licence.pdf",
+    trade_license_number: "TRAD/DNCC/1234/2024",
+    nid_front_path: "seller-1/nid-front.jpg",
+    nid_back_path: "seller-1/nid-back.jpg",
+    contact_phone: "01712345678",
     status: "pending",
     review_note: null,
     reviewed_at: null,
@@ -26,14 +33,21 @@ function verification(overrides: Partial<SupplierVerification> = {}): SupplierVe
   };
 }
 
-function licenseFile(type = "application/pdf", size = 1024): File {
-  return { type, size, name: "licence.pdf" } as unknown as File;
+function nidFile(name = "nid-front.jpg", type = "image/jpeg", size = 1024): File {
+  return { type, size, name } as unknown as File;
 }
 
-const validInput = {
+const validInput: SupplierApplicationInput = {
   shopName: "Rahman Traders",
   shopDetails: "Wholesale rice and pulses since 2004.",
   location: "Karwan Bazar, Dhaka",
+  tradeLicenseNumber: "TRAD/DNCC/1234/2024",
+  contactPhone: "01712345678",
+};
+
+const validFiles: SupplierApplicationFiles = {
+  nidFront: nidFile("nid-front.jpg"),
+  nidBack: nidFile("nid-back.jpg"),
 };
 
 describe("supplier verification gate", () => {
@@ -47,32 +61,64 @@ describe("supplier verification gate", () => {
 
 describe("supplier application validation", () => {
   it("accepts a complete first-time submission", () => {
-    expect(applicationValidationError(validInput, licenseFile())).toBeNull();
+    expect(applicationValidationError(validInput, validFiles)).toBeNull();
   });
 
   it("requires shop name, details, and location", () => {
-    expect(applicationValidationError({ ...validInput, shopName: "" }, licenseFile())).toMatch(
+    expect(applicationValidationError({ ...validInput, shopName: "" }, validFiles)).toMatch(
       /shop name/i,
     );
-    expect(
-      applicationValidationError({ ...validInput, shopDetails: "short" }, licenseFile()),
-    ).toMatch(/detail/i);
-    expect(applicationValidationError({ ...validInput, location: "" }, licenseFile())).toMatch(
+    expect(applicationValidationError({ ...validInput, shopDetails: "short" }, validFiles)).toMatch(
+      /detail/i,
+    );
+    expect(applicationValidationError({ ...validInput, location: "" }, validFiles)).toMatch(
       /location/i,
     );
   });
 
-  it("requires a trade licence unless one was already uploaded", () => {
-    expect(applicationValidationError(validInput, null)).toMatch(/trade licence/i);
-    expect(applicationValidationError(validInput, null, true)).toBeNull();
+  it("requires a trade licence number", () => {
+    expect(tradeLicenseNumberValidationError("")).toMatch(/trade licence number/i);
+    expect(tradeLicenseNumberValidationError("ab")).toMatch(/trade licence number/i);
+    expect(tradeLicenseNumberValidationError("TRAD/DNCC/1234/2024")).toBeNull();
+    expect(
+      applicationValidationError({ ...validInput, tradeLicenseNumber: "ab" }, validFiles),
+    ).toMatch(/trade licence number/i);
   });
 
-  it("rejects unsupported or oversized trade licences", () => {
-    expect(tradeLicenseValidationError(null)).toMatch(/trade licence/i);
-    expect(tradeLicenseValidationError(licenseFile("text/csv"))).toMatch(/PDF or an image/i);
-    expect(tradeLicenseValidationError(licenseFile("application/pdf", 6 * 1024 * 1024))).toMatch(
-      /5 MB/i,
+  it("requires a contact phone number", () => {
+    expect(contactPhoneValidationError("")).toMatch(/phone/i);
+    expect(contactPhoneValidationError("123")).toMatch(/phone/i);
+    expect(contactPhoneValidationError("01712 345 678")).toBeNull();
+    expect(contactPhoneValidationError("+8801712345678")).toBeNull();
+    expect(applicationValidationError({ ...validInput, contactPhone: "12" }, validFiles)).toMatch(
+      /phone/i,
     );
+  });
+
+  it("requires NID front and back unless they were already uploaded", () => {
+    expect(applicationValidationError(validInput, { ...validFiles, nidFront: null })).toMatch(
+      /front of your NID/i,
+    );
+    expect(applicationValidationError(validInput, { ...validFiles, nidBack: null })).toMatch(
+      /back of your NID/i,
+    );
+    expect(
+      applicationValidationError(
+        validInput,
+        { nidFront: null, nidBack: null },
+        { nidFront: true, nidBack: true },
+      ),
+    ).toBeNull();
+  });
+
+  it("rejects unsupported or oversized NID card photos", () => {
+    expect(nidCardValidationError(null, "front")).toMatch(/front of your NID/i);
+    expect(nidCardValidationError(nidFile("nid.pdf", "application/pdf"), "back")).toMatch(
+      /NID card back as an image/i,
+    );
+    expect(
+      nidCardValidationError(nidFile("nid.jpg", "image/jpeg", 6 * 1024 * 1024), "front"),
+    ).toMatch(/5 MB/i);
   });
 });
 
@@ -121,8 +167,17 @@ describe("supplier verification queries", () => {
 
     await submitSupplierApplication(
       "seller-1",
-      { shopName: "  Rahman Traders  ", shopDetails: "  Wholesale rice.  ", location: "  Dhaka  " },
-      "seller-1/licence.pdf",
+      {
+        shopName: "  Rahman Traders  ",
+        shopDetails: "  Wholesale rice.  ",
+        location: "  Dhaka  ",
+        tradeLicenseNumber: "  TRAD/DNCC/1234/2024  ",
+        contactPhone: "  01712345678  ",
+      },
+      {
+        nidFrontPath: "seller-1/nid-front.jpg",
+        nidBackPath: "seller-1/nid-back.jpg",
+      },
       gateway,
     );
 
@@ -132,7 +187,10 @@ describe("supplier verification queries", () => {
         shop_name: "Rahman Traders",
         shop_details: "Wholesale rice.",
         location: "Dhaka",
-        trade_license_path: "seller-1/licence.pdf",
+        trade_license_number: "TRAD/DNCC/1234/2024",
+        nid_front_path: "seller-1/nid-front.jpg",
+        nid_back_path: "seller-1/nid-back.jpg",
+        contact_phone: "01712345678",
         status: "pending",
         review_note: null,
         reviewed_by: null,

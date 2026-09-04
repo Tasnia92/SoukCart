@@ -9,6 +9,8 @@ export type AdminSupplierVerification = {
   shop_name: string;
   shop_details: string;
   location: string;
+  trade_license_number: string;
+  contact_phone: string;
   status: VerificationStatus;
   review_note: string | null;
   reviewed_at: string | null;
@@ -16,8 +18,10 @@ export type AdminSupplierVerification = {
   updated_at: string;
   supplier_name: string;
   supplier_email: string;
-  /** Short-lived signed URL for the trade licence, or null if it could not be signed. */
-  trade_license_url: string | null;
+  /** Short-lived signed URL for the NID card front. */
+  nid_front_url: string | null;
+  /** Short-lived signed URL for the NID card back. */
+  nid_back_url: string | null;
 };
 
 type VerificationsResponse = {
@@ -87,6 +91,8 @@ export function filterVerifications(
       verification.shop_name,
       verification.shop_details,
       verification.location,
+      verification.trade_license_number,
+      verification.contact_phone,
       verification.supplier_name,
       verification.supplier_email,
     ]

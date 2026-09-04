@@ -32,7 +32,12 @@ export type ProductPayload = {
   category: string | null;
 };
 
-export type ProductValidationOptions = { allowZeroStock?: boolean };
+export type ProductValidationOptions = {
+  allowZeroStock?: boolean;
+  requireImage?: boolean;
+  imageUrl?: string | null;
+  hasImageFile?: boolean;
+};
 
 export function productValidationError(
   payload: ProductPayload,
@@ -52,6 +57,9 @@ export function productValidationError(
   }
   if (!options.allowZeroStock && payload.stock < payload.min_order_qty) {
     return "Stock must be at least the minimum order quantity.";
+  }
+  if (options.requireImage && !options.hasImageFile && !options.imageUrl?.trim()) {
+    return "Please add a product image.";
   }
   return null;
 }
@@ -147,7 +155,7 @@ export async function createSupplierProduct(
   payload: ProductPayload,
   imageUrl: string | null,
 ): Promise<void> {
-  assertValidProduct(payload);
+  assertValidProduct(payload, { requireImage: true, imageUrl });
   const { error } = await supabase.from("products").insert({
     ...payload,
     seller_id: sellerId,
@@ -163,7 +171,7 @@ export async function updateSupplierProduct(
   payload: ProductPayload,
   imageUrl: string | null,
 ): Promise<void> {
-  assertValidProduct(payload, { allowZeroStock: true });
+  assertValidProduct(payload, { allowZeroStock: true, requireImage: true, imageUrl });
   const { error } = await supabase
     .from("products")
     .update({ ...payload, image_url: imageUrl })

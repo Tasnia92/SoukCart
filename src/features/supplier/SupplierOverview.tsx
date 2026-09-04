@@ -3,6 +3,7 @@ import { useCallback, useEffect, useState } from "react";
 import {
   Activity,
   ArrowRight,
+  BadgeCheck,
   Check,
   Clock,
   Layers,
@@ -12,6 +13,7 @@ import {
   Store,
   Wallet,
 } from "lucide-react";
+import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import {
@@ -37,14 +39,14 @@ import { useProductChanges } from "../../product-realtime.ts";
 import { useSessionSnapshot, useSessionStore } from "../../session.tsx";
 import { PaymentBadge, shortId, StatusBadge } from "../orders/order-presentation.tsx";
 import { firstName, formatDate, formatPrice } from "../workspace/format.ts";
-import { RouterLink, WorkspaceShell } from "../workspace/WorkspaceShell.tsx";
+import { RouterLink } from "../workspace/WorkspaceShell.tsx";
 import {
   loadSupplierDashboard,
   LOW_STOCK_THRESHOLD,
   type SupplierDashboard,
   type SupplierQueueOrder,
 } from "./supplier-dashboard-api.ts";
-import { consumeSupplierNotice, ProductThumb, supplierNavItems } from "./supplier-shared.tsx";
+import { consumeSupplierNotice, ProductThumb, SupplierWorkspaceShell } from "./supplier-shared.tsx";
 
 type SupplierOverviewProps = {
   loadDashboard?: (sellerId: string) => Promise<SupplierDashboard>;
@@ -203,15 +205,22 @@ export function SupplierOverview({ loadDashboard = loadSupplierDashboard }: Supp
   const period = `Last ${dashboard?.windowDays ?? 30} days`;
 
   return (
-    <WorkspaceShell
-      navigationLabel="Supplier navigation"
-      items={supplierNavItems("overview")}
+    <SupplierWorkspaceShell
+      section="overview"
       userName={userName}
       userEmail={state.profile.email}
       onLogout={onLogout}
     >
       <PageHeader
-        title={<>Good to see you, {firstName(userName)}.</>}
+        title={
+          <span className="inline-flex flex-wrap items-center gap-2">
+            <span>Good to see you, {firstName(userName)}.</span>
+            <Badge>
+              <BadgeCheck data-icon="inline-start" />
+              Verified
+            </Badge>
+          </span>
+        }
         copy="Confirm and ship what is waiting, restock what is running out, and see which products are carrying your sales."
         actions={
           <>
@@ -230,6 +239,14 @@ export function SupplierOverview({ loadDashboard = loadSupplierDashboard }: Supp
           </>
         }
       />
+      <Alert>
+        <BadgeCheck />
+        <AlertTitle>Your shop is verified</AlertTitle>
+        <AlertDescription>
+          {userName} is a verified SoukCart seller. You can list products and fulfill retailer
+          orders.
+        </AlertDescription>
+      </Alert>
       <InlineNotice message={notice?.message} state={notice?.state} />
 
       {dashboard && summary ? (
@@ -431,6 +448,6 @@ export function SupplierOverview({ loadDashboard = loadSupplierDashboard }: Supp
       ) : (
         <DashboardSkeleton label="Loading your workspace…" />
       )}
-    </WorkspaceShell>
+    </SupplierWorkspaceShell>
   );
 }

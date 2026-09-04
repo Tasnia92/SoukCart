@@ -1,15 +1,16 @@
 /* -----------------------------------------------------------------------------
  * SupplierGate — stands in front of the supplier workspace.
  *
- * A seller must submit their shop details + trade licence and be approved by an
- * admin before they can use the supplier tools. This gate loads the seller's
- * application and shows the right screen: the onboarding form (first time or
- * after a rejection), a "waiting for review" screen while pending, or the real
+ * A seller must submit their shop details, contact info, trade licence number,
+ * and both sides of their NID card, then be approved by an admin before they
+ * can use the supplier tools. This gate loads the seller's application and
+ * shows the right screen: the onboarding form (first time or after a
+ * rejection), a "waiting for review" screen while pending, or the real
  * workspace once approved.
  * -------------------------------------------------------------------------- */
 
-import { useEffect, useRef, useState, type FormEvent, type ReactNode } from "react";
-import { Clock, MessageSquare, RefreshCw, ShieldCheck, type LucideIcon } from "lucide-react";
+import { useEffect, useRef, useState, type FormEvent, type ReactNode, type RefObject } from "react";
+import { Clock, CreditCard, IdCard, MessageSquare, RefreshCw, type LucideIcon } from "lucide-react";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { Button } from "@/components/ui/button";
 import {
@@ -20,7 +21,14 @@ import {
   CardHeader,
   CardTitle,
 } from "@/components/ui/card";
-import { Field, FieldGroup, FieldLabel, FieldLegend, FieldSet } from "@/components/ui/field";
+import {
+  Field,
+  FieldDescription,
+  FieldGroup,
+  FieldLabel,
+  FieldLegend,
+  FieldSet,
+} from "@/components/ui/field";
 import { Input } from "@/components/ui/input";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Textarea } from "@/components/ui/textarea";
@@ -32,7 +40,7 @@ import {
   loadSupplierVerification,
   resolveSupplierGate,
   submitSupplierApplication,
-  uploadTradeLicense,
+  uploadSupplierDocument,
   type SupplierVerification,
 } from "./supplier-verification-api.ts";
 
@@ -100,24 +108,78 @@ function StatusPanel({
   );
 }
 
+function DocumentField({
+  id,
+  name,
+  label,
+  description,
+  fileName,
+  icon: Icon,
+  accept,
+  inputRef,
+  onFileChange,
+}: {
+  id: string;
+  name: string;
+  label: string;
+  description: string;
+  fileName: string | null;
+  icon: LucideIcon;
+  accept: string;
+  inputRef: RefObject<HTMLInputElement | null>;
+  onFileChange: (event: FormEvent<HTMLInputElement>) => void;
+}) {
+  return (
+    <Field>
+      <FieldLabel htmlFor={id}>{label}</FieldLabel>
+      <label
+        htmlFor={id}
+        className="flex cursor-pointer flex-col items-center justify-center gap-2 rounded-lg border border-dashed p-6 text-center"
+      >
+        <Icon aria-hidden="true" />
+        <span className="font-medium">{fileName ?? `Upload ${label.toLowerCase()}`}</span>
+        <span className="text-sm text-muted-foreground">{description}</span>
+      </label>
+      <input
+        id={id}
+        ref={inputRef}
+        className="sr-only"
+        type="file"
+        name={name}
+        accept={accept}
+        onChange={onFileChange}
+      />
+    </Field>
+  );
+}
+
 function OnboardingForm({
   userId,
+  email,
   verification,
   onSubmitted,
 }: {
   userId: string;
+  email: string;
   verification: SupplierVerification | null;
   onSubmitted: () => void;
 }) {
   const isResubmit = verification?.status === "rejected";
   const [feedback, setFeedback] = useState<Feedback>(null);
   const [submitting, setSubmitting] = useState(false);
-  const [fileName, setFileName] = useState<string | null>(null);
-  const fileInputRef = useRef<HTMLInputElement>(null);
+  const [fileNames, setFileNames] = useState<{
+    nidFront: string | null;
+    nidBack: string | null;
+  }>({
+    nidFront: null,
+    nidBack: null,
+  });
+  const nidFrontRef = useRef<HTMLInputElement>(null);
+  const nidBackRef = useRef<HTMLInputElement>(null);
 
-  const onFileChange = (event: FormEvent<HTMLInputElement>) => {
+  const onFileChange = (key: "nidFront" | "nidBack") => (event: FormEvent<HTMLInputElement>) => {
     const file = event.currentTarget.files?.[0] ?? null;
-    setFileName(file?.name ?? null);
+    setFileNames((current) => ({ ...current, [key]: file?.name ?? null }));
   };
 
   const onSubmit = async (event: FormEvent<HTMLFormElement>) => {
@@ -130,11 +192,19 @@ function OnboardingForm({
       shopName: readText(formData, "shopName"),
       shopDetails: readText(formData, "shopDetails"),
       location: readText(formData, "location"),
+      tradeLicenseNumber: readText(formData, "tradeLicenseNumber"),
+      contactPhone: readText(formData, "contactPhone"),
     };
-    const file = fileInputRef.current?.files?.[0] ?? null;
-    const hasExistingLicense = Boolean(verification?.trade_license_path);
+    const files = {
+      nidFront: nidFrontRef.current?.files?.[0] ?? null,
+      nidBack: nidBackRef.current?.files?.[0] ?? null,
+    };
+    const existing = {
+      nidFront: Boolean(verification?.nid_front_path),
+      nidBack: Boolean(verification?.nid_back_path),
+    };
 
-    const validationMessage = applicationValidationError(input, file, hasExistingLicense);
+    const validationMessage = applicationValidationError(input, files, existing);
     if (validationMessage) {
       setFeedback({ message: validationMessage, state: "error" });
       return;
@@ -142,12 +212,19 @@ function OnboardingForm({
 
     setSubmitting(true);
     try {
-      let licensePath = verification?.trade_license_path ?? "";
-      if (file) {
-        setFeedback({ message: "Uploading trade licence…", state: "info" });
-        licensePath = await uploadTradeLicense(userId, file);
-      }
-      await submitSupplierApplication(userId, input, licensePath);
+      setFeedback({ message: "Uploading your documents…", state: "info" });
+      const [nidFrontPath, nidBackPath] = await Promise.all([
+        files.nidFront
+          ? uploadSupplierDocument(userId, files.nidFront, "nid-front")
+          : Promise.resolve(verification?.nid_front_path ?? ""),
+        files.nidBack
+          ? uploadSupplierDocument(userId, files.nidBack, "nid-back")
+          : Promise.resolve(verification?.nid_back_path ?? ""),
+      ]);
+      await submitSupplierApplication(userId, input, {
+        nidFrontPath,
+        nidBackPath,
+      });
       onSubmitted();
     } catch (submitError) {
       setFeedback({
@@ -161,6 +238,9 @@ function OnboardingForm({
     }
   };
 
+  const keepCurrentHint = (hasExisting: boolean, kind: string) =>
+    isResubmit && hasExisting ? `Leave empty to keep your current ${kind}` : undefined;
+
   return (
     <>
       <header className="flex flex-col gap-2">
@@ -169,8 +249,8 @@ function OnboardingForm({
           {isResubmit ? "Update your application." : "Tell us about your shop."}
         </h1>
         <p className="text-muted-foreground">
-          Add your shop details and trade licence. Our team reviews every supplier before your
-          storefront goes live.
+          Add your shop details, contact info, trade licence number, and both sides of your NID
+          card. Our team reviews every supplier before your storefront goes live.
         </p>
       </header>
 
@@ -181,22 +261,20 @@ function OnboardingForm({
               <strong>Reason:</strong> {verification.review_note}
             </p>
           ) : (
-            <p>Please review your shop details and trade licence, then resubmit.</p>
+            <p>Please review your shop details and documents, then resubmit.</p>
           )}
         </StatusPanel>
       ) : null}
 
-      <form onSubmit={onSubmit} noValidate>
+      <form onSubmit={onSubmit} noValidate className="flex flex-col gap-6">
         <Card>
           <CardHeader>
             <CardTitle>Shop details</CardTitle>
-            <CardDescription>
-              Tell retailers who you are and provide a valid trade licence for review.
-            </CardDescription>
+            <CardDescription>Tell retailers who you are and where you trade from.</CardDescription>
           </CardHeader>
           <CardContent>
             <FieldSet>
-              <FieldLegend className="sr-only">Supplier application</FieldLegend>
+              <FieldLegend className="sr-only">Shop details</FieldLegend>
               <FieldGroup>
                 <Field>
                   <FieldLabel htmlFor="supplier-shop-name">Shop name</FieldLabel>
@@ -234,30 +312,99 @@ function OnboardingForm({
                     required
                   />
                 </Field>
+              </FieldGroup>
+            </FieldSet>
+          </CardContent>
+        </Card>
+
+        <Card>
+          <CardHeader>
+            <CardTitle>Contact info</CardTitle>
+            <CardDescription>
+              We use this to reach you about your application and orders.
+            </CardDescription>
+          </CardHeader>
+          <CardContent>
+            <FieldSet>
+              <FieldLegend className="sr-only">Contact info</FieldLegend>
+              <FieldGroup>
                 <Field>
-                  <FieldLabel htmlFor="supplier-trade-license">Trade licence</FieldLabel>
-                  <label
-                    htmlFor="supplier-trade-license"
-                    className="flex cursor-pointer flex-col items-center justify-center gap-2 rounded-lg border border-dashed p-6 text-center"
-                  >
-                    <ShieldCheck aria-hidden="true" />
-                    <span className="font-medium">{fileName ?? "Upload your trade licence"}</span>
-                    <span className="text-sm text-muted-foreground">
-                      {isResubmit && verification?.trade_license_path
-                        ? "PDF or image up to 5 MB — leave empty to keep your current file"
-                        : "PDF or image (PNG, JPG, WebP), up to 5 MB"}
-                    </span>
-                  </label>
-                  <input
-                    id="supplier-trade-license"
-                    ref={fileInputRef}
-                    className="sr-only"
-                    type="file"
-                    name="tradeLicense"
-                    accept="application/pdf,image/png,image/jpeg,image/webp"
-                    onChange={onFileChange}
+                  <FieldLabel htmlFor="supplier-contact-email">Email</FieldLabel>
+                  <Input id="supplier-contact-email" type="email" value={email} readOnly />
+                  <FieldDescription>This is the email you signed in with.</FieldDescription>
+                </Field>
+                <Field>
+                  <FieldLabel htmlFor="supplier-contact-phone">Phone</FieldLabel>
+                  <Input
+                    id="supplier-contact-phone"
+                    name="contactPhone"
+                    type="tel"
+                    inputMode="tel"
+                    maxLength={20}
+                    placeholder="01XXXXXXXXX"
+                    defaultValue={verification?.contact_phone ?? ""}
+                    required
+                  />
+                  <FieldDescription>A mobile number we can reach you on.</FieldDescription>
+                </Field>
+              </FieldGroup>
+            </FieldSet>
+          </CardContent>
+        </Card>
+
+        <Card>
+          <CardHeader>
+            <CardTitle>Identity documents</CardTitle>
+            <CardDescription>
+              Enter your trade licence number and attach both sides of your NID card.
+            </CardDescription>
+          </CardHeader>
+          <CardContent>
+            <FieldSet>
+              <FieldLegend className="sr-only">Identity documents</FieldLegend>
+              <FieldGroup>
+                <Field>
+                  <FieldLabel htmlFor="supplier-trade-license-number">
+                    Trade licence number
+                  </FieldLabel>
+                  <Input
+                    id="supplier-trade-license-number"
+                    name="tradeLicenseNumber"
+                    type="text"
+                    maxLength={60}
+                    placeholder="e.g. TRAD/DNCC/1234/2024"
+                    defaultValue={verification?.trade_license_number ?? ""}
+                    required
                   />
                 </Field>
+                <DocumentField
+                  id="supplier-nid-front"
+                  name="nidFront"
+                  label="NID card front"
+                  description={
+                    keepCurrentHint(Boolean(verification?.nid_front_path), "photo") ??
+                    "Photo of the front of your national ID, up to 5 MB"
+                  }
+                  fileName={fileNames.nidFront}
+                  icon={IdCard}
+                  accept="image/png,image/jpeg,image/webp"
+                  inputRef={nidFrontRef}
+                  onFileChange={onFileChange("nidFront")}
+                />
+                <DocumentField
+                  id="supplier-nid-back"
+                  name="nidBack"
+                  label="NID card back"
+                  description={
+                    keepCurrentHint(Boolean(verification?.nid_back_path), "photo") ??
+                    "Photo of the back of your national ID, up to 5 MB"
+                  }
+                  fileName={fileNames.nidBack}
+                  icon={CreditCard}
+                  accept="image/png,image/jpeg,image/webp"
+                  inputRef={nidBackRef}
+                  onFileChange={onFileChange("nidBack")}
+                />
               </FieldGroup>
             </FieldSet>
           </CardContent>
@@ -299,8 +446,9 @@ function PendingScreen({
           Your application is under review.
         </h1>
         <p className="text-muted-foreground">
-          Thanks, {verification.shop_name}. An admin is reviewing your shop details and trade
-          licence. We&apos;ll unlock your supplier workspace as soon as you&apos;re approved.
+          Thanks, {verification.shop_name}. An admin is reviewing your shop details, contact info,
+          trade licence number, and NID card. We&apos;ll unlock your supplier workspace as soon as
+          you&apos;re approved.
         </p>
       </header>
 
@@ -414,7 +562,12 @@ export function SupplierGate({ children, load = loadSupplierVerification }: Supp
 
   return (
     <GateFrame email={email} onLogout={onLogout}>
-      <OnboardingForm userId={sellerId} verification={verification} onSubmitted={reload} />
+      <OnboardingForm
+        userId={sellerId}
+        email={email}
+        verification={verification}
+        onSubmitted={reload}
+      />
     </GateFrame>
   );
 }

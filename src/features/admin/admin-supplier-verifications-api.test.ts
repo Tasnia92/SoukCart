@@ -18,6 +18,8 @@ function verification(
     shop_name: "Rahman Traders",
     shop_details: "Wholesale rice and pulses.",
     location: "Karwan Bazar, Dhaka",
+    trade_license_number: "TRAD/DNCC/1234/2024",
+    contact_phone: "01712345678",
     status: "pending",
     review_note: null,
     reviewed_at: null,
@@ -25,7 +27,8 @@ function verification(
     updated_at: "2026-09-01T09:00:00.000Z",
     supplier_name: "Abdur Rahman",
     supplier_email: "rahman@example.com",
-    trade_license_url: "https://signed.example/licence.pdf",
+    nid_front_url: "https://signed.example/nid-front.jpg",
+    nid_back_url: "https://signed.example/nid-back.jpg",
     ...overrides,
   };
 }
@@ -71,19 +74,23 @@ describe("admin supplier verifications API", () => {
     ]);
   });
 
-  it("filters by shop, supplier, and location text", () => {
+  it("filters by shop, supplier, location, phone, and trade licence number", () => {
     const rows = [
-      verification({ user_id: "a", shop_name: "Rahman Traders" }),
+      verification({ user_id: "a", shop_name: "Rahman Traders", contact_phone: "01711111111" }),
       verification({
         user_id: "b",
         shop_name: "City Grocers",
         location: "Chittagong",
         supplier_name: "Karim Uddin",
         supplier_email: "karim@example.com",
+        contact_phone: "01822222222",
+        trade_license_number: "TRAD/CCC/9999/2024",
       }),
     ];
     expect(filterVerifications(rows, "chittagong").map((row) => row.user_id)).toEqual(["b"]);
     expect(filterVerifications(rows, "rahman").map((row) => row.user_id)).toEqual(["a"]);
+    expect(filterVerifications(rows, "01711111111").map((row) => row.user_id)).toEqual(["a"]);
+    expect(filterVerifications(rows, "TRAD/DNCC/1234").map((row) => row.user_id)).toEqual(["a"]);
     expect(filterVerifications(rows, "")).toHaveLength(2);
   });
 

@@ -86,6 +86,8 @@ type WorkspaceShellProps = {
   items: WorkspaceNavItem[];
   userName: string;
   userEmail: string;
+  /** When true, the signed-in name shows a verified checkmark (approved sellers). */
+  verified?: boolean;
   onLogout: () => void;
   children: ReactNode;
 };
@@ -329,6 +331,7 @@ export function WorkspaceShell({
   items,
   userName,
   userEmail,
+  verified = false,
   onLogout,
   children,
 }: WorkspaceShellProps) {
@@ -363,7 +366,12 @@ export function WorkspaceShell({
             </SidebarGroup>
           </SidebarContent>
           <SidebarFooter>
-            <NavUser userName={userName} userEmail={userEmail} onLogout={onLogout} />
+            <NavUser
+              userName={userName}
+              userEmail={userEmail}
+              verified={verified}
+              onLogout={onLogout}
+            />
           </SidebarFooter>
           <SidebarRail />
         </Sidebar>

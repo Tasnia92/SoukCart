@@ -324,7 +324,10 @@ function verificationQueueItem(
     recordId: verification.user_id,
     icon: ShieldCheck,
     title: `${verification.shop_name} needs review`,
-    detail: `${verification.supplier_name} · ${verification.location}`,
+    detail: [verification.supplier_name, verification.trade_license_number, verification.location]
+      .map((part) => part.trim())
+      .filter(Boolean)
+      .join(" · "),
     severity: "attention",
     marker: ageMarker(verification.created_at, now),
     sla: slaBucketFor(verification.created_at, "verification", now),

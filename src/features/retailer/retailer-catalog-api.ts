@@ -14,8 +14,9 @@ export type RetailerProduct = {
   seller_name: string | null;
 };
 
+const CATALOG_TABLE = "catalog_products";
 const PRODUCTS_SELECT =
-  "id, name, description, price, unit, stock, min_order_qty, category, image_url, seller_id, users(name)";
+  "id, name, description, price, unit, stock, min_order_qty, category, image_url, seller_id, seller_name";
 
 type ProductRow = {
   id: string;
@@ -28,13 +29,8 @@ type ProductRow = {
   category: string | null;
   image_url: string | null;
   seller_id: string | null;
-  users: { name: string } | { name: string }[] | null;
+  seller_name: string | null;
 };
-
-function sellerName(relation: ProductRow["users"]): string | null {
-  if (Array.isArray(relation)) return relation[0]?.name ?? null;
-  return relation?.name ?? null;
-}
 
 function minOrderQty(value: ProductRow["min_order_qty"]): number {
   const qty = Number(value);
@@ -53,7 +49,7 @@ function normalize(row: ProductRow): RetailerProduct {
     category: row.category ?? null,
     image_url: row.image_url,
     seller_id: row.seller_id ?? null,
-    seller_name: sellerName(row.users),
+    seller_name: row.seller_name ?? null,
   };
 }
 
@@ -69,11 +65,7 @@ export function cartSupplierConflict(
 }
 
 export async function loadRetailerProducts(): Promise<RetailerProduct[]> {
-  const { data, error } = await supabase
-    .from("products")
-    .select(PRODUCTS_SELECT)
-    .eq("is_active", true)
-    .order("name");
+  const { data, error } = await supabase.from(CATALOG_TABLE).select(PRODUCTS_SELECT).order("name");
   if (error) throw new Error(error.message);
   return ((data ?? []) as ProductRow[]).map(normalize);
 }

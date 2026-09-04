@@ -23,7 +23,7 @@ import {
 } from "../../components/ui/Workspace.tsx";
 import { useProductChanges } from "../../product-realtime.ts";
 import { useSessionSnapshot, useSessionStore } from "../../session.tsx";
-import { RouterLink, WorkspaceShell } from "../workspace/WorkspaceShell.tsx";
+import { RouterLink } from "../workspace/WorkspaceShell.tsx";
 import {
   filterSupplierProducts,
   loadSupplierProducts,
@@ -32,7 +32,7 @@ import {
 } from "./supplier-products-api.ts";
 import {
   consumeSupplierNotice,
-  supplierNavItems,
+  SupplierWorkspaceShell,
   type SupplierNotice,
 } from "./supplier-shared.tsx";
 
@@ -197,9 +197,8 @@ export function SupplierStock({ loadProducts = loadSupplierProducts }: SupplierS
   const outOfStock = activeProducts.filter((product) => product.stock <= 0).length;
 
   return (
-    <WorkspaceShell
-      navigationLabel="Supplier navigation"
-      items={supplierNavItems("stock")}
+    <SupplierWorkspaceShell
+      section="stock"
       userName={userName}
       userEmail={state.profile.email}
       onLogout={onLogout}
@@ -283,6 +282,6 @@ export function SupplierStock({ loadProducts = loadSupplierProducts }: SupplierS
       ) : (
         <LoadingState title="Loading your stock…" />
       )}
-    </WorkspaceShell>
+    </SupplierWorkspaceShell>
   );
 }

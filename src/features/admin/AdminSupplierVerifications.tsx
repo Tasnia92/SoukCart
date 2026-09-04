@@ -1,7 +1,17 @@
 import { useEffect, useState } from "react";
-import { ArrowRight, Clock3, FileText, ImageIcon, Search, ShieldCheck, Store } from "lucide-react";
+import {
+  ArrowRight,
+  Clock3,
+  FileText,
+  ImageIcon,
+  Phone,
+  Search,
+  ShieldCheck,
+  Store,
+} from "lucide-react";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
 import {
   Card,
   CardAction,
@@ -10,6 +20,14 @@ import {
   CardHeader,
   CardTitle,
 } from "@/components/ui/card";
+import {
+  Item,
+  ItemContent,
+  ItemDescription,
+  ItemGroup,
+  ItemMedia,
+  ItemTitle,
+} from "@/components/ui/item";
 import {
   EmptyState,
   LoadingState,
@@ -31,6 +49,7 @@ import {
   tradeLicenseKind,
   type AdminSupplierVerification,
 } from "./admin-supplier-verifications-api.ts";
+import { TradeLicenseCopyField } from "./trade-license-copy-field.tsx";
 
 type AdminSupplierVerificationsProps = {
   loadVerifications?: () => Promise<AdminSupplierVerification[]>;
@@ -43,15 +62,15 @@ const STATUS_LABELS: Record<AdminSupplierVerification["status"], string> = {
 };
 
 function LicenceThumb({ verification }: { verification: AdminSupplierVerification }) {
-  const kind = tradeLicenseKind(verification.trade_license_url);
+  const kind = tradeLicenseKind(verification.nid_front_url);
 
-  if (kind === "image" && verification.trade_license_url) {
+  if (kind === "image" && verification.nid_front_url) {
     return (
       <div className="aspect-video overflow-hidden rounded-xl border">
         <img
           className="size-full object-cover"
-          src={verification.trade_license_url}
-          alt={`${verification.shop_name} trade licence`}
+          src={verification.nid_front_url}
+          alt={`${verification.shop_name} NID card front`}
         />
       </div>
     );
@@ -61,67 +80,89 @@ function LicenceThumb({ verification }: { verification: AdminSupplierVerificatio
   return (
     <div className="flex aspect-video flex-col items-center justify-center gap-2 rounded-xl border bg-muted text-muted-foreground">
       <PlaceholderIcon className="size-8" aria-hidden="true" />
-      <small className="text-xs font-medium">{kind === "pdf" ? "PDF" : "Licence"}</small>
+      <small className="text-xs font-medium">NID</small>
     </div>
   );
 }
 
 function VerificationCard({ verification }: { verification: AdminSupplierVerification }) {
   return (
-    <RouterLink
-      className="block h-full rounded-2xl outline-none focus-visible:ring-2 focus-visible:ring-ring"
-      to="/admin/verifications/$userId"
-      params={{ userId: verification.user_id }}
-    >
-      <Card className="h-full">
-        <CardHeader>
-          <CardTitle>{verification.shop_name}</CardTitle>
-          <CardAction>
-            <Badge
-              variant={
-                verification.status === "rejected"
-                  ? "destructive"
-                  : verification.status === "approved"
-                    ? "default"
-                    : "outline"
-              }
-            >
-              {STATUS_LABELS[verification.status]}
-            </Badge>
-          </CardAction>
-        </CardHeader>
-        <CardContent className="flex flex-col gap-4">
-          <LicenceThumb verification={verification} />
-          <div className="flex items-center gap-3">
+    <Card className="h-full">
+      <CardHeader>
+        <CardTitle>{verification.shop_name}</CardTitle>
+        <CardAction>
+          <Badge
+            variant={
+              verification.status === "rejected"
+                ? "destructive"
+                : verification.status === "approved"
+                  ? "default"
+                  : "outline"
+            }
+          >
+            {STATUS_LABELS[verification.status]}
+          </Badge>
+        </CardAction>
+      </CardHeader>
+      <CardContent className="flex flex-col gap-4">
+        <LicenceThumb verification={verification} />
+        <Item size="sm">
+          <ItemMedia>
             <Avatar size="sm">
               <AvatarFallback>{initials(verification.supplier_name)}</AvatarFallback>
             </Avatar>
-            <span className="flex min-w-0 flex-col gap-1">
-              <strong className="truncate font-medium">
-                {verification.supplier_name || "Unnamed supplier"}
-              </strong>
-              <small className="truncate text-xs text-muted-foreground">
-                {verification.supplier_email}
-              </small>
-            </span>
-          </div>
-          <div className="flex flex-col gap-2 text-sm text-muted-foreground">
-            <span className="flex items-center gap-2">
-              <Store className="size-4 shrink-0" aria-hidden="true" />
-              {verification.location}
-            </span>
-            <span className="flex items-center gap-2">
-              <Clock3 className="size-4 shrink-0" aria-hidden="true" />
-              {formatDateTime(verification.created_at)}
-            </span>
-          </div>
-        </CardContent>
-        <CardFooter className="text-sm font-medium">
-          Review application
-          <ArrowRight className="ml-auto size-4" aria-hidden="true" />
-        </CardFooter>
-      </Card>
-    </RouterLink>
+          </ItemMedia>
+          <ItemContent>
+            <ItemTitle>{verification.supplier_name || "Unnamed supplier"}</ItemTitle>
+            <ItemDescription>{verification.supplier_email}</ItemDescription>
+          </ItemContent>
+        </Item>
+        <TradeLicenseCopyField
+          compact
+          id={`trade-license-${verification.user_id}`}
+          value={verification.trade_license_number}
+        />
+        <ItemGroup>
+          <Item size="xs">
+            <ItemMedia variant="icon">
+              <Store />
+            </ItemMedia>
+            <ItemContent>
+              <ItemTitle>Location</ItemTitle>
+              <ItemDescription>{verification.location}</ItemDescription>
+            </ItemContent>
+          </Item>
+          {verification.contact_phone ? (
+            <Item size="xs">
+              <ItemMedia variant="icon">
+                <Phone />
+              </ItemMedia>
+              <ItemContent>
+                <ItemTitle>Phone</ItemTitle>
+                <ItemDescription>{verification.contact_phone}</ItemDescription>
+              </ItemContent>
+            </Item>
+          ) : null}
+          <Item size="xs">
+            <ItemMedia variant="icon">
+              <Clock3 />
+            </ItemMedia>
+            <ItemContent>
+              <ItemTitle>Submitted</ItemTitle>
+              <ItemDescription>{formatDateTime(verification.created_at)}</ItemDescription>
+            </ItemContent>
+          </Item>
+        </ItemGroup>
+      </CardContent>
+      <CardFooter>
+        <Button asChild className="w-full">
+          <RouterLink to="/admin/verifications/$userId" params={{ userId: verification.user_id }}>
+            Review application
+            <ArrowRight data-icon="inline-end" />
+          </RouterLink>
+        </Button>
+      </CardFooter>
+    </Card>
   );
 }
 
@@ -189,7 +230,7 @@ export function AdminSupplierVerifications({
       <PageHeader
         eyebrow="Supplier onboarding"
         title="Supplier verifications."
-        copy="Open a submission to review the trade licence and shop details, then approve or reject it."
+        copy="Open a submission to review the trade licence number, NID card, and contact info, then approve or reject it."
       />
       {verifications && stats ? (
         <>
@@ -202,7 +243,7 @@ export function AdminSupplierVerifications({
 
           <SearchToolbar
             label="Search supplier applications"
-            placeholder="Search by shop, supplier, or location"
+            placeholder="Search by shop, supplier, location, or licence number"
             value={searchTerm}
             onChange={(event) => setSearchTerm(event.target.value)}
             result={`${filtered.length} of ${verifications.length} submitted`}
@@ -219,7 +260,7 @@ export function AdminSupplierVerifications({
               <EmptyState
                 icon={Search}
                 title="No matching applications"
-                copy="Try a different shop, supplier, or location."
+                copy="Try a different shop, supplier, location, or licence number."
               />
             )
           ) : (

@@ -15,6 +15,7 @@ import { buildAdminDashboard, type AdminDashboard } from "./admin/admin-dashboar
 import type { ActivityOrder } from "./admin/admin-activity-api.ts";
 import type { AdminComplaint } from "./admin/admin-complaints-api.ts";
 import type { AdminOverviewUser } from "./admin/admin-overview-api.ts";
+import type { AdminSupplierVerification } from "./admin/admin-supplier-verifications-api.ts";
 import { AdminInbox } from "./admin/AdminInbox.tsx";
 import { AdminOverview } from "./admin/AdminOverview.tsx";
 import type { RetailerComplaint } from "./retailer/retailer-complaints-api.ts";
@@ -294,12 +295,33 @@ const adminComplaints: AdminComplaint[] = [
   },
 ];
 
+const adminVerifications: AdminSupplierVerification[] = [
+  {
+    user_id: "seller-1",
+    shop_name: "Samira Spices",
+    shop_details: "Wholesale spices",
+    location: "Dhaka",
+    trade_license_number: "TRAD/DNCC/5678/2024",
+    contact_phone: "01812345678",
+    status: "pending",
+    review_note: null,
+    reviewed_at: null,
+    created_at: iso(1),
+    updated_at: iso(1),
+    supplier_name: "Samira Supplier",
+    supplier_email: "samira@example.com",
+    nid_front_url: null,
+    nid_back_url: null,
+  },
+];
+
 function adminDashboard(): AdminDashboard {
   return buildAdminDashboard(
     {
       orders: adminOrders,
       users: adminUsers,
       complaints: adminComplaints,
+      verifications: adminVerifications,
     },
     NOW,
   );
@@ -588,6 +610,13 @@ describe("React workspace overview behavior", () => {
         ).toBeTruthy();
         expect(element<HTMLAnchorElement>(mounted.host, 'a[href="/admin/users"]')).toBeTruthy();
 
+        expect(mounted.host.textContent).toContain("Pending supplier verifications");
+        expect(mounted.host.textContent).toContain("Samira Spices");
+        expect(
+          element<HTMLInputElement>(mounted.host, "#overview-trade-license-seller-1").value,
+        ).toBe("TRAD/DNCC/5678/2024");
+        expect(element(mounted.host, '[aria-label="Copy trade licence number"]')).toBeTruthy();
+
         expect(mounted.host.textContent).toContain("Up to date");
         await clickLogOut(mounted.host);
       } finally {
@@ -625,6 +654,8 @@ describe("React workspace overview behavior", () => {
       expect(queue.textContent).toContain("Cancellation requested by retailer");
       expect(queue.textContent).toContain("Damaged crate");
       expect(queue.textContent).toContain("awaiting confirmation");
+      expect(queue.textContent).toContain("Samira Spices needs review");
+      expect(queue.textContent).toContain("TRAD/DNCC/5678/2024");
     } finally {
       await unmount(mounted.root);
     }
@@ -664,6 +695,8 @@ describe("React workspace overview behavior", () => {
       await act(async () => resolveDashboard?.(supplierDashboard()));
 
       expect(mounted.host.textContent).toContain("Good to see you, Samira.");
+      expect(mounted.host.textContent).toContain("Your shop is verified");
+      expect(mounted.host.textContent).toContain("Samira Supplier is a verified SoukCart seller");
       expect(mounted.host.textContent).toContain("Product saved.");
       expect(sessionStorage.getItem("soukcart:supplier-notice")).toBeNull();
 
@@ -697,6 +730,9 @@ describe("React workspace overview behavior", () => {
       expect(bars.textContent).toContain("5 units sold");
 
       await openWorkspaceMenu(mounted.host);
+      const accountMenu = element<HTMLButtonElement>(document, '[aria-label="Account menu"]');
+      expect(accountMenu.textContent).toContain("Samira Supplier");
+      expect(accountMenu.textContent).toContain("Verified");
       const overview = element<HTMLAnchorElement>(
         document,
         'nav[aria-label="Supplier navigation"] a[aria-current="page"]',

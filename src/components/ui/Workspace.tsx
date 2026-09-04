@@ -4,9 +4,10 @@ import type {
   InputHTMLAttributes,
   ReactNode,
 } from "react";
-import { ChevronsUpDown, LogOut, Search, type LucideIcon } from "lucide-react";
+import { BadgeCheck, ChevronsUpDown, LogOut, Search, type LucideIcon } from "lucide-react";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
+import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import {
@@ -107,10 +108,26 @@ function initials(value: string): string {
   return result || "U";
 }
 
-export function SidebarUser({ userName, userEmail }: { userName: string; userEmail: string }) {
+export function SidebarUser({
+  userName,
+  userEmail,
+  verified = false,
+}: {
+  userName: string;
+  userEmail: string;
+  verified?: boolean;
+}) {
   return (
     <div className="grid flex-1 text-left text-sm leading-tight">
-      <strong className="truncate font-medium">{userName}</strong>
+      <span className="flex min-w-0 items-center gap-1">
+        <strong className="truncate font-medium">{userName}</strong>
+        {verified ? (
+          <Badge variant="secondary" aria-label="Verified seller">
+            <BadgeCheck data-icon="inline-start" />
+            Verified
+          </Badge>
+        ) : null}
+      </span>
       <small className="truncate text-xs font-normal text-muted-foreground">{userEmail}</small>
     </div>
   );
@@ -119,10 +136,12 @@ export function SidebarUser({ userName, userEmail }: { userName: string; userEma
 export function NavUser({
   userName,
   userEmail,
+  verified = false,
   onLogout,
 }: {
   userName: string;
   userEmail: string;
+  verified?: boolean;
   onLogout: () => void;
 }) {
   const { isMobile } = useSidebar();
@@ -140,7 +159,7 @@ export function NavUser({
               <Avatar className="rounded-lg">
                 <AvatarFallback className="rounded-lg">{initials(userName)}</AvatarFallback>
               </Avatar>
-              <SidebarUser userName={userName} userEmail={userEmail} />
+              <SidebarUser userName={userName} userEmail={userEmail} verified={verified} />
               <ChevronsUpDown className="ml-auto" />
             </SidebarMenuButton>
           </DropdownMenuTrigger>
@@ -155,7 +174,7 @@ export function NavUser({
                 <Avatar className="rounded-lg">
                   <AvatarFallback className="rounded-lg">{initials(userName)}</AvatarFallback>
                 </Avatar>
-                <SidebarUser userName={userName} userEmail={userEmail} />
+                <SidebarUser userName={userName} userEmail={userEmail} verified={verified} />
               </div>
             </DropdownMenuLabel>
             <DropdownMenuSeparator />

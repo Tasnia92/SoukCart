@@ -84,6 +84,8 @@ function verification(overrides: Partial<AdminSupplierVerification>): AdminSuppl
     shop_name: "Samira Spices",
     shop_details: "Wholesale spices",
     location: "Dhaka",
+    trade_license_number: "TRAD/DNCC/5678/2024",
+    contact_phone: "01812345678",
     status: "pending",
     review_note: null,
     reviewed_at: null,
@@ -91,7 +93,8 @@ function verification(overrides: Partial<AdminSupplierVerification>): AdminSuppl
     updated_at: iso(1),
     supplier_name: "Samira Supplier",
     supplier_email: "samira@example.com",
-    trade_license_url: null,
+    nid_front_url: null,
+    nid_back_url: null,
     ...overrides,
   };
 }
@@ -246,6 +249,9 @@ describe("buildAdminDashboard", () => {
     expect(dashboard.queue[0]?.recordId).toBe("refund-0");
     expect(dashboard.queue.some((item) => item.kind === "confirmation")).toBe(true);
     expect(dashboard.queue.some((item) => item.kind === "verification")).toBe(true);
+    expect(dashboard.queue.find((item) => item.kind === "verification")?.detail).toContain(
+      "TRAD/DNCC/5678/2024",
+    );
     expect(dashboard.queue.find((item) => item.kind === "dispute")?.search).toEqual({
       complaint: "dispute",
     });

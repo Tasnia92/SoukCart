@@ -29,7 +29,7 @@ import {
 import { useProductChanges } from "../../product-realtime.ts";
 import { useSessionSnapshot, useSessionStore } from "../../session.tsx";
 import { formatDate, formatPrice } from "../workspace/format.ts";
-import { RouterLink, WorkspaceShell } from "../workspace/WorkspaceShell.tsx";
+import { RouterLink } from "../workspace/WorkspaceShell.tsx";
 import {
   deleteSupplierProduct,
   filterSupplierProducts,
@@ -42,7 +42,7 @@ import {
   consumeSupplierNotice,
   ProductThumb,
   StockChip,
-  supplierNavItems,
+  SupplierWorkspaceShell,
   type SupplierNotice,
 } from "./supplier-shared.tsx";
 
@@ -234,9 +234,8 @@ export function SupplierProducts({ loadProducts = loadSupplierProducts }: Suppli
   const filtered = products ? filterSupplierProducts(products, searchTerm) : [];
 
   return (
-    <WorkspaceShell
-      navigationLabel="Supplier navigation"
-      items={supplierNavItems("products")}
+    <SupplierWorkspaceShell
+      section="products"
       userName={userName}
       userEmail={state.profile.email}
       onLogout={onLogout}
@@ -297,6 +296,6 @@ export function SupplierProducts({ loadProducts = loadSupplierProducts }: Suppli
       ) : (
         <LoadingState title="Loading your products…" />
       )}
-    </WorkspaceShell>
+    </SupplierWorkspaceShell>
   );
 }

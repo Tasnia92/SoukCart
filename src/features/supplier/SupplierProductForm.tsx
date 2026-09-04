@@ -36,7 +36,7 @@ import {
   WorkspaceError,
 } from "../../components/ui/Workspace.tsx";
 import { useSessionSnapshot, useSessionStore } from "../../session.tsx";
-import { RouterLink, WorkspaceShell } from "../workspace/WorkspaceShell.tsx";
+import { RouterLink } from "../workspace/WorkspaceShell.tsx";
 import {
   createSupplierProduct,
   loadSupplierProduct,
@@ -49,7 +49,7 @@ import {
   type ProductPayload,
   type SupplierProduct,
 } from "./supplier-products-api.ts";
-import { SUPPLIER_NOTICE_KEY, supplierNavItems } from "./supplier-shared.tsx";
+import { SUPPLIER_NOTICE_KEY, SupplierWorkspaceShell } from "./supplier-shared.tsx";
 
 type SupplierProductFormProps = {
   productId?: string;
@@ -181,13 +181,18 @@ export function SupplierProductForm({
         return !category || category === UNCATEGORIZED ? null : category;
       })(),
     };
-    const validationMessage = productValidationError(payload, { allowZeroStock: isEdit });
+    const file = fileInputRef.current?.files?.[0] ?? null;
+    const validationMessage = productValidationError(payload, {
+      allowZeroStock: isEdit,
+      requireImage: true,
+      imageUrl: keptImageUrl,
+      hasImageFile: Boolean(file),
+    });
     if (validationMessage) {
       setFeedback({ message: validationMessage, state: "error" });
       return;
     }
 
-    const file = fileInputRef.current?.files?.[0] ?? null;
     if (file) {
       if (!file.type.startsWith("image/")) {
         setFeedback({ message: "Please choose an image file (PNG or JPG).", state: "error" });
@@ -238,15 +243,14 @@ export function SupplierProductForm({
   };
 
   const shell = (children: ReactNode) => (
-    <WorkspaceShell
-      navigationLabel="Supplier navigation"
-      items={supplierNavItems("products")}
+    <SupplierWorkspaceShell
+      section="products"
       userName={userName}
       userEmail={state.profile.email}
       onLogout={onLogout}
     >
       {children}
-    </WorkspaceShell>
+    </SupplierWorkspaceShell>
   );
 
   if (editing === undefined) {
@@ -267,7 +271,7 @@ export function SupplierProductForm({
         copy={
           editing
             ? "Update the details or swap the photo — retailers see the changes right away."
-            : "Give retailers what they need: a clear name, a fair price, and a photo."
+            : "Give retailers what they need: a clear name, a fair price, and a photo. Fields marked * are required."
         }
       />
       <InlineNotice />
@@ -284,7 +288,9 @@ export function SupplierProductForm({
               <FieldLegend className="sr-only">Product details</FieldLegend>
               <FieldGroup className="grid grid-cols-1 gap-4 md:grid-cols-2">
                 <Field className="md:col-span-2">
-                  <FieldLabel htmlFor="product-name">Product name</FieldLabel>
+                  <FieldLabel htmlFor="product-name" required>
+                    Product name
+                  </FieldLabel>
                   <Input
                     id="product-name"
                     name="name"
@@ -293,6 +299,7 @@ export function SupplierProductForm({
                     placeholder="e.g. Miniket rice, 50 kg sack"
                     defaultValue={editing?.name ?? ""}
                     required
+                    aria-required="true"
                   />
                 </Field>
                 <Field className="md:col-span-2">
@@ -307,7 +314,9 @@ export function SupplierProductForm({
                   />
                 </Field>
                 <Field>
-                  <FieldLabel htmlFor="product-price">Price (৳)</FieldLabel>
+                  <FieldLabel htmlFor="product-price" required>
+                    Price (৳)
+                  </FieldLabel>
                   <Input
                     id="product-price"
                     name="price"
@@ -317,10 +326,13 @@ export function SupplierProductForm({
                     placeholder="0.01"
                     defaultValue={editing ? String(editing.price) : ""}
                     required
+                    aria-required="true"
                   />
                 </Field>
                 <Field>
-                  <FieldLabel htmlFor="product-unit">Unit</FieldLabel>
+                  <FieldLabel htmlFor="product-unit" required>
+                    Unit
+                  </FieldLabel>
                   <Input
                     id="product-unit"
                     name="unit"
@@ -329,6 +341,7 @@ export function SupplierProductForm({
                     placeholder="kg, crate, piece…"
                     defaultValue={editing ? editing.unit : "piece"}
                     required
+                    aria-required="true"
                   />
                 </Field>
                 <Field>
@@ -350,7 +363,9 @@ export function SupplierProductForm({
                   </Select>
                 </Field>
                 <Field>
-                  <FieldLabel htmlFor="product-stock">Stock</FieldLabel>
+                  <FieldLabel htmlFor="product-stock" required>
+                    Stock
+                  </FieldLabel>
                   <Input
                     id="product-stock"
                     name="stock"
@@ -359,13 +374,16 @@ export function SupplierProductForm({
                     step="1"
                     defaultValue={editing ? String(editing.stock) : "1"}
                     required
+                    aria-required="true"
                   />
                   {isEdit ? (
                     <FieldDescription>Set to 0 to mark the product out of stock.</FieldDescription>
                   ) : null}
                 </Field>
                 <Field>
-                  <FieldLabel htmlFor="product-moq">Minimum order quantity</FieldLabel>
+                  <FieldLabel htmlFor="product-moq" required>
+                    Minimum order quantity
+                  </FieldLabel>
                   <Input
                     id="product-moq"
                     name="min_order_qty"
@@ -374,19 +392,24 @@ export function SupplierProductForm({
                     step="1"
                     defaultValue={editing ? String(editing.min_order_qty) : "1"}
                     required
+                    aria-required="true"
                   />
                   <FieldDescription>Retailers must buy at least this many units.</FieldDescription>
                 </Field>
                 <Field className="md:col-span-2">
-                  <FieldLabel htmlFor="product-image">Product image</FieldLabel>
+                  <FieldLabel htmlFor="product-image" required>
+                    Product image
+                  </FieldLabel>
                   <label
                     htmlFor="product-image"
                     hidden={Boolean(displayUrl)}
-                    className="flex min-h-40 cursor-pointer flex-col items-center justify-center gap-2 rounded-lg border border-dashed p-6 text-center"
+                    className="flex min-h-40 cursor-pointer flex-col items-center justify-center gap-2 rounded-lg border border-dashed border-destructive/80 bg-destructive/5 p-6 text-center"
                   >
-                    <ImageIcon aria-hidden="true" />
+                    <ImageIcon aria-hidden="true" className="text-destructive" />
                     <span className="font-medium">Add a product image</span>
-                    <span className="text-sm text-muted-foreground">PNG or JPG, up to 5 MB</span>
+                    <span className="text-sm text-destructive">
+                      Required · PNG or JPG, up to 5 MB
+                    </span>
                     <input
                       id="product-image"
                       ref={fileInputRef}
@@ -394,19 +417,23 @@ export function SupplierProductForm({
                       type="file"
                       name="image"
                       accept="image/png,image/jpeg,image/webp"
+                      required={!displayUrl}
+                      aria-required={!displayUrl}
                       onChange={onFileChange}
                     />
                   </label>
-                  <div className="flex flex-col items-start gap-3" hidden={!displayUrl}>
-                    <img
-                      className="max-h-96 w-full rounded-lg border object-contain"
-                      src={displayUrl ?? ""}
-                      alt="Product image preview"
-                    />
-                    <Button type="button" variant="outline" onClick={onRemoveImage}>
-                      Choose a different image
-                    </Button>
-                  </div>
+                  {displayUrl ? (
+                    <div className="flex flex-col items-start gap-3">
+                      <img
+                        className="max-h-96 w-full rounded-lg border object-contain"
+                        src={displayUrl}
+                        alt="Product image preview"
+                      />
+                      <Button type="button" variant="outline" onClick={onRemoveImage}>
+                        Choose a different image
+                      </Button>
+                    </div>
+                  ) : null}
                 </Field>
               </FieldGroup>
             </FieldSet>

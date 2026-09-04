@@ -52,8 +52,8 @@ import {
   StatusBadge,
 } from "../orders/order-presentation.tsx";
 import { formatDate, formatPrice, initials } from "../workspace/format.ts";
-import { RouterLink, WorkspaceShell } from "../workspace/WorkspaceShell.tsx";
-import { supplierNavItems } from "./supplier-shared.tsx";
+import { RouterLink } from "../workspace/WorkspaceShell.tsx";
+import { SupplierWorkspaceShell } from "./supplier-shared.tsx";
 import {
   canCollectCod,
   canConfirmOrder,
@@ -392,9 +392,8 @@ export function SupplierOrders({ loadOrders = loadSupplierOrders }: SupplierOrde
   const filtered = searched.filter((order) => matchesFilter(order, filter));
 
   return (
-    <WorkspaceShell
-      navigationLabel="Supplier navigation"
-      items={supplierNavItems("orders")}
+    <SupplierWorkspaceShell
+      section="orders"
       userName={userName}
       userEmail={state.profile.email}
       onLogout={onLogout}
@@ -657,6 +656,6 @@ export function SupplierOrders({ loadOrders = loadSupplierOrders }: SupplierOrde
           </DialogFooter>
         </DialogContent>
       </Dialog>
-    </WorkspaceShell>
+    </SupplierWorkspaceShell>
   );
 }

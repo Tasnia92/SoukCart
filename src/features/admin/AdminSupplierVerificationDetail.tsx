@@ -8,6 +8,9 @@ import {
   FileText,
   ImageIcon,
   LockKeyhole,
+  Mail,
+  MapPin,
+  Phone,
   X,
   type LucideIcon,
 } from "lucide-react";
@@ -33,6 +36,15 @@ import {
   EmptyTitle,
 } from "@/components/ui/empty";
 import { Field, FieldDescription, FieldGroup, FieldLabel } from "@/components/ui/field";
+import {
+  Item,
+  ItemContent,
+  ItemDescription,
+  ItemGroup,
+  ItemMedia,
+  ItemTitle,
+} from "@/components/ui/item";
+import { Separator } from "@/components/ui/separator";
 import { Textarea } from "@/components/ui/textarea";
 import {
   InlineNotice,
@@ -52,6 +64,7 @@ import {
   tradeLicenseKind,
   type AdminSupplierVerification,
 } from "./admin-supplier-verifications-api.ts";
+import { TradeLicenseCopyField } from "./trade-license-copy-field.tsx";
 
 type AdminSupplierVerificationDetailProps = {
   userId: string;
@@ -68,19 +81,21 @@ const STATUS_LABELS: Record<AdminSupplierVerification["status"], string> = {
   rejected: "Rejected",
 };
 
-function LicenceEmpty({
+function DocumentEmpty({
   icon: EmptyIcon,
   title,
   copy,
   action,
+  compact = false,
 }: {
   icon: LucideIcon;
   title: string;
   copy?: string;
   action?: ReactNode;
+  compact?: boolean;
 }) {
   return (
-    <Empty className="min-h-80 border">
+    <Empty className={compact ? "min-h-48 border" : "min-h-80 border"}>
       <EmptyHeader>
         <EmptyMedia variant="icon">
           <EmptyIcon />
@@ -93,8 +108,19 @@ function LicenceEmpty({
   );
 }
 
-function LicencePreview({ verification }: { verification: AdminSupplierVerification }) {
-  const url = verification.trade_license_url;
+function DocumentPreview({
+  title,
+  description,
+  url,
+  alt,
+  compact = false,
+}: {
+  title: string;
+  description: string;
+  url: string | null;
+  alt: string;
+  compact?: boolean;
+}) {
   const kind = tradeLicenseKind(url);
   const openOriginal = url ? (
     <Button asChild variant="outline" size="sm">
@@ -104,20 +130,27 @@ function LicencePreview({ verification }: { verification: AdminSupplierVerificat
       </a>
     </Button>
   ) : null;
+  const imageClass = compact
+    ? "max-h-[24rem] w-full object-contain"
+    : "max-h-[48rem] w-full object-contain";
+  const pdfClass = compact
+    ? "h-[24rem] w-full rounded-xl border"
+    : "h-[48rem] w-full rounded-xl border";
 
   return (
     <Card>
       <CardHeader>
-        <CardTitle>Trade licence</CardTitle>
-        <CardDescription>Review the supplier&apos;s uploaded document.</CardDescription>
+        <CardTitle>{title}</CardTitle>
+        <CardDescription>{description}</CardDescription>
         {openOriginal ? <CardAction>{openOriginal}</CardAction> : null}
       </CardHeader>
       <CardContent>
         {!url ? (
-          <LicenceEmpty
+          <DocumentEmpty
             icon={ImageIcon}
-            title="Trade licence unavailable"
+            title={`${title} unavailable`}
             copy="The uploaded file could not be loaded. Ask the supplier to resubmit."
+            compact={compact}
           />
         ) : kind === "image" ? (
           <a
@@ -126,36 +159,34 @@ function LicencePreview({ verification }: { verification: AdminSupplierVerificat
             rel="noopener noreferrer"
             className="block overflow-hidden rounded-xl border"
           >
-            <img
-              className="max-h-[48rem] w-full object-contain"
-              src={url}
-              alt={`${verification.shop_name} trade licence`}
-            />
+            <img className={imageClass} src={url} alt={alt} />
           </a>
         ) : kind === "pdf" ? (
-          <object className="h-[48rem] w-full rounded-xl border" data={url} type="application/pdf">
-            <LicenceEmpty
+          <object className={pdfClass} data={url} type="application/pdf">
+            <DocumentEmpty
               icon={FileText}
               title="PDF preview unavailable"
+              compact={compact}
               action={
                 <Button asChild variant="secondary" size="sm">
                   <a href={url} target="_blank" rel="noopener noreferrer">
                     <Download data-icon="inline-start" />
-                    Download licence
+                    Download file
                   </a>
                 </Button>
               }
             />
           </object>
         ) : (
-          <LicenceEmpty
+          <DocumentEmpty
             icon={Download}
             title="Downloadable file"
+            compact={compact}
             action={
               <Button asChild variant="secondary" size="sm">
                 <a href={url} target="_blank" rel="noopener noreferrer">
                   <Download data-icon="inline-start" />
-                  Download licence
+                  Download file
                 </a>
               </Button>
             }
@@ -163,15 +194,6 @@ function LicencePreview({ verification }: { verification: AdminSupplierVerificat
         )}
       </CardContent>
     </Card>
-  );
-}
-
-function DetailRow({ label, value }: { label: string; value: string }) {
-  return (
-    <div className="grid gap-1 sm:grid-cols-[8rem_minmax(0,1fr)] sm:gap-4">
-      <dt className="text-sm text-muted-foreground">{label}</dt>
-      <dd className="text-sm font-medium sm:text-right">{value}</dd>
-    </div>
   );
 }
 
@@ -310,7 +332,7 @@ export function AdminSupplierVerificationDetail({
       <PageHeader
         eyebrow="Supplier onboarding"
         title={verification.shop_name}
-        copy="Review the attached trade licence and shop details, then approve or reject the supplier."
+        copy="Review the trade licence number, NID card, and contact info, then approve or reject the supplier."
         actions={
           <Badge
             variant={
@@ -328,49 +350,106 @@ export function AdminSupplierVerificationDetail({
       <InlineNotice message={notice?.message} state={notice?.state} />
 
       <div className="grid gap-6 xl:grid-cols-[minmax(0,2fr)_minmax(20rem,1fr)]">
-        <LicencePreview verification={verification} />
+        <div className="grid gap-6 sm:grid-cols-2">
+          <DocumentPreview
+            title="NID card front"
+            description="Front of the national ID card."
+            url={verification.nid_front_url}
+            alt={`${verification.supplier_name || verification.shop_name} NID card front`}
+          />
+          <DocumentPreview
+            title="NID card back"
+            description="Back of the national ID card."
+            url={verification.nid_back_url}
+            alt={`${verification.supplier_name || verification.shop_name} NID card back`}
+          />
+        </div>
 
         <div className="flex flex-col gap-6">
           <Card>
             <CardHeader>
               <CardTitle>Supplier</CardTitle>
+              <CardDescription>Who submitted this application.</CardDescription>
             </CardHeader>
             <CardContent>
-              <div className="flex items-center gap-3">
-                <Avatar>
-                  <AvatarFallback>{initials(verification.supplier_name)}</AvatarFallback>
-                </Avatar>
-                <span className="flex min-w-0 flex-col gap-1">
-                  <strong className="truncate font-medium">
-                    {verification.supplier_name || "Unnamed supplier"}
-                  </strong>
-                  <small className="truncate text-xs text-muted-foreground">
-                    {verification.supplier_email}
-                  </small>
-                </span>
-              </div>
+              <Item size="sm">
+                <ItemMedia>
+                  <Avatar>
+                    <AvatarFallback>{initials(verification.supplier_name)}</AvatarFallback>
+                  </Avatar>
+                </ItemMedia>
+                <ItemContent>
+                  <ItemTitle>{verification.supplier_name || "Unnamed supplier"}</ItemTitle>
+                  <ItemDescription>{verification.supplier_email}</ItemDescription>
+                </ItemContent>
+              </Item>
             </CardContent>
           </Card>
 
           <Card>
             <CardHeader>
-              <CardTitle>Shop details</CardTitle>
+              <CardTitle>Identity and contact</CardTitle>
+              <CardDescription>
+                Trade licence number, location, and how to reach this supplier.
+              </CardDescription>
             </CardHeader>
             <CardContent className="flex flex-col gap-4">
-              <dl className="flex flex-col gap-3">
-                <DetailRow label="Location" value={verification.location} />
-                <DetailRow label="Submitted" value={formatDateTime(verification.created_at)} />
-                {decided && verification.reviewed_at ? (
-                  <DetailRow
-                    label="Last reviewed"
-                    value={formatDateTime(verification.reviewed_at)}
-                  />
-                ) : null}
-              </dl>
+              <TradeLicenseCopyField value={verification.trade_license_number} />
+              <Separator />
+              <ItemGroup>
+                <Item size="sm">
+                  <ItemMedia variant="icon">
+                    <MapPin />
+                  </ItemMedia>
+                  <ItemContent>
+                    <ItemTitle>Location</ItemTitle>
+                    <ItemDescription>{verification.location}</ItemDescription>
+                  </ItemContent>
+                </Item>
+                <Item size="sm">
+                  <ItemMedia variant="icon">
+                    <Phone />
+                  </ItemMedia>
+                  <ItemContent>
+                    <ItemTitle>Phone</ItemTitle>
+                    <ItemDescription>
+                      {verification.contact_phone || "Not provided"}
+                    </ItemDescription>
+                  </ItemContent>
+                </Item>
+                <Item size="sm">
+                  <ItemMedia variant="icon">
+                    <Mail />
+                  </ItemMedia>
+                  <ItemContent>
+                    <ItemTitle>Email</ItemTitle>
+                    <ItemDescription>
+                      {verification.supplier_email || "Not provided"}
+                    </ItemDescription>
+                  </ItemContent>
+                </Item>
+              </ItemGroup>
+              <Separator />
               <div className="flex flex-col gap-1">
                 <span className="text-sm text-muted-foreground">About the shop</span>
                 <p className="text-sm leading-relaxed">{verification.shop_details}</p>
               </div>
+              <ItemGroup>
+                <Item size="xs">
+                  <ItemContent>
+                    <ItemTitle>Submitted</ItemTitle>
+                    <ItemDescription>{formatDateTime(verification.created_at)}</ItemDescription>
+                  </ItemContent>
+                </Item>
+                {decided && verification.reviewed_at ? (
+                  <Item size="xs">
+                    <ItemContent>
+                      <ItemTitle>Last reviewed</ItemTitle>
+                      <ItemDescription>{formatDateTime(verification.reviewed_at)}</ItemDescription>
+                    </ItemContent>
+                  </Item>
+                ) : null}
+              </ItemGroup>
             </CardContent>
           </Card>
 

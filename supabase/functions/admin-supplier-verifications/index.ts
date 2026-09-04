@@ -26,7 +26,10 @@ type SupplierRow = {
   shop_name: string;
   shop_details: string;
   location: string;
-  trade_license_path: string;
+  trade_license_number: string;
+  nid_front_path: string;
+  nid_back_path: string;
+  contact_phone: string;
   status: "pending" | "approved" | "rejected";
   review_note: string | null;
   reviewed_by: string | null;
@@ -100,7 +103,7 @@ async function listVerifications(): Promise<Response> {
   const { data: rows, error } = await admin
     .from("supplier_profiles")
     .select(
-      "user_id, shop_name, shop_details, location, trade_license_path, status, review_note, reviewed_by, reviewed_at, created_at, updated_at",
+      "user_id, shop_name, shop_details, location, trade_license_number, nid_front_path, nid_back_path, contact_phone, status, review_note, reviewed_by, reviewed_at, created_at, updated_at",
     )
     .order("created_at", { ascending: false });
   if (error) throw error;
@@ -116,6 +119,8 @@ async function listVerifications(): Promise<Response> {
         shop_name: row.shop_name,
         shop_details: row.shop_details,
         location: row.location,
+        trade_license_number: row.trade_license_number ?? "",
+        contact_phone: row.contact_phone ?? "",
         status: row.status,
         review_note: row.review_note,
         reviewed_at: row.reviewed_at,
@@ -123,7 +128,8 @@ async function listVerifications(): Promise<Response> {
         updated_at: row.updated_at,
         supplier_name: profile?.name ?? "",
         supplier_email: profile?.email ?? "",
-        trade_license_url: await signTradeLicense(row.trade_license_path),
+        nid_front_url: await signDocument(row.nid_front_path),
+        nid_back_url: await signDocument(row.nid_back_path),
       };
     }),
   );
@@ -190,6 +196,20 @@ async function review(
     );
   }
 
+  if (status === "approved") {
+    const { error: notifyError } = await admin.from("notifications").insert({
+      recipient_id: userId,
+      order_id: null,
+      type: "supplier_verified",
+      title: "Your shop is verified",
+      message:
+        "You are now a verified SoukCart seller. A checkmark appears next to your name on the dashboard.",
+    });
+    if (notifyError) {
+      console.error("Could not notify the verified supplier", notifyError);
+    }
+  }
+
   return json({ userId, status });
 }
 
@@ -203,13 +223,13 @@ async function loadProfiles(userIds: readonly string[]): Promise<Map<string, Pro
   return new Map((data as ProfileRow[]).map((profile) => [profile.id, profile]));
 }
 
-async function signTradeLicense(path: string): Promise<string | null> {
+async function signDocument(path: string): Promise<string | null> {
   if (!path) return null;
   const { data, error } = await admin.storage
     .from(TRADE_LICENSES_BUCKET)
     .createSignedUrl(path, SIGNED_URL_TTL_SECONDS);
   if (error || !data) {
-    console.error("Could not sign trade licence", error);
+    console.error("Could not sign supplier document", error);
     return null;
   }
   return data.signedUrl;

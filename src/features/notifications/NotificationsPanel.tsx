@@ -1,5 +1,6 @@
 import { useEffect, useState } from "react";
 import {
+  BadgeCheck,
   Ban,
   Banknote,
   Bell,
@@ -42,6 +43,8 @@ function notificationIcon(type: string): LucideIcon {
       return Wallet;
     case "delivery_verified":
       return PackageCheck;
+    case "supplier_verified":
+      return BadgeCheck;
     case "order_support_requested":
       return LifeBuoy;
     default:

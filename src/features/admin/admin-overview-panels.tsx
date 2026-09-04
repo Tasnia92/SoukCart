@@ -1,5 +1,5 @@
 import { useState, type FormEvent, type MouseEvent } from "react";
-import { ArrowRight, Package, ShieldCheck, Store } from "lucide-react";
+import { ArrowRight, Mail, MapPin, Package, Phone, ShieldCheck, Store } from "lucide-react";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import {
   AlertDialog,
@@ -29,6 +29,7 @@ import {
   ItemActions,
   ItemContent,
   ItemDescription,
+  ItemFooter,
   ItemGroup,
   ItemMedia,
   ItemTitle,
@@ -65,6 +66,7 @@ import { TableShell, type NoticeState } from "../../components/ui/Workspace.tsx"
 import { PaymentBadge, shortId, StatusBadge } from "../orders/order-presentation.tsx";
 import { formatDate, formatPrice } from "../workspace/format.ts";
 import { RouterLink } from "../workspace/WorkspaceShell.tsx";
+import { TradeLicenseCopyField } from "./trade-license-copy-field.tsx";
 import {
   completeManualRefund,
   updateOrderStatus,
@@ -790,7 +792,48 @@ export function AdminActionWorkspace({
               <p className="text-sm">{sheetItem.complaint.description}</p>
             ) : null}
             {sheetItem?.verification ? (
-              <p className="text-sm text-muted-foreground">{sheetItem.verification.shop_details}</p>
+              <div className="flex flex-col gap-4">
+                <TradeLicenseCopyField
+                  id={`queue-trade-license-${sheetItem.verification.user_id}`}
+                  value={sheetItem.verification.trade_license_number}
+                />
+                <ItemGroup>
+                  <Item size="sm">
+                    <ItemMedia variant="icon">
+                      <MapPin />
+                    </ItemMedia>
+                    <ItemContent>
+                      <ItemTitle>Location</ItemTitle>
+                      <ItemDescription>{sheetItem.verification.location}</ItemDescription>
+                    </ItemContent>
+                  </Item>
+                  <Item size="sm">
+                    <ItemMedia variant="icon">
+                      <Phone />
+                    </ItemMedia>
+                    <ItemContent>
+                      <ItemTitle>Phone</ItemTitle>
+                      <ItemDescription>
+                        {sheetItem.verification.contact_phone || "Not provided"}
+                      </ItemDescription>
+                    </ItemContent>
+                  </Item>
+                  <Item size="sm">
+                    <ItemMedia variant="icon">
+                      <Mail />
+                    </ItemMedia>
+                    <ItemContent>
+                      <ItemTitle>Email</ItemTitle>
+                      <ItemDescription>
+                        {sheetItem.verification.supplier_email || "Not provided"}
+                      </ItemDescription>
+                    </ItemContent>
+                  </Item>
+                </ItemGroup>
+                {sheetItem.verification.shop_details ? (
+                  <p className="text-sm leading-relaxed">{sheetItem.verification.shop_details}</p>
+                ) : null}
+              </div>
             ) : null}
           </div>
           <SheetFooter>
@@ -1050,6 +1093,7 @@ export function AdminRecentOrders({ dashboard }: { dashboard: AdminDashboard }) 
                   <ItemTitle>{verification.shop_name}</ItemTitle>
                   <ItemDescription>
                     {verification.supplier_name} · {verification.location}
+                    {verification.contact_phone ? ` · ${verification.contact_phone}` : ""}
                   </ItemDescription>
                 </ItemContent>
                 <ItemActions>
@@ -1066,6 +1110,13 @@ export function AdminRecentOrders({ dashboard }: { dashboard: AdminDashboard }) 
                     </RouterLink>
                   </Button>
                 </ItemActions>
+                <ItemFooter className="w-full">
+                  <TradeLicenseCopyField
+                    compact
+                    id={`overview-trade-license-${verification.user_id}`}
+                    value={verification.trade_license_number}
+                  />
+                </ItemFooter>
               </Item>
             ))}
           </ItemGroup>

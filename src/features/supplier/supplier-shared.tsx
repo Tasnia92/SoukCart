@@ -1,6 +1,7 @@
+import type { ReactNode } from "react";
 import { Home, Layers, Package, ShoppingBag } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
-import type { WorkspaceNavItem } from "../workspace/WorkspaceShell.tsx";
+import { WorkspaceShell, type WorkspaceNavItem } from "../workspace/WorkspaceShell.tsx";
 import type { SupplierProduct } from "./supplier-overview-api.ts";
 
 export const SUPPLIER_NOTICE_KEY = "soukcart:supplier-notice";
@@ -30,6 +31,33 @@ export function ProductThumb({ product }: { product: Pick<SupplierProduct, "imag
 }
 
 type SupplierSection = "overview" | "orders" | "products" | "stock";
+
+export function SupplierWorkspaceShell({
+  section,
+  userName,
+  userEmail,
+  onLogout,
+  children,
+}: {
+  section: SupplierSection;
+  userName: string;
+  userEmail: string;
+  onLogout: () => void;
+  children: ReactNode;
+}) {
+  return (
+    <WorkspaceShell
+      navigationLabel="Supplier navigation"
+      items={supplierNavItems(section)}
+      userName={userName}
+      userEmail={userEmail}
+      verified
+      onLogout={onLogout}
+    >
+      {children}
+    </WorkspaceShell>
+  );
+}
 
 export function supplierNavItems(active: SupplierSection): WorkspaceNavItem[] {
   return [
