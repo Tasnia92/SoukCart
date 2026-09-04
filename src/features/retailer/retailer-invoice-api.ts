@@ -20,6 +20,7 @@ export type InvoiceOrder = {
   delivery_address: string | null;
   delivery_city: string | null;
   delivery_postcode: string | null;
+  delivery_charge: number;
   items: InvoiceItem[];
 };
 
@@ -29,7 +30,7 @@ export type InvoiceResult =
   | { kind: "paid"; order: InvoiceOrder };
 
 const INVOICE_SELECT =
-  "id, status, cancel_requested, payment_status, payment_method, notes, created_at, paid_at, tran_id, val_id, bank_tran_id, delivery_phone, delivery_address, delivery_city, delivery_postcode, order_items(id, product_id, quantity, unit_price, products(name))";
+  "id, status, cancel_requested, payment_status, payment_method, notes, created_at, paid_at, tran_id, val_id, bank_tran_id, delivery_phone, delivery_address, delivery_city, delivery_postcode, delivery_charge, order_items(id, product_id, quantity, unit_price, products(name))";
 
 type InvoiceItemRow = {
   id: string;
@@ -52,6 +53,7 @@ type InvoiceRow = {
   delivery_address: string | null;
   delivery_city: string | null;
   delivery_postcode: string | null;
+  delivery_charge: number | string | null;
   order_items: InvoiceItemRow[] | null;
 };
 
@@ -92,11 +94,16 @@ export async function loadInvoice(orderId: string): Promise<InvoiceResult> {
       delivery_address: row.delivery_address ?? null,
       delivery_city: row.delivery_city ?? null,
       delivery_postcode: row.delivery_postcode ?? null,
+      delivery_charge: Number(row.delivery_charge ?? 0),
       items,
     },
   };
 }
 
-export function invoiceTotal(order: InvoiceOrder): number {
+export function invoiceMerchandiseTotal(order: InvoiceOrder): number {
   return order.items.reduce((sum, item) => sum + item.unit_price * item.quantity, 0);
+}
+
+export function invoiceTotal(order: InvoiceOrder): number {
+  return invoiceMerchandiseTotal(order) + Number(order.delivery_charge ?? 0);
 }

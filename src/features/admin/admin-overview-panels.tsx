@@ -89,12 +89,10 @@ type AdminActionWorkspaceProps = {
 };
 
 type PendingMutation =
-  | { type: "confirm"; order: ActivityOrder }
   | { type: "reject-cancel"; order: ActivityOrder }
   | { type: "approve-cancel"; order: ActivityOrder }
   | { type: "settle"; order: ActivityOrder }
   | { type: "resolve"; item: AdminQueueItem }
-  | { type: "batch-confirm"; orders: ActivityOrder[] }
   | { type: "batch-settle"; orders: ActivityOrder[] }
   | { type: "batch-resolve"; items: AdminQueueItem[] };
 
@@ -102,7 +100,6 @@ export const KIND_FILTERS: { value: QueueKindFilter; label: string }[] = [
   { value: "all", label: "All" },
   { value: "refund", label: "Refunds" },
   { value: "cancellation", label: "Cancellations" },
-  { value: "confirmation", label: "Confirmations" },
   { value: "dispute", label: "Disputes" },
   { value: "verification", label: "Verifications" },
 ];
@@ -110,7 +107,6 @@ export const KIND_FILTERS: { value: QueueKindFilter; label: string }[] = [
 export const QUEUE_KIND_LABELS: Record<AdminQueueKind, string> = {
   refund: "Refund",
   cancellation: "Cancellation",
-  confirmation: "Confirmation",
   dispute: "Dispute",
   verification: "Verification",
 };
@@ -151,9 +147,6 @@ export function exposureCopy(dashboard: AdminDashboard): string {
     parts.push(
       `${sla.cancellationCount} cancellation${sla.cancellationCount === 1 ? "" : "s"} · ${formatPrice(sla.cancellationAmount)}`,
     );
-  }
-  if (sla.confirmationCount) {
-    parts.push(`${sla.confirmationCount} awaiting confirmation`);
   }
   if (sla.disputeCount) {
     parts.push(`${sla.disputeCount} dispute${sla.disputeCount === 1 ? "" : "s"}`);
@@ -296,14 +289,6 @@ export function AdminActionWorkspace({
 
   const confirmPending = () => {
     if (!pending) return;
-    if (pending.type === "confirm") {
-      const order = pending.order;
-      run(
-        () => updateOrderStatus(order.id, "confirmed"),
-        `Order #${shortId(order.id)} is now confirmed.`,
-      );
-      return;
-    }
     if (pending.type === "reject-cancel") {
       const order = pending.order;
       run(
@@ -339,17 +324,6 @@ export function AdminActionWorkspace({
       run(() => resolveComplaint(complaint.id), "Dispute marked as resolved.");
       return;
     }
-    if (pending.type === "batch-confirm") {
-      const orders = pending.orders;
-      run(
-        () =>
-          Promise.all(orders.map((order) => updateOrderStatus(order.id, "confirmed"))).then(
-            () => undefined,
-          ),
-        `${orders.length} orders confirmed.`,
-      );
-      return;
-    }
     if (pending.type === "batch-settle") {
       const orders = pending.orders;
       run(
@@ -377,13 +351,6 @@ export function AdminActionWorkspace({
 
   const startBatch = () => {
     if (!canBatch || !selectedKind) return;
-    if (selectedKind === "confirmation") {
-      const orders = selectedItems
-        .map((item) => item.order)
-        .filter((order): order is ActivityOrder => Boolean(order));
-      setPending({ type: "batch-confirm", orders });
-      return;
-    }
     if (selectedKind === "refund") {
       const orders = selectedItems
         .map((item) => item.order)
@@ -398,9 +365,6 @@ export function AdminActionWorkspace({
 
   const pendingMessage = (() => {
     if (!pending) return "";
-    if (pending.type === "confirm") {
-      return `Confirm order #${shortId(pending.order.id)} for ${pending.order.retailer_name}?`;
-    }
     if (pending.type === "reject-cancel") {
       return `Reject the cancellation request for order #${shortId(pending.order.id)}?`;
     }
@@ -418,9 +382,6 @@ export function AdminActionWorkspace({
     }
     if (pending.type === "resolve") {
       return `Mark “${pending.item.title}” as resolved?`;
-    }
-    if (pending.type === "batch-confirm") {
-      return `Confirm ${pending.orders.length} orders?`;
     }
     if (pending.type === "batch-settle") {
       return `Mark ${pending.orders.length} manual refunds as completed?`;
@@ -477,11 +438,9 @@ export function AdminActionWorkspace({
                 {busy ? <Spinner data-icon="inline-start" /> : null}
                 {selectedKind === "refund"
                   ? "Settle selected refunds"
-                  : selectedKind === "confirmation"
-                    ? "Confirm selected orders"
-                    : selectedKind === "dispute"
-                      ? "Resolve selected disputes"
-                      : "Batch not available"}
+                  : selectedKind === "dispute"
+                    ? "Resolve selected disputes"
+                    : "Batch not available"}
               </Button>
               <Button
                 type="button"
@@ -586,19 +545,6 @@ export function AdminActionWorkspace({
                         </TableCell>
                         <TableCell className="text-right" onClick={stopRow}>
                           <div className="flex justify-end gap-2">
-                            {item.kind === "confirmation" && item.order ? (
-                              <Button
-                                type="button"
-                                size="sm"
-                                disabled={busy}
-                                onClick={() => {
-                                  const order = item.order;
-                                  if (order) setPending({ type: "confirm", order });
-                                }}
-                              >
-                                Confirm
-                              </Button>
-                            ) : null}
                             {item.kind === "refund" &&
                             item.order?.manual_refund_status === "pending" ? (
                               <Button
@@ -657,8 +603,7 @@ export function AdminActionWorkspace({
           <ShieldCheck />
           <AlertTitle>Nothing needs you right now</AlertTitle>
           <AlertDescription>
-            No refunds, cancellations, confirmations, disputes, or supplier applications are
-            waiting.
+            No refunds, cancellations, disputes, or supplier applications are waiting.
           </AlertDescription>
         </Alert>
       )}
@@ -768,18 +713,6 @@ export function AdminActionWorkspace({
             ) : null}
           </div>
           <SheetFooter>
-            {sheetItem?.kind === "confirmation" && sheetItem.order ? (
-              <Button
-                type="button"
-                disabled={busy}
-                onClick={() => {
-                  const order = sheetItem.order;
-                  if (order) setPending({ type: "confirm", order });
-                }}
-              >
-                Confirm order
-              </Button>
-            ) : null}
             {sheetItem?.kind === "cancellation" && sheetItem.order ? (
               <>
                 <Button
@@ -949,7 +882,7 @@ export function AdminNeedsYouNow({ dashboard }: { dashboard: AdminDashboard }) {
         <SectionEmpty
           icon={ShieldCheck}
           title="You’re caught up"
-          copy="When refunds, cancellations, confirmations, disputes, or applications need you, they’ll show up here."
+          copy="When refunds, cancellations, disputes, or applications need you, they’ll show up here."
         />
       )}
     </DashboardCard>

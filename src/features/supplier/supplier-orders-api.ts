@@ -35,6 +35,9 @@ export type SupplierOrder = {
   retailer_name: string;
   retailer_email: string;
   accepted_at: string | null;
+  package_status: "pending" | "confirmed" | "declined" | "shipped" | "delivered";
+  declined_at: string | null;
+  decline_reason: string | null;
   items: SupplierOrderItem[];
   supplier_total: number;
 };
@@ -45,6 +48,8 @@ type SupplierOrderRow = Omit<
   | "items"
   | "cancel_requested"
   | "accepted_at"
+  | "package_status"
+  | "declined_at"
   | "delivery_charge"
   | "delivery_payment_status"
   | "delivery_paid_at"
@@ -55,6 +60,9 @@ type SupplierOrderRow = Omit<
   delivery_paid_at?: string | null;
   cancel_requested: boolean | null;
   accepted_at: string | null;
+  package_status?: string | null;
+  declined_at?: string | null;
+  decline_reason?: string | null;
   items: (Omit<SupplierOrderItem, "unit_price" | "line_total"> & {
     unit_price: number | string;
     line_total: number | string;
@@ -68,6 +76,15 @@ function normalizeOrder(row: SupplierOrderRow): SupplierOrder {
     status: row.status as SupplierOrderStatus,
     cancel_requested: row.cancel_requested === true,
     accepted_at: row.accepted_at ?? null,
+    package_status:
+      row.package_status === "confirmed" ||
+      row.package_status === "declined" ||
+      row.package_status === "shipped" ||
+      row.package_status === "delivered"
+        ? row.package_status
+        : "pending",
+    declined_at: row.declined_at ?? null,
+    decline_reason: row.decline_reason ?? null,
     delivery_charge: Number(row.delivery_charge ?? 0),
     delivery_payment_status:
       deliveryStatus === "paid" || deliveryStatus === "failed" || deliveryStatus === "cancelled"
@@ -129,7 +146,32 @@ export function canFulfillPayment(
 }
 
 export function canConfirmOrder(order: SupplierOrder): boolean {
-  return order.status === "pending" && !order.cancel_requested && canFulfillPayment(order);
+  return order.package_status === "pending" && !order.cancel_requested && canFulfillPayment(order);
+}
+
+export function canDeclineOrderItems(order: SupplierOrder): boolean {
+  return (
+    order.package_status === "pending" &&
+    !order.cancel_requested &&
+    order.status !== "cancelled" &&
+    canFulfillPayment(order)
+  );
+}
+
+export async function declineSupplierItems(orderId: string, reason: string): Promise<void> {
+  const { data, error } = await supabase.rpc("seller_decline_order_items", {
+    p_order_id: orderId,
+    p_reason: reason,
+  });
+  if (error) throw new Error(error.message || "These items could not be declined.");
+  if (
+    typeof data !== "object" ||
+    data === null ||
+    !("packageStatus" in data) ||
+    data.packageStatus !== "declined"
+  ) {
+    throw new Error("The items were not declined.");
+  }
 }
 
 export function canSupplierCancel(order: SupplierOrder): boolean {

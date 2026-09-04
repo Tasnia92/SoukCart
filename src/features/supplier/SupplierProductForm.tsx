@@ -39,9 +39,14 @@ import { useSessionSnapshot, useSessionStore } from "../../session.tsx";
 import { RouterLink } from "../workspace/WorkspaceShell.tsx";
 import {
   createSupplierProduct,
+  DEFAULT_PRODUCT_UNIT,
+  loadProductCategoryOptions,
   loadSupplierProduct,
   MAX_IMAGE_BYTES,
+  MAX_PRODUCT_DESCRIPTION,
+  mergeCurrentCategory,
   PRODUCT_CATEGORIES,
+  productUnitOptions,
   productValidationError,
   removeStoredImage,
   updateSupplierProduct,
@@ -54,6 +59,7 @@ import { SUPPLIER_NOTICE_KEY, SupplierWorkspaceShell } from "./supplier-shared.t
 type SupplierProductFormProps = {
   productId?: string;
   loadProduct?: (sellerId: string, productId: string) => Promise<SupplierProduct | null>;
+  loadCategories?: () => Promise<string[]>;
 };
 
 type Feedback = { message: string; state: "info" | "success" | "error" } | null;
@@ -68,6 +74,7 @@ function readText(formData: FormData, name: string): string {
 export function SupplierProductForm({
   productId,
   loadProduct = loadSupplierProduct,
+  loadCategories = loadProductCategoryOptions,
 }: SupplierProductFormProps) {
   const isEdit = Boolean(productId);
   const { state } = useSessionSnapshot();
@@ -78,12 +85,31 @@ export function SupplierProductForm({
   const [editing, setEditing] = useState<SupplierProduct | null | undefined>(
     isEdit ? undefined : null,
   );
+  const [categoryOptions, setCategoryOptions] = useState<string[] | null>(null);
+  const [description, setDescription] = useState("");
   const [error, setError] = useState<string | null>(null);
   const [keptImageUrl, setKeptImageUrl] = useState<string | null>(null);
   const [previewObjectUrl, setPreviewObjectUrl] = useState<string | null>(null);
   const [feedback, setFeedback] = useState<Feedback>(null);
   const [submitting, setSubmitting] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
+
+  useEffect(() => {
+    if (!sellerId) return;
+    let current = true;
+
+    void loadCategories()
+      .then((options) => {
+        if (current) setCategoryOptions(options);
+      })
+      .catch(() => {
+        if (current) setCategoryOptions([...PRODUCT_CATEGORIES]);
+      });
+
+    return () => {
+      current = false;
+    };
+  }, [loadCategories, sellerId]);
 
   useEffect(() => {
     if (!isEdit || !sellerId || !productId) return;
@@ -99,6 +125,7 @@ export function SupplierProductForm({
         }
         setEditing(found);
         setKeptImageUrl(found.image_url ?? null);
+        setDescription(found.description ?? "");
       })
       .catch((loadError: unknown) => {
         if (current) {
@@ -118,6 +145,13 @@ export function SupplierProductForm({
   }, [previewObjectUrl]);
 
   if (state.status !== "seller") return null;
+
+  const categoryChoices = mergeCurrentCategory(
+    categoryOptions ?? [...PRODUCT_CATEGORIES],
+    editing?.category ?? null,
+  );
+
+  const unitChoices = productUnitOptions(editing?.unit ?? DEFAULT_PRODUCT_UNIT);
 
   const onLogout = () => {
     void store.signOut().then(() => {
@@ -173,7 +207,7 @@ export function SupplierProductForm({
       name: readText(formData, "name").trim(),
       description: readText(formData, "description").trim(),
       price: Number(readText(formData, "price")),
-      unit: readText(formData, "unit").trim() || "piece",
+      unit: readText(formData, "unit").trim() || DEFAULT_PRODUCT_UNIT,
       stock: Number(readText(formData, "stock")),
       min_order_qty: Number(readText(formData, "min_order_qty")),
       category: (() => {
@@ -303,19 +337,26 @@ export function SupplierProductForm({
                   />
                 </Field>
                 <Field className="md:col-span-2">
-                  <FieldLabel htmlFor="product-description">Description</FieldLabel>
+                  <FieldLabel htmlFor="product-description">Long description</FieldLabel>
                   <Textarea
                     id="product-description"
                     name="description"
-                    rows={3}
-                    maxLength={500}
-                    placeholder="Short detail retailers will see"
-                    defaultValue={editing?.description ?? ""}
+                    rows={6}
+                    maxLength={MAX_PRODUCT_DESCRIPTION}
+                    placeholder="The full story retailers see on the product page — origin, grain size, packaging, shelf life…"
+                    value={description}
+                    onChange={(event) => setDescription(event.currentTarget.value)}
                   />
+                  <FieldDescription className="flex flex-wrap items-center justify-between gap-2">
+                    <span>Shown on the product page — write the details retailers ask about.</span>
+                    <span className="tabular-nums">
+                      {description.length}/{MAX_PRODUCT_DESCRIPTION}
+                    </span>
+                  </FieldDescription>
                 </Field>
                 <Field>
                   <FieldLabel htmlFor="product-price" required>
-                    Price (৳)
+                    Price per unit (৳)
                   </FieldLabel>
                   <Input
                     id="product-price"
@@ -333,16 +374,23 @@ export function SupplierProductForm({
                   <FieldLabel htmlFor="product-unit" required>
                     Unit
                   </FieldLabel>
-                  <Input
-                    id="product-unit"
-                    name="unit"
-                    type="text"
-                    maxLength={24}
-                    placeholder="kg, crate, piece…"
-                    defaultValue={editing ? editing.unit : "piece"}
-                    required
-                    aria-required="true"
-                  />
+                  <Select name="unit" defaultValue={editing ? editing.unit : DEFAULT_PRODUCT_UNIT}>
+                    <SelectTrigger id="product-unit" className="w-full">
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectGroup>
+                        {unitChoices.map((unit) => (
+                          <SelectItem value={unit.value} key={unit.value}>
+                            {unit.label}
+                          </SelectItem>
+                        ))}
+                      </SelectGroup>
+                    </SelectContent>
+                  </Select>
+                  <FieldDescription>
+                    How this product is sold and priced — retailers see the price per unit.
+                  </FieldDescription>
                 </Field>
                 <Field>
                   <FieldLabel htmlFor="product-category">Category</FieldLabel>
@@ -353,7 +401,7 @@ export function SupplierProductForm({
                     <SelectContent>
                       <SelectGroup>
                         <SelectItem value={UNCATEGORIZED}>Choose a category</SelectItem>
-                        {PRODUCT_CATEGORIES.map((category) => (
+                        {categoryChoices.map((category) => (
                           <SelectItem value={category} key={category}>
                             {category}
                           </SelectItem>

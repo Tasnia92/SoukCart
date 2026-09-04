@@ -221,7 +221,7 @@ export function RetailerCart({
                     </RouterLink>
                   </Button>
                   <Button asChild variant="ghost">
-                    <RouterLink to="/retailer/catalog">Continue shopping</RouterLink>
+                    <RouterLink to="/retailer">Continue shopping</RouterLink>
                   </Button>
                 </CardFooter>
               </Card>
@@ -234,7 +234,7 @@ export function RetailerCart({
             copy="Browse the catalog and add products to start ordering."
             action={
               <Button asChild>
-                <RouterLink to="/retailer/catalog">Browse catalog</RouterLink>
+                <RouterLink to="/retailer">Browse catalog</RouterLink>
               </Button>
             }
           />

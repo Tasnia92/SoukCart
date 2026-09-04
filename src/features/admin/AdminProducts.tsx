@@ -54,14 +54,17 @@ import { useSessionSnapshot, useSessionStore } from "../../session.tsx";
 import { formatDate, formatPrice, initials } from "../workspace/format.ts";
 import { AdminWorkspaceShell } from "./admin-workspace-shell.tsx";
 import {
+  ADMIN_PRODUCT_SORTS,
   filterAdminProducts,
   getAdminProductStats,
   hideAdminProduct,
   loadAdminProducts,
   removeAdminProduct,
   restoreAdminProduct,
+  sortAdminProducts,
   type AdminProduct,
   type AdminProductFilter,
+  type AdminProductSort,
 } from "./admin-products-api.ts";
 
 type AdminProductsProps = {
@@ -204,6 +207,7 @@ export function AdminProducts({
   const [loadVersion, setLoadVersion] = useState(0);
   const [searchTerm, setSearchTerm] = useState("");
   const [statusFilter, setStatusFilter] = useState<AdminProductFilter>("all");
+  const [sort, setSort] = useState<AdminProductSort>("newest");
   const [notice, setNotice] = useState<Notice>(null);
   const [busyId, setBusyId] = useState<string | null>(null);
   const [pending, setPending] = useState<{ product: AdminProduct; action: ModerateAction } | null>(
@@ -364,7 +368,9 @@ export function AdminProducts({
   };
 
   const stats = products ? getAdminProductStats(products) : null;
-  const filtered = products ? filterAdminProducts(products, searchTerm, statusFilter) : [];
+  const filtered = products
+    ? sortAdminProducts(filterAdminProducts(products, searchTerm, statusFilter), sort)
+    : [];
 
   return (
     <AdminWorkspaceShell
@@ -396,21 +402,35 @@ export function AdminProducts({
               onChange={(event) => setSearchTerm(event.target.value)}
               result={`${filtered.length} of ${products.length} products`}
             />
-            <Select
-              value={statusFilter}
-              onValueChange={(value) => setStatusFilter(value as AdminProductFilter)}
-            >
-              <SelectTrigger className="w-44" aria-label="Filter by status">
-                <SelectValue placeholder="Status" />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="all">All statuses</SelectItem>
-                <SelectItem value="active">Active</SelectItem>
-                <SelectItem value="hidden">Hidden by admin</SelectItem>
-                <SelectItem value="removed">Removed</SelectItem>
-                <SelectItem value="seller_hidden">Hidden by seller</SelectItem>
-              </SelectContent>
-            </Select>
+            <div className="flex items-center gap-2">
+              <Select value={sort} onValueChange={(value) => setSort(value as AdminProductSort)}>
+                <SelectTrigger className="w-36" aria-label="Sort products by listing date">
+                  <SelectValue placeholder="Sort" />
+                </SelectTrigger>
+                <SelectContent>
+                  {ADMIN_PRODUCT_SORTS.map((option) => (
+                    <SelectItem key={option.id} value={option.id}>
+                      {option.label}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+              <Select
+                value={statusFilter}
+                onValueChange={(value) => setStatusFilter(value as AdminProductFilter)}
+              >
+                <SelectTrigger className="w-44" aria-label="Filter by status">
+                  <SelectValue placeholder="Status" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="all">All statuses</SelectItem>
+                  <SelectItem value="active">Active</SelectItem>
+                  <SelectItem value="hidden">Hidden by admin</SelectItem>
+                  <SelectItem value="removed">Removed</SelectItem>
+                  <SelectItem value="seller_hidden">Hidden by seller</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
           </div>
 
           {products.length ? (

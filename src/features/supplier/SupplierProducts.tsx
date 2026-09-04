@@ -31,7 +31,6 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
-import { Item, ItemActions, ItemContent, ItemDescription, ItemTitle } from "@/components/ui/item";
 import {
   Select,
   SelectContent,
@@ -51,6 +50,7 @@ import {
 import { useProductChanges } from "../../product-realtime.ts";
 import { useSessionSnapshot, useSessionStore } from "../../session.tsx";
 import { formatDate, formatPrice } from "../workspace/format.ts";
+import { ProductArt } from "../workspace/product-art.tsx";
 import { searchParam } from "../workspace/search.ts";
 import { RouterLink } from "../workspace/WorkspaceShell.tsx";
 import {
@@ -74,7 +74,6 @@ import {
 import { isAdminModerated } from "./supplier-overview-api.ts";
 import {
   consumeSupplierNotice,
-  ProductThumb,
   StockChip,
   SupplierWorkspaceShell,
   type SupplierNotice,
@@ -121,8 +120,8 @@ function ProductCard({
       className="h-full gap-0 overflow-hidden py-0"
       data-selected={selected ? "true" : undefined}
     >
-      <div className="relative flex aspect-[4/3] w-full shrink-0 items-center justify-center overflow-hidden bg-muted text-muted-foreground">
-        <ProductThumb product={product} fill />
+      <div className="relative aspect-[4/3] w-full shrink-0 overflow-hidden bg-muted">
+        <ProductArt src={product.image_url} />
         <div className="absolute top-2 left-2 z-10">
           <Checkbox
             checked={selected}
@@ -200,26 +199,19 @@ function ProductCard({
           {product.is_active && isProductLowStock(product) ? (
             <Badge variant="outline">Low stock</Badge>
           ) : null}
-          {product.is_active && product.stock <= 0 ? (
-            <Badge variant="destructive">Out of stock</Badge>
-          ) : null}
         </div>
         {product.moderation_reason ? (
           <p className="rounded-md border border-destructive/30 bg-destructive/5 px-3 py-2 text-xs text-destructive">
             <strong>Admin reason:</strong> {product.moderation_reason}
           </p>
         ) : null}
-        <Item variant="muted" size="sm">
-          <ItemContent>
-            <ItemDescription>Available stock</ItemDescription>
-            <ItemTitle>
-              {product.stock} {product.unit}
-            </ItemTitle>
-          </ItemContent>
-          <ItemActions>
-            <Badge variant="secondary">MOQ {product.min_order_qty}</Badge>
-          </ItemActions>
-        </Item>
+        <div className="flex items-center justify-between gap-2 text-sm">
+          <span>
+            <span className="font-medium tabular-nums">{product.stock}</span> {product.unit}{" "}
+            available
+          </span>
+          <span className="text-xs text-muted-foreground">MOQ {product.min_order_qty}</span>
+        </div>
       </CardContent>
       <CardFooter className="mt-auto justify-between border-t pt-(--card-spacing) pb-(--card-spacing)">
         <span className="text-xs text-muted-foreground">

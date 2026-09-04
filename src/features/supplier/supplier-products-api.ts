@@ -31,9 +31,76 @@ export const PRODUCT_CATEGORIES = [
   "Other",
 ] as const;
 
+/**
+ * Categories offered in the product form: the admin-managed list with the
+ * static curated list as a fallback (e.g. if the table is unreachable).
+ */
+export async function loadProductCategoryOptions(): Promise<string[]> {
+  try {
+    const { data, error } = await supabase
+      .from("categories")
+      .select("name")
+      .eq("is_active", true)
+      .order("sort_order", { ascending: true })
+      .order("name", { ascending: true });
+    if (error) throw error;
+    const names = ((data ?? []) as { name: string }[])
+      .map((row) => (typeof row.name === "string" ? row.name.trim() : ""))
+      .filter((name) => name.length > 0);
+    return names.length ? names : [...PRODUCT_CATEGORIES];
+  } catch {
+    return [...PRODUCT_CATEGORIES];
+  }
+}
+
+/** Ensure a product's current category stays selectable, even if hidden/removed. */
+export function mergeCurrentCategory(options: readonly string[], current: string | null): string[] {
+  if (!current) return [...options];
+  return options.includes(current)
+    ? [...options]
+    : [...options, current].sort((a, b) => a.localeCompare(b));
+}
+
+export type ProductUnitOption = { value: string; label: string };
+
+/**
+ * Units offered in the product form. The value is stored verbatim in
+ * `products.unit` and shown to retailers (e.g. "per kg", "100 kg available"),
+ * so keep values short and human-readable.
+ */
+export const PRODUCT_UNITS: ReadonlyArray<ProductUnitOption> = [
+  { value: "kg", label: "Kilogram (kg)" },
+  { value: "g", label: "Gram (g)" },
+  { value: "litre", label: "Litre" },
+  { value: "piece", label: "Piece" },
+  { value: "dozen", label: "Dozen" },
+  { value: "packet", label: "Packet" },
+  { value: "box", label: "Box" },
+  { value: "carton", label: "Carton" },
+  { value: "crate", label: "Crate" },
+  { value: "sack", label: "Sack" },
+  { value: "bundle", label: "Bundle" },
+  { value: "bottle", label: "Bottle" },
+];
+
+/** Unit used when a product has none (form fallback and database default). */
+export const DEFAULT_PRODUCT_UNIT = "piece";
+
+/**
+ * Unit picker options, with a product's current unit appended when it is a
+ * legacy free-text value that is not part of the curated list.
+ */
+export function productUnitOptions(current: string): ReadonlyArray<ProductUnitOption> {
+  if (!current || PRODUCT_UNITS.some((unit) => unit.value === current)) return PRODUCT_UNITS;
+  return [...PRODUCT_UNITS, { value: current, label: current }];
+}
+
 export const PRODUCT_IMAGES_BUCKET = "product-images";
 export const MAX_IMAGE_BYTES = 5 * 1024 * 1024;
 export const CATALOG_PAGE_SIZE = 12;
+
+/** Longest description accepted for a product (form limit and shared validator). */
+export const MAX_PRODUCT_DESCRIPTION = 2000;
 
 export type ProductPayload = {
   name: string;
@@ -146,6 +213,9 @@ export function productValidationError(
   }
   if (!options.allowZeroStock && payload.stock < payload.min_order_qty) {
     return "Stock must be at least the minimum order quantity.";
+  }
+  if (payload.description.length > MAX_PRODUCT_DESCRIPTION) {
+    return `Keep the description under ${MAX_PRODUCT_DESCRIPTION} characters.`;
   }
   if (options.requireImage && !options.hasImageFile && !options.imageUrl?.trim()) {
     return "Please add a product image.";

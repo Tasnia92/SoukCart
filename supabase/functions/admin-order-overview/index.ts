@@ -18,6 +18,7 @@ type RequestBody = {
   status?: unknown;
   platformCharge?: unknown;
   deliveryCharge?: unknown;
+  supplierId?: unknown;
 };
 
 const ORDER_STATUSES = ["pending", "confirmed", "shipped", "delivered", "cancelled"] as const;
@@ -64,6 +65,15 @@ type ActivityOrder = {
   retailer_email: string;
   total: number;
   lines: ActivityLine[];
+  packages: ActivityPackage[];
+};
+
+type ActivityPackage = {
+  supplier_id: string;
+  supplier_name: string | null;
+  status: string;
+  declined_at: string | null;
+  decline_reason: string | null;
 };
 
 type ActivitySummary = {
@@ -150,7 +160,7 @@ async function listActivity(): Promise<Response> {
   const { data, error } = await admin
     .from("orders")
     .select(
-      "id, status, cancel_requested, cancellation_initiator, cancellation_reason, payment_status, payment_method, created_at, delivered_at, delivery_verified_at, delivery_phone, delivery_address, delivery_city, delivery_postcode, platform_charge, delivery_charge, delivery_payment_status, refund_amount, manual_refund_status, refund_completed_at, retailer_id, users!orders_retailer_id_fkey(name, email), order_items(id, product_id, quantity, unit_price, products(id, name, seller_id, users!products_seller_id_fkey(name, email)))",
+      "id, status, cancel_requested, cancellation_initiator, cancellation_reason, payment_status, payment_method, created_at, delivered_at, delivery_verified_at, delivery_phone, delivery_address, delivery_city, delivery_postcode, platform_charge, delivery_charge, delivery_payment_status, refund_amount, manual_refund_status, refund_completed_at, retailer_id, users!orders_retailer_id_fkey(name, email), order_items(id, product_id, quantity, unit_price, products(id, name, seller_id, users!products_seller_id_fkey(name, email))), order_supplier_acceptances(supplier_id, status, declined_at, decline_reason)",
     )
     .order("created_at", { ascending: false })
     .limit(1000);
@@ -204,6 +214,7 @@ async function listActivity(): Promise<Response> {
       retailer_email: typeof retailer?.email === "string" ? retailer.email : "",
       total: roundMoney(lines.reduce((sum, line) => sum + line.amount, 0)),
       lines,
+      packages: packagesFrom(row, lines),
     };
   });
 
@@ -243,12 +254,14 @@ async function updateStatus(caller: Caller, body: RequestBody): Promise<Response
     return json({ error: "Cancellation charges must be valid non-negative amounts." }, 400);
   }
 
+  const supplierId = readUuid(body.supplierId);
   const { data, error } = await admin.rpc("admin_update_order_status", {
     p_order_id: orderId,
     p_status: status,
     p_admin_id: caller.id,
     p_platform_charge: platformCharge,
     p_delivery_charge: deliveryCharge,
+    p_supplier_id: supplierId,
   });
   if (error) {
     return json({ error: error.message }, 400);
@@ -296,6 +309,14 @@ type OrderRow = {
   retailer_id: string;
   users: unknown;
   order_items: OrderItemRow[] | null;
+  order_supplier_acceptances?: PackageRow[] | null;
+};
+
+type PackageRow = {
+  supplier_id: string;
+  status: string | null;
+  declined_at: string | null;
+  decline_reason: string | null;
 };
 
 type OrderItemRow = {
@@ -309,6 +330,39 @@ type OrderItemRow = {
 function pickRelation(value: unknown): { name?: unknown; email?: unknown } | null {
   const record = Array.isArray(value) ? value[0] : value;
   return isRecord(record) ? record : null;
+}
+
+function packagesFrom(row: OrderRow, lines: ActivityLine[]): ActivityPackage[] {
+  const names = new Map<string, string | null>();
+  for (const line of lines) {
+    if (line.supplier_id && !names.has(line.supplier_id)) {
+      names.set(line.supplier_id, line.supplier_name);
+    }
+  }
+  const acceptances = row.order_supplier_acceptances ?? [];
+  if (acceptances.length) {
+    return acceptances
+      .filter((pkg) => typeof pkg.supplier_id === "string")
+      .map((pkg) => ({
+        supplier_id: pkg.supplier_id,
+        supplier_name: names.get(pkg.supplier_id) ?? null,
+        status: typeof pkg.status === "string" ? pkg.status : "pending",
+        declined_at: pkg.declined_at,
+        decline_reason: pkg.decline_reason,
+      }));
+  }
+  return [...names.entries()].map(([supplier_id, supplier_name]) => ({
+    supplier_id,
+    supplier_name,
+    status:
+      row.status === "cancelled"
+        ? "declined"
+        : row.status === "delivered" || row.status === "shipped" || row.status === "confirmed"
+          ? row.status
+          : "pending",
+    declined_at: null,
+    decline_reason: null,
+  }));
 }
 
 function roundMoney(value: number): number {

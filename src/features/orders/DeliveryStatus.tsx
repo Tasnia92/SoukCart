@@ -36,6 +36,11 @@ export function isDeliveryStep(status: string): status is DeliveryStepId {
   return status in STEP_INDEX;
 }
 
+/** Position on the 4-step delivery ladder; -1 for cancelled/unknown statuses. */
+export function deliveryStepIndex(status: string): number {
+  return isDeliveryStep(status) ? STEP_INDEX[status] : -1;
+}
+
 export function nextDeliveryStatus(status: string): "confirmed" | "shipped" | "delivered" | null {
   switch (status) {
     case "pending":
@@ -77,9 +82,9 @@ export function deliveryStatusCopy(status: string, audience: DeliveryAudience): 
   if (audience === "retailer") {
     switch (status) {
       case "pending":
-        return "Your order is placed. The supplier will confirm it next.";
+        return "Your order is placed. Each supplier confirms their own items next.";
       case "confirmed":
-        return "Confirmed. Admin will mark it shipped when the parcel is on the way.";
+        return "Confirmed. Your parcels are being prepared and will ship soon.";
       case "shipped":
         return "Your order is on the way.";
       case "delivered":
@@ -106,9 +111,9 @@ export function deliveryStatusCopy(status: string, audience: DeliveryAudience): 
 
   switch (status) {
     case "pending":
-      return "Confirm the order, then mark shipped and delivered as the parcel moves.";
+      return "Waiting for the supplier to confirm. You can ship a package after that.";
     case "confirmed":
-      return "Mark shipped when the parcel leaves.";
+      return "Ship each confirmed supplier package. Unconfirmed items stay here until the supplier acts.";
     case "shipped":
       return "Mark delivered when the retailer has received it.";
     case "delivered":

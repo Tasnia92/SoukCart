@@ -124,6 +124,68 @@ export function getCategoryCounts(products: readonly RetailerProduct[]): Categor
   }));
 }
 
+export type ProductSort = "name" | "price-asc" | "price-desc";
+
+export const PRODUCT_SORTS: { id: ProductSort; label: string }[] = [
+  { id: "name", label: "Name A–Z" },
+  { id: "price-asc", label: "Price: low to high" },
+  { id: "price-desc", label: "Price: high to low" },
+];
+
+/** Cap for the related-products rail on a product page. */
+export const RELATED_PRODUCT_LIMIT = 10;
+
+/**
+ * Suggestions for a product page: other listings from the same supplier
+ * first, then other products in the same category. The product itself is
+ * always excluded, and each product appears at most once.
+ */
+export function relatedProducts(
+  products: readonly RetailerProduct[],
+  product: RetailerProduct,
+  limit = RELATED_PRODUCT_LIMIT,
+): RetailerProduct[] {
+  const sameSupplier =
+    product.seller_id !== null
+      ? products.filter(
+          (candidate) => candidate.id !== product.id && candidate.seller_id === product.seller_id,
+        )
+      : [];
+  const sameCategory =
+    product.category !== null
+      ? products.filter(
+          (candidate) =>
+            candidate.id !== product.id &&
+            candidate.seller_id !== product.seller_id &&
+            candidate.category === product.category,
+        )
+      : [];
+  return [...sameSupplier, ...sameCategory].slice(0, limit);
+}
+
+export function parseProductSort(value: string | null): ProductSort {
+  return value === "price-asc" || value === "price-desc" ? value : "name";
+}
+
+export function sortProducts(
+  products: readonly RetailerProduct[],
+  sort: ProductSort,
+): RetailerProduct[] {
+  const sorted = [...products];
+  switch (sort) {
+    case "price-asc":
+      return sorted.sort(
+        (left, right) => left.price - right.price || left.name.localeCompare(right.name),
+      );
+    case "price-desc":
+      return sorted.sort(
+        (left, right) => right.price - left.price || left.name.localeCompare(right.name),
+      );
+    default:
+      return sorted.sort((left, right) => left.name.localeCompare(right.name));
+  }
+}
+
 // Resolves the total quantity to persist, throwing the legacy stock messages when the
 // requested addition would exceed available stock.
 export function nextCartQuantity(

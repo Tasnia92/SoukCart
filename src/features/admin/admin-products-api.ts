@@ -28,6 +28,29 @@ export type AdminProduct = {
 
 export type AdminProductFilter = "all" | "active" | "hidden" | "removed" | "seller_hidden";
 
+export type AdminProductSort = "newest" | "oldest";
+
+export const ADMIN_PRODUCT_SORTS: { id: AdminProductSort; label: string }[] = [
+  { id: "newest", label: "New to old" },
+  { id: "oldest", label: "Old to new" },
+];
+
+/** Sort used when no explicit choice is stored (defaults to newest first). */
+export function parseAdminProductSort(value: string | null): AdminProductSort {
+  return value === "oldest" ? "oldest" : "newest";
+}
+
+/** Order products by listing date without mutating the input array. */
+export function sortAdminProducts(
+  products: readonly AdminProduct[],
+  sort: AdminProductSort,
+): AdminProduct[] {
+  const direction = sort === "oldest" ? 1 : -1;
+  return [...products].sort(
+    (a, b) => direction * (Date.parse(a.created_at) - Date.parse(b.created_at)),
+  );
+}
+
 type ProductsResponse = {
   products: AdminProduct[];
 };

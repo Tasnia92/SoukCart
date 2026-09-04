@@ -1,6 +1,6 @@
 import { useNavigate } from "@tanstack/react-router";
 import { useCallback, useEffect, useState, type FormEvent } from "react";
-import { KeyRound, MapPin, Plus, RefreshCw, Store, Trash2 } from "lucide-react";
+import { KeyRound, LogOut, MapPin, Plus, Store, Trash2 } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
@@ -81,7 +81,6 @@ export function RetailerSettings() {
   const [addressNotice, setAddressNotice] = useState<Notice>(null);
   const [passwordNotice, setPasswordNotice] = useState<Notice>(null);
   const [loadVersion, setLoadVersion] = useState(0);
-  const [loading, setLoading] = useState(false);
   const [savingName, setSavingName] = useState(false);
   const [savingPassword, setSavingPassword] = useState(false);
   const [savingAddress, setSavingAddress] = useState(false);
@@ -104,7 +103,6 @@ export function RetailerSettings() {
     if (!retailerId) return;
     let current = true;
     setError(null);
-    setLoading(true);
 
     void loadRetailerShippingAddresses(retailerId)
       .then((next) => {
@@ -114,9 +112,6 @@ export function RetailerSettings() {
         if (current) {
           setError(loadError instanceof Error ? loadError.message : "Please try again.");
         }
-      })
-      .finally(() => {
-        if (current) setLoading(false);
       });
 
     return () => {
@@ -287,16 +282,6 @@ export function RetailerSettings() {
         eyebrow="Account"
         title="Settings."
         copy="Update your shop contact details and saved delivery addresses for checkout."
-        actions={
-          <Button type="button" variant="ghost" disabled={loading} onClick={retry}>
-            {loading ? (
-              <Spinner data-icon="inline-start" />
-            ) : (
-              <RefreshCw data-icon="inline-start" />
-            )}
-            Refresh
-          </Button>
-        }
       />
 
       <Tabs defaultValue="profile">
@@ -483,6 +468,21 @@ export function RetailerSettings() {
           </Card>
         </TabsContent>
       </Tabs>
+
+      <Card size="sm">
+        <CardContent className="flex flex-wrap items-center justify-between gap-3">
+          <div className="min-w-0">
+            <p className="text-sm font-medium">Log out of SoukCart</p>
+            <p className="text-sm text-muted-foreground">
+              End your session on this device. Your cart and orders stay saved.
+            </p>
+          </div>
+          <Button type="button" variant="outline" onClick={onLogout}>
+            <LogOut data-icon="inline-start" />
+            Log out
+          </Button>
+        </CardContent>
+      </Card>
 
       <Dialog open={editorOpen} onOpenChange={setEditorOpen}>
         <DialogContent>
