@@ -128,7 +128,7 @@ async function initiate(userId: string, body: Record<string, unknown>): Promise<
     return json({ error: reserveError.message }, 409);
   }
 
-  const reserved = parseReservedCheckout(reservedData);
+  const reserved = parseReservedCheckout(reservedData, paymentMethod);
   if (!reserved) {
     throw new Error("The reserved order returned invalid details.");
   }
@@ -150,7 +150,12 @@ async function initiate(userId: string, body: Record<string, unknown>): Promise<
     ? `${supabaseUrl.replace(/\/+$/, "")}/functions/v1/sslcommerz-return`
     : "";
   const appParam = encodeURIComponent(baseUrl);
-  const gatewayAmount = Number(reserved.payableNow);
+  // Online pays goods + delivery. Never send merchandise-only `total` (the
+  // previous hosted function did, so SSLCommerz omitted the delivery charge).
+  const gatewayAmount =
+    reserved.paymentMethod === "cod"
+      ? round2(reserved.deliveryCharge)
+      : round2(reserved.merchandiseTotal + reserved.deliveryCharge);
   const params = new URLSearchParams({
     store_id: storeId,
     store_passwd: storePasswd,
@@ -214,20 +219,24 @@ async function initiate(userId: string, body: Record<string, unknown>): Promise<
   }
 }
 
-function parseReservedCheckout(value: unknown): ReservedCheckout | null {
+function parseReservedCheckout(
+  value: unknown,
+  fallbackMethod: "online" | "cod",
+): ReservedCheckout | null {
   if (!isRecord(value)) return null;
   const orderId = readText(value.orderId);
   const merchandiseTotal = Number(
     value.merchandiseTotal !== undefined ? value.merchandiseTotal : value.total,
   );
   const deliveryCharge = Number(value.deliveryCharge ?? 0);
-  const paymentMethod = readText(value.paymentMethod).trim() === "cod" ? "cod" : "online";
+  const reportedMethod = readText(value.paymentMethod).trim();
+  const paymentMethod =
+    reportedMethod === "cod" || reportedMethod === "online" ? reportedMethod : fallbackMethod;
   const total = Number.isFinite(Number(value.total)) ? Number(value.total) : merchandiseTotal;
-  let payableNow = Number(value.payableNow);
-  if (!Number.isFinite(payableNow)) {
-    payableNow =
-      paymentMethod === "cod" ? deliveryCharge : round2(merchandiseTotal + deliveryCharge);
-  }
+  // Recompute here so a stale `payableNow` (or merchandise-only `total`) cannot
+  // send only the delivery fee or omit it from the SSLCommerz session.
+  const payableNow =
+    paymentMethod === "cod" ? round2(deliveryCharge) : round2(merchandiseTotal + deliveryCharge);
 
   const rawLines = Array.isArray(value.lines) ? value.lines : [];
   const lines: CartLine[] = [];
