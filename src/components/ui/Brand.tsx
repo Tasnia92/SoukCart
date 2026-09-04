@@ -24,7 +24,7 @@ export function Brand({ variant = "default", className, ...props }: BrandProps) 
         width="36"
         height="36"
       />
-      <span>SoukCart</span>
+      <span className="tracking-tight">soukcart</span>
     </a>
   );
 }

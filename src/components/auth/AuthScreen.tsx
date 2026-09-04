@@ -27,6 +27,10 @@ export type AuthScreenProps = {
   initialRole?: AuthRole;
   onLogin: AuthCallbackWithRole<LoginCredentials>;
   onRegister: AuthCallbackWithRole<RegistrationDetails>;
+  /** When set (route-driven pages), mode changes navigate instead of local state. */
+  onModeChange?: (mode: AuthMode) => void;
+  /** When set (route-driven pages), role changes update the URL search params. */
+  onRoleChange?: (role: AuthRole) => void;
   variant?: AuthShellVariant;
 };
 
@@ -36,6 +40,8 @@ export function AuthScreen({
   initialRole = "retailer",
   onLogin,
   onRegister,
+  onModeChange,
+  onRoleChange,
   variant = "public",
 }: AuthScreenProps) {
   const [mode, setMode] = useState<AuthMode>(() => (variant === "admin" ? "login" : initialMode));
@@ -44,6 +50,13 @@ export function AuthScreen({
   const [feedback, setFeedback] = useState<AuthFeedback | null>(initialFeedback);
   const headingRef = useRef<HTMLHeadingElement>(null);
   const focusHeadingAfterSwitch = useRef(false);
+  const routeDriven = Boolean(onModeChange || onRoleChange);
+
+  useEffect(() => {
+    setMode(variant === "admin" ? "login" : initialMode);
+    setRole(initialRole);
+    setFeedback(initialFeedback);
+  }, [initialFeedback, initialMode, initialRole, variant]);
 
   useEffect(() => {
     if (!focusHeadingAfterSwitch.current) {
@@ -82,6 +95,10 @@ export function AuthScreen({
 
     focusHeadingAfterSwitch.current = true;
     setFeedback(null);
+    if (onModeChange) {
+      onModeChange(nextMode);
+      return;
+    }
     setMode(nextMode);
   };
 
@@ -91,6 +108,10 @@ export function AuthScreen({
     }
 
     setFeedback(null);
+    if (onRoleChange) {
+      onRoleChange(nextRole);
+      return;
+    }
     setRole(nextRole);
   };
 
@@ -98,15 +119,19 @@ export function AuthScreen({
     <AuthShell
       feedback={feedback}
       headingRef={headingRef}
-      mode={mode}
+      mode={routeDriven ? initialMode : mode}
       onForgotPassword={() => setFeedback(FORGOT_PASSWORD_FEEDBACK)}
-      onLogin={(values) => runAuthCallback((entry) => onLogin(entry, role), values)}
-      onRegister={(values) => runAuthCallback((entry) => onRegister(entry, role), values)}
+      onLogin={(values) =>
+        runAuthCallback((entry) => onLogin(entry, routeDriven ? initialRole : role), values)
+      }
+      onRegister={(values) =>
+        runAuthCallback((entry) => onRegister(entry, routeDriven ? initialRole : role), values)
+      }
       onRoleChange={switchRole}
       onSwitchMode={switchMode}
       onTerms={() => setFeedback(TERMS_FEEDBACK)}
       pending={pending}
-      role={role}
+      role={routeDriven ? initialRole : role}
       variant={variant}
     />
   );

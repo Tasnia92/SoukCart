@@ -238,7 +238,12 @@ export async function clearCart(userId: string): Promise<void> {
 export type CancellationRequestResult = {
   status: "requested";
   initiator: "retailer";
-  refundPolicy: "manual_less_charges" | "delivery_refund_requestable" | "not_required";
+  refundPolicy:
+    | "manual_keep_delivery"
+    | "manual_less_charges"
+    | "delivery_not_refunded"
+    | "delivery_refund_requestable"
+    | "not_required";
 };
 
 export async function requestOrderCancellation(

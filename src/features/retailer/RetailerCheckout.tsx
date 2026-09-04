@@ -41,7 +41,6 @@ import { useSessionSnapshot, useSessionStore } from "../../session.tsx";
 import { formatPrice } from "../workspace/format.ts";
 import {
   assertCartWithinStock,
-  assertSingleSupplierCart,
   cartDeliveryCharge,
   cartItemCount,
   cartOrderTotal,
@@ -208,7 +207,6 @@ export function RetailerCheckout({
     setCheckingOut(true);
     try {
       assertCartWithinStock(lines);
-      assertSingleSupplierCart(lines);
       if (selectedAddressId === "new" && saveAddress) {
         await createRetailerShippingAddress(retailerId, {
           label: addressLabel.trim() || "Address",

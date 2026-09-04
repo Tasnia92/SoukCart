@@ -9,57 +9,109 @@
  * -------------------------------------------------------------------------- */
 
 import {
+  BadgePercentIcon,
+  ClipboardListIcon,
+  LayoutGridIcon,
+  PackageCheckIcon,
   PackageIcon,
+  ScaleIcon,
   SearchIcon,
+  ShieldCheckIcon,
   ShoppingCartIcon,
+  ShoppingBagIcon,
   StoreIcon,
+  TrendingUpIcon,
   TruckIcon,
+  UserRoundIcon,
   type LucideIcon,
 } from "lucide-react";
 
 export const SECTION_IDS = {
-  platform: "platform",
   howItWorks: "how-it-works",
+  forSuppliers: "for-suppliers",
+  forRetailers: "for-retailers",
   join: "join",
 } as const;
 
 export const NAV_LINKS = [
-  { label: "For Retailers", href: `#${SECTION_IDS.join}` },
-  { label: "For Suppliers", href: `#${SECTION_IDS.join}` },
-  { label: "How it Works", href: `#${SECTION_IDS.howItWorks}` },
-  { label: "About", href: `#${SECTION_IDS.platform}` },
+  { label: "How It Works", href: `#${SECTION_IDS.howItWorks}` },
+  { label: "For Suppliers", href: `#${SECTION_IDS.forSuppliers}` },
+  { label: "For Retailers", href: `#${SECTION_IDS.forRetailers}` },
+  { label: "Benefits", href: `#${SECTION_IDS.join}` },
+  { label: "Pricing", href: `#${SECTION_IDS.join}` },
 ] as const;
 
-export const HANDOFF_STEPS = [
-  { step: "01", title: "Supplier Stock", detail: "Ready to fulfill" },
-  { step: "02", title: "Picked & Packed", detail: "Order confirmed" },
-  { step: "03", title: "In Transit", detail: "On the way" },
-  { step: "04", title: "Delivered", detail: "Stocked & ready" },
-] as const;
-
-export const PLATFORM_HIGHLIGHTS: {
+export const HERO_POINTS: {
   icon: LucideIcon;
   title: string;
   copy: string;
 }[] = [
   {
-    icon: PackageIcon,
-    title: "Clear product details",
-    copy: "Keep product information, quantities, and order expectations easy to understand.",
+    icon: ShieldCheckIcon,
+    title: "Verified Partners",
+    copy: "Trusted & reliable network",
   },
   {
-    icon: ShoppingCartIcon,
-    title: "Straightforward ordering",
-    copy: "Give retailers a simpler way to move from choosing products to placing an order.",
+    icon: BadgePercentIcon,
+    title: "Competitive Prices",
+    copy: "Better deals, higher margins",
   },
   {
-    icon: TruckIcon,
-    title: "One connected workflow",
-    copy: "Keep suppliers and retailers aligned from confirmation through delivery.",
+    icon: PackageCheckIcon,
+    title: "Reliable Delivery",
+    copy: "On-time, every time",
   },
 ];
 
-export const FLOW_STEPS: {
+export const SUPPLIER_SECTION = {
+  icon: LayoutGridIcon,
+  title: "For Suppliers",
+} as const;
+
+export const RETAILER_SECTION = {
+  icon: ShoppingBagIcon,
+  title: "For Retailers",
+} as const;
+
+export const SUPPLIER_STEPS: {
+  icon: LucideIcon;
+  step: string;
+  title: string;
+  copy: string;
+}[] = [
+  {
+    icon: UserRoundIcon,
+    step: "1",
+    title: "Create Your Account",
+    copy: "Sign up and set up your business profile.",
+  },
+  {
+    icon: PackageIcon,
+    step: "2",
+    title: "List Your Products",
+    copy: "Add products, prices, MOQs and availability.",
+  },
+  {
+    icon: ShoppingCartIcon,
+    step: "3",
+    title: "Receive Orders",
+    copy: "Retailers place orders directly from you.",
+  },
+  {
+    icon: TruckIcon,
+    step: "4",
+    title: "Pack & Deliver",
+    copy: "Process orders and ship on time.",
+  },
+  {
+    icon: TrendingUpIcon,
+    step: "5",
+    title: "Grow Your Business",
+    copy: "Reach more retailers and grow your sales.",
+  },
+];
+
+export const RETAILER_STEPS: {
   icon: LucideIcon;
   step: string;
   title: string;
@@ -67,27 +119,33 @@ export const FLOW_STEPS: {
 }[] = [
   {
     icon: SearchIcon,
-    step: "01",
-    title: "Discover Products",
-    copy: "Browse from a wide range of wholesale essentials.",
+    step: "1",
+    title: "Find Products",
+    copy: "Explore thousands of groceries from verified suppliers.",
   },
   {
-    icon: ShoppingCartIcon,
-    step: "02",
-    title: "Place Order",
-    copy: "Order against real-time stock with best pricing.",
+    icon: ScaleIcon,
+    step: "2",
+    title: "Compare & Choose",
+    copy: "Compare prices, MOQs and ratings to get the best deal.",
+  },
+  {
+    icon: ClipboardListIcon,
+    step: "3",
+    title: "Place Your Order",
+    copy: "Order in bulk with secure payment options.",
   },
   {
     icon: TruckIcon,
-    step: "03",
-    title: "Track Every Step",
-    copy: "Follow your order from supplier to your shop.",
+    step: "4",
+    title: "Track & Receive",
+    copy: "Track your order and get it delivered to your store.",
   },
   {
     icon: StoreIcon,
-    step: "04",
-    title: "Receive & Restock",
-    copy: "Get delivered on time and restock with ease.",
+    step: "5",
+    title: "Stock & Grow",
+    copy: "Keep your shelves full and delight your customers.",
   },
 ];
 
@@ -96,38 +154,39 @@ export const FOOTER_COLUMNS: {
   links: { label: string; href: string }[];
 }[] = [
   {
-    title: "For Retailers",
+    title: "Platform",
     links: [
-      { label: "Browse Products", href: `#${SECTION_IDS.platform}` },
-      { label: "How it Works", href: `#${SECTION_IDS.howItWorks}` },
-      { label: "Pricing", href: `#${SECTION_IDS.platform}` },
-      { label: "Help Center", href: `#${SECTION_IDS.join}` },
-    ],
-  },
-  {
-    title: "For Suppliers",
-    links: [
-      { label: "Sell on SoukCart", href: `#${SECTION_IDS.join}` },
-      { label: "Supplier Guide", href: `#${SECTION_IDS.howItWorks}` },
-      { label: "Pricing", href: `#${SECTION_IDS.platform}` },
-      { label: "Resources", href: `#${SECTION_IDS.howItWorks}` },
+      { label: "How It Works", href: `#${SECTION_IDS.howItWorks}` },
+      { label: "For Suppliers", href: `#${SECTION_IDS.forSuppliers}` },
+      { label: "For Retailers", href: `#${SECTION_IDS.forRetailers}` },
+      { label: "Benefits", href: `#${SECTION_IDS.join}` },
+      { label: "Pricing", href: `#${SECTION_IDS.join}` },
+      { label: "FAQ", href: `#${SECTION_IDS.howItWorks}` },
     ],
   },
   {
     title: "Company",
     links: [
-      { label: "About Us", href: `#${SECTION_IDS.platform}` },
+      { label: "About Us", href: `#${SECTION_IDS.howItWorks}` },
       { label: "Careers", href: `#${SECTION_IDS.join}` },
       { label: "Blog", href: `#${SECTION_IDS.join}` },
       { label: "Contact Us", href: `#${SECTION_IDS.join}` },
     ],
   },
+  {
+    title: "Legal",
+    links: [
+      { label: "Terms of Use", href: `#${SECTION_IDS.join}` },
+      { label: "Privacy Policy", href: `#${SECTION_IDS.join}` },
+      { label: "Refund Policy", href: `#${SECTION_IDS.join}` },
+    ],
+  },
 ];
 
-export const LEGAL_LINKS = [
-  { label: "Privacy Policy", href: `#${SECTION_IDS.join}` },
-  { label: "Terms of Service", href: `#${SECTION_IDS.join}` },
-  { label: "Cookie Policy", href: `#${SECTION_IDS.join}` },
+export const SOCIAL_LINKS = [
+  { label: "SoukCart on Facebook", href: "https://facebook.com/soukcart" },
+  { label: "SoukCart on LinkedIn", href: "https://linkedin.com/company/soukcart" },
+  { label: "SoukCart on Instagram", href: "https://instagram.com/soukcart" },
 ] as const;
 
 export const NEWSLETTER_FEEDBACK =

@@ -375,9 +375,9 @@ export function RetailerOrders({
     const prepaidDelivery =
       order.payment_method === "cod" && order.delivery_payment_status === "paid";
     const refundHint = paidOnline
-      ? " and manually refund the eligible paid amount (a platform retention may be deducted)"
+      ? " and manually refund paid merchandise (prepaid delivery is kept; no platform charge)"
       : prepaidDelivery
-        ? ". Prepaid delivery is not refunded automatically when you cancel"
+        ? ". Prepaid delivery is not refunded when you cancel"
         : "";
     const message = `Request cancellation of order #${shortId(order.id)}? The admin team will review it${refundHint}.`;
     if (!window.confirm(message)) return;
@@ -611,9 +611,13 @@ export function RetailerOrders({
                                 <RefreshCw />
                                 <AlertTitle>Refund details</AlertTitle>
                                 <AlertDescription>
-                                  {formatPrice(order.refund_amount)} · platform charge{" "}
-                                  {formatPrice(order.platform_charge)} · delivery charge{" "}
-                                  {formatPrice(order.delivery_charge)}
+                                  {formatPrice(order.refund_amount)} refund
+                                  {order.platform_charge > 0
+                                    ? ` · platform charge ${formatPrice(order.platform_charge)}`
+                                    : ""}
+                                  {order.delivery_charge > 0
+                                    ? ` · prepaid delivery ${formatPrice(order.delivery_charge)} retained`
+                                    : ""}
                                 </AlertDescription>
                               </Alert>
                             ) : null}

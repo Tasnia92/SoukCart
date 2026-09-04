@@ -1,4 +1,5 @@
 import { useState } from "react";
+import { useNavigate } from "@tanstack/react-router";
 import { LandingPage } from "../../features/landing/LandingPage.tsx";
 import { useSessionSnapshot, useSessionStore } from "../../session.tsx";
 import { AuthScreen } from "./AuthScreen.tsx";
@@ -74,43 +75,15 @@ function UnknownRoleScreen() {
   return <SignedInFallback feedback={feedback} onLogout={logout} pending={pending} />;
 }
 
-/**
- * Signed-out visitors land on the marketing page. Its two hero buttons open the
- * shared auth screen pre-set to the retailer or supplier path; the tab on the
- * auth screen lets them switch, and the brand link points back at "/".
- */
-function PublicEntry({
-  login,
-  register,
-}: {
-  login: ReturnType<typeof useAuthCallbacks>["login"];
-  register: ReturnType<typeof useAuthCallbacks>["register"];
-}) {
-  const [auth, setAuth] = useState<{ mode: AuthMode; role: AuthRole } | null>(null);
-
-  if (!auth) {
-    return <LandingPage onOpenAuth={(options) => setAuth(options)} />;
-  }
-
-  return (
-    <AuthScreen
-      initialMode={auth.mode}
-      initialRole={auth.role}
-      onLogin={login}
-      onRegister={register}
-    />
-  );
-}
-
+/** Marketing homepage for signed-out visitors. Auth lives on `/login` and `/register`. */
 export function RootAuthRoute() {
   const { state } = useSessionSnapshot();
-  const callbacks = useAuthCallbacks();
 
   switch (state.status) {
     case "loading":
       return <SessionLoading />;
     case "signed-out":
-      return <PublicEntry login={callbacks.login} register={callbacks.register} />;
+      return <LandingPage />;
     case "missing-profile":
     case "roleless":
       return <RoleSetup />;
@@ -119,6 +92,39 @@ export function RootAuthRoute() {
     default:
       return <SessionLoading />;
   }
+}
+
+/** Dedicated public auth pages (`/login`, `/register`). */
+export function PublicAuthRoute({ mode, role }: { mode: AuthMode; role: AuthRole }) {
+  const { state } = useSessionSnapshot();
+  const callbacks = useAuthCallbacks();
+  const navigate = useNavigate();
+
+  if (state.status === "loading") return <SessionLoading />;
+  if (state.status !== "signed-out") return <SessionLoading />;
+
+  return (
+    <AuthScreen
+      key={`${mode}-${role}`}
+      initialMode={mode}
+      initialRole={role}
+      onLogin={callbacks.login}
+      onRegister={callbacks.register}
+      onModeChange={(nextMode) => {
+        void navigate({
+          to: nextMode === "login" ? "/login" : "/register",
+          search: { role },
+        });
+      }}
+      onRoleChange={(nextRole) => {
+        void navigate({
+          to: mode === "login" ? "/login" : "/register",
+          search: { role: nextRole },
+          replace: true,
+        });
+      }}
+    />
+  );
 }
 
 export function AdminAuthRoute() {

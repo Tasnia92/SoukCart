@@ -53,17 +53,6 @@ function normalize(row: ProductRow): RetailerProduct {
   };
 }
 
-export function cartSupplierConflict(
-  product: Pick<RetailerProduct, "seller_id" | "seller_name">,
-  cartProducts: readonly Pick<RetailerProduct, "seller_id" | "seller_name">[],
-): string | null {
-  const other = cartProducts.find(
-    (item) => item.seller_id && product.seller_id && item.seller_id !== product.seller_id,
-  );
-  if (!other) return null;
-  return `Your cart is from ${other.seller_name ?? "another supplier"}. Checkout one supplier at a time.`;
-}
-
 export async function loadRetailerProducts(): Promise<RetailerProduct[]> {
   const { data, error } = await supabase.from(CATALOG_TABLE).select(PRODUCTS_SELECT).order("name");
   if (error) throw new Error(error.message);

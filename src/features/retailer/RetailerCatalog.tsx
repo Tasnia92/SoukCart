@@ -27,7 +27,6 @@ import { useSessionSnapshot, useSessionStore } from "../../session.tsx";
 import { formatPrice } from "../workspace/format.ts";
 import { RouterLink } from "../workspace/WorkspaceShell.tsx";
 import {
-  cartSupplierConflict,
   filterProducts,
   getCategoryCounts,
   loadActiveProducts,
@@ -150,12 +149,6 @@ export function RetailerCatalog({
 
   const onAdd = async (product: RetailerProduct) => {
     if (addingId === product.id) return;
-    const inCart = (products ?? []).filter((item) => (cart[item.id] ?? 0) > 0);
-    const conflict = cartSupplierConflict(product, inCart);
-    if (conflict) {
-      setNotice({ message: conflict, state: "error" });
-      return;
-    }
 
     let wanted: number;
     try {

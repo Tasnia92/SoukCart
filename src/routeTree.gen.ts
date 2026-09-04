@@ -8,392 +8,408 @@
 // You should NOT make any changes in this file as it will be overwritten.
 // Additionally, you should also exclude this file from your linter and/or formatter to prevent it from being checked or modified.
 
-import { Route as rootRouteImport } from "./routes/__root"
-import { Route as IndexRouteImport } from "./routes/index"
-import { Route as SplatRouteImport } from "./routes/$"
-import { Route as AdminRouteImport } from "./routes/admin"
-import { Route as RetailerRouteImport } from "./routes/retailer"
-import { Route as SupplierRouteImport } from "./routes/supplier"
-import { Route as AdminIndexRouteImport } from "./routes/admin/index"
-import { Route as AdminSplatRouteImport } from "./routes/admin/$"
-import { Route as AdminActivityRouteImport } from "./routes/admin/activity"
-import { Route as AdminComplaintsRouteImport } from "./routes/admin/complaints"
-import { Route as AdminInboxRouteImport } from "./routes/admin/inbox"
-import { Route as AdminPayoutsRouteImport } from "./routes/admin/payouts"
-import { Route as AdminUsersRouteImport } from "./routes/admin/users"
-import { Route as AdminVerificationsRouteImport } from "./routes/admin/verifications"
-import { Route as RetailerIndexRouteImport } from "./routes/retailer/index"
-import { Route as RetailerSplatRouteImport } from "./routes/retailer/$"
-import { Route as RetailerCartRouteImport } from "./routes/retailer/cart"
-import { Route as RetailerCatalogRouteImport } from "./routes/retailer/catalog"
-import { Route as RetailerCheckoutRouteImport } from "./routes/retailer/checkout"
-import { Route as RetailerComplaintsRouteImport } from "./routes/retailer/complaints"
-import { Route as RetailerNotificationsRouteImport } from "./routes/retailer/notifications"
-import { Route as RetailerOrdersRouteImport } from "./routes/retailer/orders"
-import { Route as RetailerSettingsRouteImport } from "./routes/retailer/settings"
-import { Route as SupplierIndexRouteImport } from "./routes/supplier/index"
-import { Route as SupplierSplatRouteImport } from "./routes/supplier/$"
-import { Route as SupplierCustomersRouteImport } from "./routes/supplier/customers"
-import { Route as SupplierEarningsRouteImport } from "./routes/supplier/earnings"
-import { Route as SupplierNotificationsRouteImport } from "./routes/supplier/notifications"
-import { Route as SupplierOrdersRouteImport } from "./routes/supplier/orders"
-import { Route as SupplierProductsRouteImport } from "./routes/supplier/products"
-import { Route as SupplierReturnsRouteImport } from "./routes/supplier/returns"
-import { Route as SupplierSettingsRouteImport } from "./routes/supplier/settings"
-import { Route as SupplierStockRouteImport } from "./routes/supplier/stock"
-import { Route as AdminInboxQueueRouteImport } from "./routes/admin/inbox.queue"
-import { Route as AdminInboxUrgentRouteImport } from "./routes/admin/inbox.urgent"
-import { Route as AdminVerificationsUserIdRouteImport } from "./routes/admin/verifications.$userId"
-import { Route as RetailerCheckoutCancelledRouteImport } from "./routes/retailer/checkout.cancelled"
-import { Route as RetailerCheckoutFailedRouteImport } from "./routes/retailer/checkout.failed"
-import { Route as RetailerCheckoutSuccessRouteImport } from "./routes/retailer/checkout.success"
-import { Route as SupplierProductsNewRouteImport } from "./routes/supplier/products.new"
-import { Route as RetailerOrdersOrderIdInvoiceRouteImport } from "./routes/retailer/orders.$orderId.invoice"
-import { Route as SupplierProductsProductIdEditRouteImport } from "./routes/supplier/products.$productId.edit"
+import { Route as rootRouteImport } from "./routes/__root";
+import { Route as IndexRouteImport } from "./routes/index";
+import { Route as SplatRouteImport } from "./routes/$";
+import { Route as AdminRouteImport } from "./routes/admin";
+import { Route as LoginRouteImport } from "./routes/login";
+import { Route as RegisterRouteImport } from "./routes/register";
+import { Route as RetailerRouteImport } from "./routes/retailer";
+import { Route as SupplierRouteImport } from "./routes/supplier";
+import { Route as AdminIndexRouteImport } from "./routes/admin/index";
+import { Route as AdminSplatRouteImport } from "./routes/admin/$";
+import { Route as AdminActivityRouteImport } from "./routes/admin/activity";
+import { Route as AdminComplaintsRouteImport } from "./routes/admin/complaints";
+import { Route as AdminInboxRouteImport } from "./routes/admin/inbox";
+import { Route as AdminPayoutsRouteImport } from "./routes/admin/payouts";
+import { Route as AdminUsersRouteImport } from "./routes/admin/users";
+import { Route as AdminVerificationsRouteImport } from "./routes/admin/verifications";
+import { Route as RetailerIndexRouteImport } from "./routes/retailer/index";
+import { Route as RetailerSplatRouteImport } from "./routes/retailer/$";
+import { Route as RetailerCartRouteImport } from "./routes/retailer/cart";
+import { Route as RetailerCatalogRouteImport } from "./routes/retailer/catalog";
+import { Route as RetailerCheckoutRouteImport } from "./routes/retailer/checkout";
+import { Route as RetailerComplaintsRouteImport } from "./routes/retailer/complaints";
+import { Route as RetailerNotificationsRouteImport } from "./routes/retailer/notifications";
+import { Route as RetailerOrdersRouteImport } from "./routes/retailer/orders";
+import { Route as RetailerSettingsRouteImport } from "./routes/retailer/settings";
+import { Route as SupplierIndexRouteImport } from "./routes/supplier/index";
+import { Route as SupplierSplatRouteImport } from "./routes/supplier/$";
+import { Route as SupplierCustomersRouteImport } from "./routes/supplier/customers";
+import { Route as SupplierEarningsRouteImport } from "./routes/supplier/earnings";
+import { Route as SupplierNotificationsRouteImport } from "./routes/supplier/notifications";
+import { Route as SupplierOrdersRouteImport } from "./routes/supplier/orders";
+import { Route as SupplierProductsRouteImport } from "./routes/supplier/products";
+import { Route as SupplierReturnsRouteImport } from "./routes/supplier/returns";
+import { Route as SupplierSettingsRouteImport } from "./routes/supplier/settings";
+import { Route as SupplierStockRouteImport } from "./routes/supplier/stock";
+import { Route as AdminInboxQueueRouteImport } from "./routes/admin/inbox.queue";
+import { Route as AdminInboxUrgentRouteImport } from "./routes/admin/inbox.urgent";
+import { Route as AdminVerificationsUserIdRouteImport } from "./routes/admin/verifications.$userId";
+import { Route as RetailerCheckoutCancelledRouteImport } from "./routes/retailer/checkout.cancelled";
+import { Route as RetailerCheckoutFailedRouteImport } from "./routes/retailer/checkout.failed";
+import { Route as RetailerCheckoutSuccessRouteImport } from "./routes/retailer/checkout.success";
+import { Route as SupplierProductsNewRouteImport } from "./routes/supplier/products.new";
+import { Route as RetailerOrdersOrderIdInvoiceRouteImport } from "./routes/retailer/orders.$orderId.invoice";
+import { Route as SupplierProductsProductIdEditRouteImport } from "./routes/supplier/products.$productId.edit";
 
 const IndexRoute = IndexRouteImport.update({
   id: "/",
   path: "/",
   getParentRoute: () => rootRouteImport,
-} as any)
+} as any);
 const SplatRoute = SplatRouteImport.update({
   id: "/$",
   path: "/$",
   getParentRoute: () => rootRouteImport,
-} as any)
+} as any);
 const AdminRoute = AdminRouteImport.update({
   id: "/admin",
   path: "/admin",
   getParentRoute: () => rootRouteImport,
-} as any)
+} as any);
+const LoginRoute = LoginRouteImport.update({
+  id: "/login",
+  path: "/login",
+  getParentRoute: () => rootRouteImport,
+} as any);
+const RegisterRoute = RegisterRouteImport.update({
+  id: "/register",
+  path: "/register",
+  getParentRoute: () => rootRouteImport,
+} as any);
 const RetailerRoute = RetailerRouteImport.update({
   id: "/retailer",
   path: "/retailer",
   getParentRoute: () => rootRouteImport,
-} as any)
+} as any);
 const SupplierRoute = SupplierRouteImport.update({
   id: "/supplier",
   path: "/supplier",
   getParentRoute: () => rootRouteImport,
-} as any)
+} as any);
 const AdminIndexRoute = AdminIndexRouteImport.update({
   id: "/",
   path: "/",
   getParentRoute: () => AdminRoute,
-} as any)
+} as any);
 const AdminSplatRoute = AdminSplatRouteImport.update({
   id: "/$",
   path: "/$",
   getParentRoute: () => AdminRoute,
-} as any)
+} as any);
 const AdminActivityRoute = AdminActivityRouteImport.update({
   id: "/activity",
   path: "/activity",
   getParentRoute: () => AdminRoute,
-} as any)
+} as any);
 const AdminComplaintsRoute = AdminComplaintsRouteImport.update({
   id: "/complaints",
   path: "/complaints",
   getParentRoute: () => AdminRoute,
-} as any)
+} as any);
 const AdminInboxRoute = AdminInboxRouteImport.update({
   id: "/inbox",
   path: "/inbox",
   getParentRoute: () => AdminRoute,
-} as any)
+} as any);
 const AdminPayoutsRoute = AdminPayoutsRouteImport.update({
   id: "/payouts",
   path: "/payouts",
   getParentRoute: () => AdminRoute,
-} as any)
+} as any);
 const AdminUsersRoute = AdminUsersRouteImport.update({
   id: "/users",
   path: "/users",
   getParentRoute: () => AdminRoute,
-} as any)
+} as any);
 const AdminVerificationsRoute = AdminVerificationsRouteImport.update({
   id: "/verifications",
   path: "/verifications",
   getParentRoute: () => AdminRoute,
-} as any)
+} as any);
 const RetailerIndexRoute = RetailerIndexRouteImport.update({
   id: "/",
   path: "/",
   getParentRoute: () => RetailerRoute,
-} as any)
+} as any);
 const RetailerSplatRoute = RetailerSplatRouteImport.update({
   id: "/$",
   path: "/$",
   getParentRoute: () => RetailerRoute,
-} as any)
+} as any);
 const RetailerCartRoute = RetailerCartRouteImport.update({
   id: "/cart",
   path: "/cart",
   getParentRoute: () => RetailerRoute,
-} as any)
+} as any);
 const RetailerCatalogRoute = RetailerCatalogRouteImport.update({
   id: "/catalog",
   path: "/catalog",
   getParentRoute: () => RetailerRoute,
-} as any)
+} as any);
 const RetailerCheckoutRoute = RetailerCheckoutRouteImport.update({
   id: "/checkout",
   path: "/checkout",
   getParentRoute: () => RetailerRoute,
-} as any)
+} as any);
 const RetailerComplaintsRoute = RetailerComplaintsRouteImport.update({
   id: "/complaints",
   path: "/complaints",
   getParentRoute: () => RetailerRoute,
-} as any)
+} as any);
 const RetailerNotificationsRoute = RetailerNotificationsRouteImport.update({
   id: "/notifications",
   path: "/notifications",
   getParentRoute: () => RetailerRoute,
-} as any)
+} as any);
 const RetailerOrdersRoute = RetailerOrdersRouteImport.update({
   id: "/orders",
   path: "/orders",
   getParentRoute: () => RetailerRoute,
-} as any)
+} as any);
 const RetailerSettingsRoute = RetailerSettingsRouteImport.update({
   id: "/settings",
   path: "/settings",
   getParentRoute: () => RetailerRoute,
-} as any)
+} as any);
 const SupplierIndexRoute = SupplierIndexRouteImport.update({
   id: "/",
   path: "/",
   getParentRoute: () => SupplierRoute,
-} as any)
+} as any);
 const SupplierSplatRoute = SupplierSplatRouteImport.update({
   id: "/$",
   path: "/$",
   getParentRoute: () => SupplierRoute,
-} as any)
+} as any);
 const SupplierCustomersRoute = SupplierCustomersRouteImport.update({
   id: "/customers",
   path: "/customers",
   getParentRoute: () => SupplierRoute,
-} as any)
+} as any);
 const SupplierEarningsRoute = SupplierEarningsRouteImport.update({
   id: "/earnings",
   path: "/earnings",
   getParentRoute: () => SupplierRoute,
-} as any)
+} as any);
 const SupplierNotificationsRoute = SupplierNotificationsRouteImport.update({
   id: "/notifications",
   path: "/notifications",
   getParentRoute: () => SupplierRoute,
-} as any)
+} as any);
 const SupplierOrdersRoute = SupplierOrdersRouteImport.update({
   id: "/orders",
   path: "/orders",
   getParentRoute: () => SupplierRoute,
-} as any)
+} as any);
 const SupplierProductsRoute = SupplierProductsRouteImport.update({
   id: "/products",
   path: "/products",
   getParentRoute: () => SupplierRoute,
-} as any)
+} as any);
 const SupplierReturnsRoute = SupplierReturnsRouteImport.update({
   id: "/returns",
   path: "/returns",
   getParentRoute: () => SupplierRoute,
-} as any)
+} as any);
 const SupplierSettingsRoute = SupplierSettingsRouteImport.update({
   id: "/settings",
   path: "/settings",
   getParentRoute: () => SupplierRoute,
-} as any)
+} as any);
 const SupplierStockRoute = SupplierStockRouteImport.update({
   id: "/stock",
   path: "/stock",
   getParentRoute: () => SupplierRoute,
-} as any)
+} as any);
 const AdminInboxQueueRoute = AdminInboxQueueRouteImport.update({
   id: "/queue",
   path: "/queue",
   getParentRoute: () => AdminInboxRoute,
-} as any)
+} as any);
 const AdminInboxUrgentRoute = AdminInboxUrgentRouteImport.update({
   id: "/urgent",
   path: "/urgent",
   getParentRoute: () => AdminInboxRoute,
-} as any)
-const AdminVerificationsUserIdRoute =
-  AdminVerificationsUserIdRouteImport.update({
-    id: "/$userId",
-    path: "/$userId",
-    getParentRoute: () => AdminVerificationsRoute,
-  } as any)
-const RetailerCheckoutCancelledRoute =
-  RetailerCheckoutCancelledRouteImport.update({
-    id: "/cancelled",
-    path: "/cancelled",
-    getParentRoute: () => RetailerCheckoutRoute,
-  } as any)
+} as any);
+const AdminVerificationsUserIdRoute = AdminVerificationsUserIdRouteImport.update({
+  id: "/$userId",
+  path: "/$userId",
+  getParentRoute: () => AdminVerificationsRoute,
+} as any);
+const RetailerCheckoutCancelledRoute = RetailerCheckoutCancelledRouteImport.update({
+  id: "/cancelled",
+  path: "/cancelled",
+  getParentRoute: () => RetailerCheckoutRoute,
+} as any);
 const RetailerCheckoutFailedRoute = RetailerCheckoutFailedRouteImport.update({
   id: "/failed",
   path: "/failed",
   getParentRoute: () => RetailerCheckoutRoute,
-} as any)
+} as any);
 const RetailerCheckoutSuccessRoute = RetailerCheckoutSuccessRouteImport.update({
   id: "/success",
   path: "/success",
   getParentRoute: () => RetailerCheckoutRoute,
-} as any)
+} as any);
 const SupplierProductsNewRoute = SupplierProductsNewRouteImport.update({
   id: "/new",
   path: "/new",
   getParentRoute: () => SupplierProductsRoute,
-} as any)
-const RetailerOrdersOrderIdInvoiceRoute =
-  RetailerOrdersOrderIdInvoiceRouteImport.update({
-    id: "/$orderId/invoice",
-    path: "/$orderId/invoice",
-    getParentRoute: () => RetailerOrdersRoute,
-  } as any)
-const SupplierProductsProductIdEditRoute =
-  SupplierProductsProductIdEditRouteImport.update({
-    id: "/$productId/edit",
-    path: "/$productId/edit",
-    getParentRoute: () => SupplierProductsRoute,
-  } as any)
+} as any);
+const RetailerOrdersOrderIdInvoiceRoute = RetailerOrdersOrderIdInvoiceRouteImport.update({
+  id: "/$orderId/invoice",
+  path: "/$orderId/invoice",
+  getParentRoute: () => RetailerOrdersRoute,
+} as any);
+const SupplierProductsProductIdEditRoute = SupplierProductsProductIdEditRouteImport.update({
+  id: "/$productId/edit",
+  path: "/$productId/edit",
+  getParentRoute: () => SupplierProductsRoute,
+} as any);
 
 export interface FileRoutesByFullPath {
-  "/": typeof IndexRoute
-  "/$": typeof SplatRoute
-  "/admin": typeof AdminRouteWithChildren
-  "/retailer": typeof RetailerRouteWithChildren
-  "/supplier": typeof SupplierRouteWithChildren
-  "/admin/$": typeof AdminSplatRoute
-  "/admin/activity": typeof AdminActivityRoute
-  "/admin/complaints": typeof AdminComplaintsRoute
-  "/admin/inbox": typeof AdminInboxRouteWithChildren
-  "/admin/payouts": typeof AdminPayoutsRoute
-  "/admin/users": typeof AdminUsersRoute
-  "/admin/verifications": typeof AdminVerificationsRouteWithChildren
-  "/retailer/$": typeof RetailerSplatRoute
-  "/retailer/cart": typeof RetailerCartRoute
-  "/retailer/catalog": typeof RetailerCatalogRoute
-  "/retailer/checkout": typeof RetailerCheckoutRouteWithChildren
-  "/retailer/complaints": typeof RetailerComplaintsRoute
-  "/retailer/notifications": typeof RetailerNotificationsRoute
-  "/retailer/orders": typeof RetailerOrdersRouteWithChildren
-  "/retailer/settings": typeof RetailerSettingsRoute
-  "/supplier/$": typeof SupplierSplatRoute
-  "/supplier/customers": typeof SupplierCustomersRoute
-  "/supplier/earnings": typeof SupplierEarningsRoute
-  "/supplier/notifications": typeof SupplierNotificationsRoute
-  "/supplier/orders": typeof SupplierOrdersRoute
-  "/supplier/products": typeof SupplierProductsRouteWithChildren
-  "/supplier/returns": typeof SupplierReturnsRoute
-  "/supplier/settings": typeof SupplierSettingsRoute
-  "/supplier/stock": typeof SupplierStockRoute
-  "/admin/": typeof AdminIndexRoute
-  "/retailer/": typeof RetailerIndexRoute
-  "/supplier/": typeof SupplierIndexRoute
-  "/admin/inbox/queue": typeof AdminInboxQueueRoute
-  "/admin/inbox/urgent": typeof AdminInboxUrgentRoute
-  "/admin/verifications/$userId": typeof AdminVerificationsUserIdRoute
-  "/retailer/checkout/cancelled": typeof RetailerCheckoutCancelledRoute
-  "/retailer/checkout/failed": typeof RetailerCheckoutFailedRoute
-  "/retailer/checkout/success": typeof RetailerCheckoutSuccessRoute
-  "/supplier/products/new": typeof SupplierProductsNewRoute
-  "/retailer/orders/$orderId/invoice": typeof RetailerOrdersOrderIdInvoiceRoute
-  "/supplier/products/$productId/edit": typeof SupplierProductsProductIdEditRoute
+  "/": typeof IndexRoute;
+  "/$": typeof SplatRoute;
+  "/admin": typeof AdminRouteWithChildren;
+  "/login": typeof LoginRoute;
+  "/register": typeof RegisterRoute;
+  "/retailer": typeof RetailerRouteWithChildren;
+  "/supplier": typeof SupplierRouteWithChildren;
+  "/admin/$": typeof AdminSplatRoute;
+  "/admin/activity": typeof AdminActivityRoute;
+  "/admin/complaints": typeof AdminComplaintsRoute;
+  "/admin/inbox": typeof AdminInboxRouteWithChildren;
+  "/admin/payouts": typeof AdminPayoutsRoute;
+  "/admin/users": typeof AdminUsersRoute;
+  "/admin/verifications": typeof AdminVerificationsRouteWithChildren;
+  "/retailer/$": typeof RetailerSplatRoute;
+  "/retailer/cart": typeof RetailerCartRoute;
+  "/retailer/catalog": typeof RetailerCatalogRoute;
+  "/retailer/checkout": typeof RetailerCheckoutRouteWithChildren;
+  "/retailer/complaints": typeof RetailerComplaintsRoute;
+  "/retailer/notifications": typeof RetailerNotificationsRoute;
+  "/retailer/orders": typeof RetailerOrdersRouteWithChildren;
+  "/retailer/settings": typeof RetailerSettingsRoute;
+  "/supplier/$": typeof SupplierSplatRoute;
+  "/supplier/customers": typeof SupplierCustomersRoute;
+  "/supplier/earnings": typeof SupplierEarningsRoute;
+  "/supplier/notifications": typeof SupplierNotificationsRoute;
+  "/supplier/orders": typeof SupplierOrdersRoute;
+  "/supplier/products": typeof SupplierProductsRouteWithChildren;
+  "/supplier/returns": typeof SupplierReturnsRoute;
+  "/supplier/settings": typeof SupplierSettingsRoute;
+  "/supplier/stock": typeof SupplierStockRoute;
+  "/admin/": typeof AdminIndexRoute;
+  "/retailer/": typeof RetailerIndexRoute;
+  "/supplier/": typeof SupplierIndexRoute;
+  "/admin/inbox/queue": typeof AdminInboxQueueRoute;
+  "/admin/inbox/urgent": typeof AdminInboxUrgentRoute;
+  "/admin/verifications/$userId": typeof AdminVerificationsUserIdRoute;
+  "/retailer/checkout/cancelled": typeof RetailerCheckoutCancelledRoute;
+  "/retailer/checkout/failed": typeof RetailerCheckoutFailedRoute;
+  "/retailer/checkout/success": typeof RetailerCheckoutSuccessRoute;
+  "/supplier/products/new": typeof SupplierProductsNewRoute;
+  "/retailer/orders/$orderId/invoice": typeof RetailerOrdersOrderIdInvoiceRoute;
+  "/supplier/products/$productId/edit": typeof SupplierProductsProductIdEditRoute;
 }
 export interface FileRoutesByTo {
-  "/": typeof IndexRoute
-  "/$": typeof SplatRoute
-  "/admin/$": typeof AdminSplatRoute
-  "/admin/activity": typeof AdminActivityRoute
-  "/admin/complaints": typeof AdminComplaintsRoute
-  "/admin/inbox": typeof AdminInboxRouteWithChildren
-  "/admin/payouts": typeof AdminPayoutsRoute
-  "/admin/users": typeof AdminUsersRoute
-  "/admin/verifications": typeof AdminVerificationsRouteWithChildren
-  "/retailer/$": typeof RetailerSplatRoute
-  "/retailer/cart": typeof RetailerCartRoute
-  "/retailer/catalog": typeof RetailerCatalogRoute
-  "/retailer/checkout": typeof RetailerCheckoutRouteWithChildren
-  "/retailer/complaints": typeof RetailerComplaintsRoute
-  "/retailer/notifications": typeof RetailerNotificationsRoute
-  "/retailer/orders": typeof RetailerOrdersRouteWithChildren
-  "/retailer/settings": typeof RetailerSettingsRoute
-  "/supplier/$": typeof SupplierSplatRoute
-  "/supplier/customers": typeof SupplierCustomersRoute
-  "/supplier/earnings": typeof SupplierEarningsRoute
-  "/supplier/notifications": typeof SupplierNotificationsRoute
-  "/supplier/orders": typeof SupplierOrdersRoute
-  "/supplier/products": typeof SupplierProductsRouteWithChildren
-  "/supplier/returns": typeof SupplierReturnsRoute
-  "/supplier/settings": typeof SupplierSettingsRoute
-  "/supplier/stock": typeof SupplierStockRoute
-  "/admin": typeof AdminIndexRoute
-  "/retailer": typeof RetailerIndexRoute
-  "/supplier": typeof SupplierIndexRoute
-  "/admin/inbox/queue": typeof AdminInboxQueueRoute
-  "/admin/inbox/urgent": typeof AdminInboxUrgentRoute
-  "/admin/verifications/$userId": typeof AdminVerificationsUserIdRoute
-  "/retailer/checkout/cancelled": typeof RetailerCheckoutCancelledRoute
-  "/retailer/checkout/failed": typeof RetailerCheckoutFailedRoute
-  "/retailer/checkout/success": typeof RetailerCheckoutSuccessRoute
-  "/supplier/products/new": typeof SupplierProductsNewRoute
-  "/retailer/orders/$orderId/invoice": typeof RetailerOrdersOrderIdInvoiceRoute
-  "/supplier/products/$productId/edit": typeof SupplierProductsProductIdEditRoute
+  "/": typeof IndexRoute;
+  "/$": typeof SplatRoute;
+  "/login": typeof LoginRoute;
+  "/register": typeof RegisterRoute;
+  "/admin/$": typeof AdminSplatRoute;
+  "/admin/activity": typeof AdminActivityRoute;
+  "/admin/complaints": typeof AdminComplaintsRoute;
+  "/admin/inbox": typeof AdminInboxRouteWithChildren;
+  "/admin/payouts": typeof AdminPayoutsRoute;
+  "/admin/users": typeof AdminUsersRoute;
+  "/admin/verifications": typeof AdminVerificationsRouteWithChildren;
+  "/retailer/$": typeof RetailerSplatRoute;
+  "/retailer/cart": typeof RetailerCartRoute;
+  "/retailer/catalog": typeof RetailerCatalogRoute;
+  "/retailer/checkout": typeof RetailerCheckoutRouteWithChildren;
+  "/retailer/complaints": typeof RetailerComplaintsRoute;
+  "/retailer/notifications": typeof RetailerNotificationsRoute;
+  "/retailer/orders": typeof RetailerOrdersRouteWithChildren;
+  "/retailer/settings": typeof RetailerSettingsRoute;
+  "/supplier/$": typeof SupplierSplatRoute;
+  "/supplier/customers": typeof SupplierCustomersRoute;
+  "/supplier/earnings": typeof SupplierEarningsRoute;
+  "/supplier/notifications": typeof SupplierNotificationsRoute;
+  "/supplier/orders": typeof SupplierOrdersRoute;
+  "/supplier/products": typeof SupplierProductsRouteWithChildren;
+  "/supplier/returns": typeof SupplierReturnsRoute;
+  "/supplier/settings": typeof SupplierSettingsRoute;
+  "/supplier/stock": typeof SupplierStockRoute;
+  "/admin": typeof AdminIndexRoute;
+  "/retailer": typeof RetailerIndexRoute;
+  "/supplier": typeof SupplierIndexRoute;
+  "/admin/inbox/queue": typeof AdminInboxQueueRoute;
+  "/admin/inbox/urgent": typeof AdminInboxUrgentRoute;
+  "/admin/verifications/$userId": typeof AdminVerificationsUserIdRoute;
+  "/retailer/checkout/cancelled": typeof RetailerCheckoutCancelledRoute;
+  "/retailer/checkout/failed": typeof RetailerCheckoutFailedRoute;
+  "/retailer/checkout/success": typeof RetailerCheckoutSuccessRoute;
+  "/supplier/products/new": typeof SupplierProductsNewRoute;
+  "/retailer/orders/$orderId/invoice": typeof RetailerOrdersOrderIdInvoiceRoute;
+  "/supplier/products/$productId/edit": typeof SupplierProductsProductIdEditRoute;
 }
 export interface FileRoutesById {
-  __root__: typeof rootRouteImport
-  "/": typeof IndexRoute
-  "/$": typeof SplatRoute
-  "/admin": typeof AdminRouteWithChildren
-  "/retailer": typeof RetailerRouteWithChildren
-  "/supplier": typeof SupplierRouteWithChildren
-  "/admin/$": typeof AdminSplatRoute
-  "/admin/activity": typeof AdminActivityRoute
-  "/admin/complaints": typeof AdminComplaintsRoute
-  "/admin/inbox": typeof AdminInboxRouteWithChildren
-  "/admin/payouts": typeof AdminPayoutsRoute
-  "/admin/users": typeof AdminUsersRoute
-  "/admin/verifications": typeof AdminVerificationsRouteWithChildren
-  "/retailer/$": typeof RetailerSplatRoute
-  "/retailer/cart": typeof RetailerCartRoute
-  "/retailer/catalog": typeof RetailerCatalogRoute
-  "/retailer/checkout": typeof RetailerCheckoutRouteWithChildren
-  "/retailer/complaints": typeof RetailerComplaintsRoute
-  "/retailer/notifications": typeof RetailerNotificationsRoute
-  "/retailer/orders": typeof RetailerOrdersRouteWithChildren
-  "/retailer/settings": typeof RetailerSettingsRoute
-  "/supplier/$": typeof SupplierSplatRoute
-  "/supplier/customers": typeof SupplierCustomersRoute
-  "/supplier/earnings": typeof SupplierEarningsRoute
-  "/supplier/notifications": typeof SupplierNotificationsRoute
-  "/supplier/orders": typeof SupplierOrdersRoute
-  "/supplier/products": typeof SupplierProductsRouteWithChildren
-  "/supplier/returns": typeof SupplierReturnsRoute
-  "/supplier/settings": typeof SupplierSettingsRoute
-  "/supplier/stock": typeof SupplierStockRoute
-  "/admin/": typeof AdminIndexRoute
-  "/retailer/": typeof RetailerIndexRoute
-  "/supplier/": typeof SupplierIndexRoute
-  "/admin/inbox/queue": typeof AdminInboxQueueRoute
-  "/admin/inbox/urgent": typeof AdminInboxUrgentRoute
-  "/admin/verifications/$userId": typeof AdminVerificationsUserIdRoute
-  "/retailer/checkout/cancelled": typeof RetailerCheckoutCancelledRoute
-  "/retailer/checkout/failed": typeof RetailerCheckoutFailedRoute
-  "/retailer/checkout/success": typeof RetailerCheckoutSuccessRoute
-  "/supplier/products/new": typeof SupplierProductsNewRoute
-  "/retailer/orders/$orderId/invoice": typeof RetailerOrdersOrderIdInvoiceRoute
-  "/supplier/products/$productId/edit": typeof SupplierProductsProductIdEditRoute
+  __root__: typeof rootRouteImport;
+  "/": typeof IndexRoute;
+  "/$": typeof SplatRoute;
+  "/admin": typeof AdminRouteWithChildren;
+  "/login": typeof LoginRoute;
+  "/register": typeof RegisterRoute;
+  "/retailer": typeof RetailerRouteWithChildren;
+  "/supplier": typeof SupplierRouteWithChildren;
+  "/admin/$": typeof AdminSplatRoute;
+  "/admin/activity": typeof AdminActivityRoute;
+  "/admin/complaints": typeof AdminComplaintsRoute;
+  "/admin/inbox": typeof AdminInboxRouteWithChildren;
+  "/admin/payouts": typeof AdminPayoutsRoute;
+  "/admin/users": typeof AdminUsersRoute;
+  "/admin/verifications": typeof AdminVerificationsRouteWithChildren;
+  "/retailer/$": typeof RetailerSplatRoute;
+  "/retailer/cart": typeof RetailerCartRoute;
+  "/retailer/catalog": typeof RetailerCatalogRoute;
+  "/retailer/checkout": typeof RetailerCheckoutRouteWithChildren;
+  "/retailer/complaints": typeof RetailerComplaintsRoute;
+  "/retailer/notifications": typeof RetailerNotificationsRoute;
+  "/retailer/orders": typeof RetailerOrdersRouteWithChildren;
+  "/retailer/settings": typeof RetailerSettingsRoute;
+  "/supplier/$": typeof SupplierSplatRoute;
+  "/supplier/customers": typeof SupplierCustomersRoute;
+  "/supplier/earnings": typeof SupplierEarningsRoute;
+  "/supplier/notifications": typeof SupplierNotificationsRoute;
+  "/supplier/orders": typeof SupplierOrdersRoute;
+  "/supplier/products": typeof SupplierProductsRouteWithChildren;
+  "/supplier/returns": typeof SupplierReturnsRoute;
+  "/supplier/settings": typeof SupplierSettingsRoute;
+  "/supplier/stock": typeof SupplierStockRoute;
+  "/admin/": typeof AdminIndexRoute;
+  "/retailer/": typeof RetailerIndexRoute;
+  "/supplier/": typeof SupplierIndexRoute;
+  "/admin/inbox/queue": typeof AdminInboxQueueRoute;
+  "/admin/inbox/urgent": typeof AdminInboxUrgentRoute;
+  "/admin/verifications/$userId": typeof AdminVerificationsUserIdRoute;
+  "/retailer/checkout/cancelled": typeof RetailerCheckoutCancelledRoute;
+  "/retailer/checkout/failed": typeof RetailerCheckoutFailedRoute;
+  "/retailer/checkout/success": typeof RetailerCheckoutSuccessRoute;
+  "/supplier/products/new": typeof SupplierProductsNewRoute;
+  "/retailer/orders/$orderId/invoice": typeof RetailerOrdersOrderIdInvoiceRoute;
+  "/supplier/products/$productId/edit": typeof SupplierProductsProductIdEditRoute;
 }
 export interface FileRouteTypes {
-  fileRoutesByFullPath: FileRoutesByFullPath
+  fileRoutesByFullPath: FileRoutesByFullPath;
   fullPaths:
     | "/"
     | "/$"
     | "/admin"
+    | "/login"
+    | "/register"
     | "/retailer"
     | "/supplier"
     | "/admin/$"
@@ -431,11 +447,13 @@ export interface FileRouteTypes {
     | "/retailer/checkout/success"
     | "/supplier/products/new"
     | "/retailer/orders/$orderId/invoice"
-    | "/supplier/products/$productId/edit"
-  fileRoutesByTo: FileRoutesByTo
+    | "/supplier/products/$productId/edit";
+  fileRoutesByTo: FileRoutesByTo;
   to:
     | "/"
     | "/$"
+    | "/login"
+    | "/register"
     | "/admin/$"
     | "/admin/activity"
     | "/admin/complaints"
@@ -471,12 +489,14 @@ export interface FileRouteTypes {
     | "/retailer/checkout/success"
     | "/supplier/products/new"
     | "/retailer/orders/$orderId/invoice"
-    | "/supplier/products/$productId/edit"
+    | "/supplier/products/$productId/edit";
   id:
     | "__root__"
     | "/"
     | "/$"
     | "/admin"
+    | "/login"
+    | "/register"
     | "/retailer"
     | "/supplier"
     | "/admin/$"
@@ -514,343 +534,358 @@ export interface FileRouteTypes {
     | "/retailer/checkout/success"
     | "/supplier/products/new"
     | "/retailer/orders/$orderId/invoice"
-    | "/supplier/products/$productId/edit"
-  fileRoutesById: FileRoutesById
+    | "/supplier/products/$productId/edit";
+  fileRoutesById: FileRoutesById;
 }
 export interface RootRouteChildren {
-  IndexRoute: typeof IndexRoute
-  SplatRoute: typeof SplatRoute
-  AdminRoute: typeof AdminRouteWithChildren
-  RetailerRoute: typeof RetailerRouteWithChildren
-  SupplierRoute: typeof SupplierRouteWithChildren
+  IndexRoute: typeof IndexRoute;
+  SplatRoute: typeof SplatRoute;
+  AdminRoute: typeof AdminRouteWithChildren;
+  LoginRoute: typeof LoginRoute;
+  RegisterRoute: typeof RegisterRoute;
+  RetailerRoute: typeof RetailerRouteWithChildren;
+  SupplierRoute: typeof SupplierRouteWithChildren;
 }
 
 declare module "@tanstack/react-router" {
   interface FileRoutesByPath {
     "/": {
-      id: "/"
-      path: "/"
-      fullPath: "/"
-      preLoaderRoute: typeof IndexRouteImport
-      parentRoute: typeof rootRouteImport
-    }
+      id: "/";
+      path: "/";
+      fullPath: "/";
+      preLoaderRoute: typeof IndexRouteImport;
+      parentRoute: typeof rootRouteImport;
+    };
     "/$": {
-      id: "/$"
-      path: "/$"
-      fullPath: "/$"
-      preLoaderRoute: typeof SplatRouteImport
-      parentRoute: typeof rootRouteImport
-    }
+      id: "/$";
+      path: "/$";
+      fullPath: "/$";
+      preLoaderRoute: typeof SplatRouteImport;
+      parentRoute: typeof rootRouteImport;
+    };
     "/admin": {
-      id: "/admin"
-      path: "/admin"
-      fullPath: "/admin"
-      preLoaderRoute: typeof AdminRouteImport
-      parentRoute: typeof rootRouteImport
-    }
+      id: "/admin";
+      path: "/admin";
+      fullPath: "/admin";
+      preLoaderRoute: typeof AdminRouteImport;
+      parentRoute: typeof rootRouteImport;
+    };
+    "/login": {
+      id: "/login";
+      path: "/login";
+      fullPath: "/login";
+      preLoaderRoute: typeof LoginRouteImport;
+      parentRoute: typeof rootRouteImport;
+    };
+    "/register": {
+      id: "/register";
+      path: "/register";
+      fullPath: "/register";
+      preLoaderRoute: typeof RegisterRouteImport;
+      parentRoute: typeof rootRouteImport;
+    };
     "/retailer": {
-      id: "/retailer"
-      path: "/retailer"
-      fullPath: "/retailer"
-      preLoaderRoute: typeof RetailerRouteImport
-      parentRoute: typeof rootRouteImport
-    }
+      id: "/retailer";
+      path: "/retailer";
+      fullPath: "/retailer";
+      preLoaderRoute: typeof RetailerRouteImport;
+      parentRoute: typeof rootRouteImport;
+    };
     "/supplier": {
-      id: "/supplier"
-      path: "/supplier"
-      fullPath: "/supplier"
-      preLoaderRoute: typeof SupplierRouteImport
-      parentRoute: typeof rootRouteImport
-    }
+      id: "/supplier";
+      path: "/supplier";
+      fullPath: "/supplier";
+      preLoaderRoute: typeof SupplierRouteImport;
+      parentRoute: typeof rootRouteImport;
+    };
     "/admin/": {
-      id: "/admin/"
-      path: "/"
-      fullPath: "/admin/"
-      preLoaderRoute: typeof AdminIndexRouteImport
-      parentRoute: typeof AdminRoute
-    }
+      id: "/admin/";
+      path: "/";
+      fullPath: "/admin/";
+      preLoaderRoute: typeof AdminIndexRouteImport;
+      parentRoute: typeof AdminRoute;
+    };
     "/admin/$": {
-      id: "/admin/$"
-      path: "/$"
-      fullPath: "/admin/$"
-      preLoaderRoute: typeof AdminSplatRouteImport
-      parentRoute: typeof AdminRoute
-    }
+      id: "/admin/$";
+      path: "/$";
+      fullPath: "/admin/$";
+      preLoaderRoute: typeof AdminSplatRouteImport;
+      parentRoute: typeof AdminRoute;
+    };
     "/admin/activity": {
-      id: "/admin/activity"
-      path: "/activity"
-      fullPath: "/admin/activity"
-      preLoaderRoute: typeof AdminActivityRouteImport
-      parentRoute: typeof AdminRoute
-    }
+      id: "/admin/activity";
+      path: "/activity";
+      fullPath: "/admin/activity";
+      preLoaderRoute: typeof AdminActivityRouteImport;
+      parentRoute: typeof AdminRoute;
+    };
     "/admin/complaints": {
-      id: "/admin/complaints"
-      path: "/complaints"
-      fullPath: "/admin/complaints"
-      preLoaderRoute: typeof AdminComplaintsRouteImport
-      parentRoute: typeof AdminRoute
-    }
+      id: "/admin/complaints";
+      path: "/complaints";
+      fullPath: "/admin/complaints";
+      preLoaderRoute: typeof AdminComplaintsRouteImport;
+      parentRoute: typeof AdminRoute;
+    };
     "/admin/inbox": {
-      id: "/admin/inbox"
-      path: "/inbox"
-      fullPath: "/admin/inbox"
-      preLoaderRoute: typeof AdminInboxRouteImport
-      parentRoute: typeof AdminRoute
-    }
+      id: "/admin/inbox";
+      path: "/inbox";
+      fullPath: "/admin/inbox";
+      preLoaderRoute: typeof AdminInboxRouteImport;
+      parentRoute: typeof AdminRoute;
+    };
     "/admin/payouts": {
-      id: "/admin/payouts"
-      path: "/payouts"
-      fullPath: "/admin/payouts"
-      preLoaderRoute: typeof AdminPayoutsRouteImport
-      parentRoute: typeof AdminRoute
-    }
+      id: "/admin/payouts";
+      path: "/payouts";
+      fullPath: "/admin/payouts";
+      preLoaderRoute: typeof AdminPayoutsRouteImport;
+      parentRoute: typeof AdminRoute;
+    };
     "/admin/users": {
-      id: "/admin/users"
-      path: "/users"
-      fullPath: "/admin/users"
-      preLoaderRoute: typeof AdminUsersRouteImport
-      parentRoute: typeof AdminRoute
-    }
+      id: "/admin/users";
+      path: "/users";
+      fullPath: "/admin/users";
+      preLoaderRoute: typeof AdminUsersRouteImport;
+      parentRoute: typeof AdminRoute;
+    };
     "/admin/verifications": {
-      id: "/admin/verifications"
-      path: "/verifications"
-      fullPath: "/admin/verifications"
-      preLoaderRoute: typeof AdminVerificationsRouteImport
-      parentRoute: typeof AdminRoute
-    }
+      id: "/admin/verifications";
+      path: "/verifications";
+      fullPath: "/admin/verifications";
+      preLoaderRoute: typeof AdminVerificationsRouteImport;
+      parentRoute: typeof AdminRoute;
+    };
     "/retailer/": {
-      id: "/retailer/"
-      path: "/"
-      fullPath: "/retailer/"
-      preLoaderRoute: typeof RetailerIndexRouteImport
-      parentRoute: typeof RetailerRoute
-    }
+      id: "/retailer/";
+      path: "/";
+      fullPath: "/retailer/";
+      preLoaderRoute: typeof RetailerIndexRouteImport;
+      parentRoute: typeof RetailerRoute;
+    };
     "/retailer/$": {
-      id: "/retailer/$"
-      path: "/$"
-      fullPath: "/retailer/$"
-      preLoaderRoute: typeof RetailerSplatRouteImport
-      parentRoute: typeof RetailerRoute
-    }
+      id: "/retailer/$";
+      path: "/$";
+      fullPath: "/retailer/$";
+      preLoaderRoute: typeof RetailerSplatRouteImport;
+      parentRoute: typeof RetailerRoute;
+    };
     "/retailer/cart": {
-      id: "/retailer/cart"
-      path: "/cart"
-      fullPath: "/retailer/cart"
-      preLoaderRoute: typeof RetailerCartRouteImport
-      parentRoute: typeof RetailerRoute
-    }
+      id: "/retailer/cart";
+      path: "/cart";
+      fullPath: "/retailer/cart";
+      preLoaderRoute: typeof RetailerCartRouteImport;
+      parentRoute: typeof RetailerRoute;
+    };
     "/retailer/catalog": {
-      id: "/retailer/catalog"
-      path: "/catalog"
-      fullPath: "/retailer/catalog"
-      preLoaderRoute: typeof RetailerCatalogRouteImport
-      parentRoute: typeof RetailerRoute
-    }
+      id: "/retailer/catalog";
+      path: "/catalog";
+      fullPath: "/retailer/catalog";
+      preLoaderRoute: typeof RetailerCatalogRouteImport;
+      parentRoute: typeof RetailerRoute;
+    };
     "/retailer/checkout": {
-      id: "/retailer/checkout"
-      path: "/checkout"
-      fullPath: "/retailer/checkout"
-      preLoaderRoute: typeof RetailerCheckoutRouteImport
-      parentRoute: typeof RetailerRoute
-    }
+      id: "/retailer/checkout";
+      path: "/checkout";
+      fullPath: "/retailer/checkout";
+      preLoaderRoute: typeof RetailerCheckoutRouteImport;
+      parentRoute: typeof RetailerRoute;
+    };
     "/retailer/complaints": {
-      id: "/retailer/complaints"
-      path: "/complaints"
-      fullPath: "/retailer/complaints"
-      preLoaderRoute: typeof RetailerComplaintsRouteImport
-      parentRoute: typeof RetailerRoute
-    }
+      id: "/retailer/complaints";
+      path: "/complaints";
+      fullPath: "/retailer/complaints";
+      preLoaderRoute: typeof RetailerComplaintsRouteImport;
+      parentRoute: typeof RetailerRoute;
+    };
     "/retailer/notifications": {
-      id: "/retailer/notifications"
-      path: "/notifications"
-      fullPath: "/retailer/notifications"
-      preLoaderRoute: typeof RetailerNotificationsRouteImport
-      parentRoute: typeof RetailerRoute
-    }
+      id: "/retailer/notifications";
+      path: "/notifications";
+      fullPath: "/retailer/notifications";
+      preLoaderRoute: typeof RetailerNotificationsRouteImport;
+      parentRoute: typeof RetailerRoute;
+    };
     "/retailer/orders": {
-      id: "/retailer/orders"
-      path: "/orders"
-      fullPath: "/retailer/orders"
-      preLoaderRoute: typeof RetailerOrdersRouteImport
-      parentRoute: typeof RetailerRoute
-    }
+      id: "/retailer/orders";
+      path: "/orders";
+      fullPath: "/retailer/orders";
+      preLoaderRoute: typeof RetailerOrdersRouteImport;
+      parentRoute: typeof RetailerRoute;
+    };
     "/retailer/settings": {
-      id: "/retailer/settings"
-      path: "/settings"
-      fullPath: "/retailer/settings"
-      preLoaderRoute: typeof RetailerSettingsRouteImport
-      parentRoute: typeof RetailerRoute
-    }
+      id: "/retailer/settings";
+      path: "/settings";
+      fullPath: "/retailer/settings";
+      preLoaderRoute: typeof RetailerSettingsRouteImport;
+      parentRoute: typeof RetailerRoute;
+    };
     "/supplier/": {
-      id: "/supplier/"
-      path: "/"
-      fullPath: "/supplier/"
-      preLoaderRoute: typeof SupplierIndexRouteImport
-      parentRoute: typeof SupplierRoute
-    }
+      id: "/supplier/";
+      path: "/";
+      fullPath: "/supplier/";
+      preLoaderRoute: typeof SupplierIndexRouteImport;
+      parentRoute: typeof SupplierRoute;
+    };
     "/supplier/$": {
-      id: "/supplier/$"
-      path: "/$"
-      fullPath: "/supplier/$"
-      preLoaderRoute: typeof SupplierSplatRouteImport
-      parentRoute: typeof SupplierRoute
-    }
+      id: "/supplier/$";
+      path: "/$";
+      fullPath: "/supplier/$";
+      preLoaderRoute: typeof SupplierSplatRouteImport;
+      parentRoute: typeof SupplierRoute;
+    };
     "/supplier/customers": {
-      id: "/supplier/customers"
-      path: "/customers"
-      fullPath: "/supplier/customers"
-      preLoaderRoute: typeof SupplierCustomersRouteImport
-      parentRoute: typeof SupplierRoute
-    }
+      id: "/supplier/customers";
+      path: "/customers";
+      fullPath: "/supplier/customers";
+      preLoaderRoute: typeof SupplierCustomersRouteImport;
+      parentRoute: typeof SupplierRoute;
+    };
     "/supplier/earnings": {
-      id: "/supplier/earnings"
-      path: "/earnings"
-      fullPath: "/supplier/earnings"
-      preLoaderRoute: typeof SupplierEarningsRouteImport
-      parentRoute: typeof SupplierRoute
-    }
+      id: "/supplier/earnings";
+      path: "/earnings";
+      fullPath: "/supplier/earnings";
+      preLoaderRoute: typeof SupplierEarningsRouteImport;
+      parentRoute: typeof SupplierRoute;
+    };
     "/supplier/notifications": {
-      id: "/supplier/notifications"
-      path: "/notifications"
-      fullPath: "/supplier/notifications"
-      preLoaderRoute: typeof SupplierNotificationsRouteImport
-      parentRoute: typeof SupplierRoute
-    }
+      id: "/supplier/notifications";
+      path: "/notifications";
+      fullPath: "/supplier/notifications";
+      preLoaderRoute: typeof SupplierNotificationsRouteImport;
+      parentRoute: typeof SupplierRoute;
+    };
     "/supplier/orders": {
-      id: "/supplier/orders"
-      path: "/orders"
-      fullPath: "/supplier/orders"
-      preLoaderRoute: typeof SupplierOrdersRouteImport
-      parentRoute: typeof SupplierRoute
-    }
+      id: "/supplier/orders";
+      path: "/orders";
+      fullPath: "/supplier/orders";
+      preLoaderRoute: typeof SupplierOrdersRouteImport;
+      parentRoute: typeof SupplierRoute;
+    };
     "/supplier/products": {
-      id: "/supplier/products"
-      path: "/products"
-      fullPath: "/supplier/products"
-      preLoaderRoute: typeof SupplierProductsRouteImport
-      parentRoute: typeof SupplierRoute
-    }
+      id: "/supplier/products";
+      path: "/products";
+      fullPath: "/supplier/products";
+      preLoaderRoute: typeof SupplierProductsRouteImport;
+      parentRoute: typeof SupplierRoute;
+    };
     "/supplier/returns": {
-      id: "/supplier/returns"
-      path: "/returns"
-      fullPath: "/supplier/returns"
-      preLoaderRoute: typeof SupplierReturnsRouteImport
-      parentRoute: typeof SupplierRoute
-    }
+      id: "/supplier/returns";
+      path: "/returns";
+      fullPath: "/supplier/returns";
+      preLoaderRoute: typeof SupplierReturnsRouteImport;
+      parentRoute: typeof SupplierRoute;
+    };
     "/supplier/settings": {
-      id: "/supplier/settings"
-      path: "/settings"
-      fullPath: "/supplier/settings"
-      preLoaderRoute: typeof SupplierSettingsRouteImport
-      parentRoute: typeof SupplierRoute
-    }
+      id: "/supplier/settings";
+      path: "/settings";
+      fullPath: "/supplier/settings";
+      preLoaderRoute: typeof SupplierSettingsRouteImport;
+      parentRoute: typeof SupplierRoute;
+    };
     "/supplier/stock": {
-      id: "/supplier/stock"
-      path: "/stock"
-      fullPath: "/supplier/stock"
-      preLoaderRoute: typeof SupplierStockRouteImport
-      parentRoute: typeof SupplierRoute
-    }
+      id: "/supplier/stock";
+      path: "/stock";
+      fullPath: "/supplier/stock";
+      preLoaderRoute: typeof SupplierStockRouteImport;
+      parentRoute: typeof SupplierRoute;
+    };
     "/admin/inbox/queue": {
-      id: "/admin/inbox/queue"
-      path: "/queue"
-      fullPath: "/admin/inbox/queue"
-      preLoaderRoute: typeof AdminInboxQueueRouteImport
-      parentRoute: typeof AdminInboxRoute
-    }
+      id: "/admin/inbox/queue";
+      path: "/queue";
+      fullPath: "/admin/inbox/queue";
+      preLoaderRoute: typeof AdminInboxQueueRouteImport;
+      parentRoute: typeof AdminInboxRoute;
+    };
     "/admin/inbox/urgent": {
-      id: "/admin/inbox/urgent"
-      path: "/urgent"
-      fullPath: "/admin/inbox/urgent"
-      preLoaderRoute: typeof AdminInboxUrgentRouteImport
-      parentRoute: typeof AdminInboxRoute
-    }
+      id: "/admin/inbox/urgent";
+      path: "/urgent";
+      fullPath: "/admin/inbox/urgent";
+      preLoaderRoute: typeof AdminInboxUrgentRouteImport;
+      parentRoute: typeof AdminInboxRoute;
+    };
     "/admin/verifications/$userId": {
-      id: "/admin/verifications/$userId"
-      path: "/$userId"
-      fullPath: "/admin/verifications/$userId"
-      preLoaderRoute: typeof AdminVerificationsUserIdRouteImport
-      parentRoute: typeof AdminVerificationsRoute
-    }
+      id: "/admin/verifications/$userId";
+      path: "/$userId";
+      fullPath: "/admin/verifications/$userId";
+      preLoaderRoute: typeof AdminVerificationsUserIdRouteImport;
+      parentRoute: typeof AdminVerificationsRoute;
+    };
     "/retailer/checkout/cancelled": {
-      id: "/retailer/checkout/cancelled"
-      path: "/cancelled"
-      fullPath: "/retailer/checkout/cancelled"
-      preLoaderRoute: typeof RetailerCheckoutCancelledRouteImport
-      parentRoute: typeof RetailerCheckoutRoute
-    }
+      id: "/retailer/checkout/cancelled";
+      path: "/cancelled";
+      fullPath: "/retailer/checkout/cancelled";
+      preLoaderRoute: typeof RetailerCheckoutCancelledRouteImport;
+      parentRoute: typeof RetailerCheckoutRoute;
+    };
     "/retailer/checkout/failed": {
-      id: "/retailer/checkout/failed"
-      path: "/failed"
-      fullPath: "/retailer/checkout/failed"
-      preLoaderRoute: typeof RetailerCheckoutFailedRouteImport
-      parentRoute: typeof RetailerCheckoutRoute
-    }
+      id: "/retailer/checkout/failed";
+      path: "/failed";
+      fullPath: "/retailer/checkout/failed";
+      preLoaderRoute: typeof RetailerCheckoutFailedRouteImport;
+      parentRoute: typeof RetailerCheckoutRoute;
+    };
     "/retailer/checkout/success": {
-      id: "/retailer/checkout/success"
-      path: "/success"
-      fullPath: "/retailer/checkout/success"
-      preLoaderRoute: typeof RetailerCheckoutSuccessRouteImport
-      parentRoute: typeof RetailerCheckoutRoute
-    }
+      id: "/retailer/checkout/success";
+      path: "/success";
+      fullPath: "/retailer/checkout/success";
+      preLoaderRoute: typeof RetailerCheckoutSuccessRouteImport;
+      parentRoute: typeof RetailerCheckoutRoute;
+    };
     "/supplier/products/new": {
-      id: "/supplier/products/new"
-      path: "/new"
-      fullPath: "/supplier/products/new"
-      preLoaderRoute: typeof SupplierProductsNewRouteImport
-      parentRoute: typeof SupplierProductsRoute
-    }
+      id: "/supplier/products/new";
+      path: "/new";
+      fullPath: "/supplier/products/new";
+      preLoaderRoute: typeof SupplierProductsNewRouteImport;
+      parentRoute: typeof SupplierProductsRoute;
+    };
     "/retailer/orders/$orderId/invoice": {
-      id: "/retailer/orders/$orderId/invoice"
-      path: "/$orderId/invoice"
-      fullPath: "/retailer/orders/$orderId/invoice"
-      preLoaderRoute: typeof RetailerOrdersOrderIdInvoiceRouteImport
-      parentRoute: typeof RetailerOrdersRoute
-    }
+      id: "/retailer/orders/$orderId/invoice";
+      path: "/$orderId/invoice";
+      fullPath: "/retailer/orders/$orderId/invoice";
+      preLoaderRoute: typeof RetailerOrdersOrderIdInvoiceRouteImport;
+      parentRoute: typeof RetailerOrdersRoute;
+    };
     "/supplier/products/$productId/edit": {
-      id: "/supplier/products/$productId/edit"
-      path: "/$productId/edit"
-      fullPath: "/supplier/products/$productId/edit"
-      preLoaderRoute: typeof SupplierProductsProductIdEditRouteImport
-      parentRoute: typeof SupplierProductsRoute
-    }
+      id: "/supplier/products/$productId/edit";
+      path: "/$productId/edit";
+      fullPath: "/supplier/products/$productId/edit";
+      preLoaderRoute: typeof SupplierProductsProductIdEditRouteImport;
+      parentRoute: typeof SupplierProductsRoute;
+    };
   }
 }
 
 interface AdminInboxRouteChildren {
-  AdminInboxQueueRoute: typeof AdminInboxQueueRoute
-  AdminInboxUrgentRoute: typeof AdminInboxUrgentRoute
+  AdminInboxQueueRoute: typeof AdminInboxQueueRoute;
+  AdminInboxUrgentRoute: typeof AdminInboxUrgentRoute;
 }
 
 const AdminInboxRouteChildren: AdminInboxRouteChildren = {
   AdminInboxQueueRoute: AdminInboxQueueRoute,
   AdminInboxUrgentRoute: AdminInboxUrgentRoute,
-}
+};
 
-const AdminInboxRouteWithChildren = AdminInboxRoute._addFileChildren(
-  AdminInboxRouteChildren,
-)
+const AdminInboxRouteWithChildren = AdminInboxRoute._addFileChildren(AdminInboxRouteChildren);
 
 interface AdminVerificationsRouteChildren {
-  AdminVerificationsUserIdRoute: typeof AdminVerificationsUserIdRoute
+  AdminVerificationsUserIdRoute: typeof AdminVerificationsUserIdRoute;
 }
 
 const AdminVerificationsRouteChildren: AdminVerificationsRouteChildren = {
   AdminVerificationsUserIdRoute: AdminVerificationsUserIdRoute,
-}
+};
 
-const AdminVerificationsRouteWithChildren =
-  AdminVerificationsRoute._addFileChildren(AdminVerificationsRouteChildren)
+const AdminVerificationsRouteWithChildren = AdminVerificationsRoute._addFileChildren(
+  AdminVerificationsRouteChildren,
+);
 
 interface AdminRouteChildren {
-  AdminSplatRoute: typeof AdminSplatRoute
-  AdminActivityRoute: typeof AdminActivityRoute
-  AdminComplaintsRoute: typeof AdminComplaintsRoute
-  AdminInboxRoute: typeof AdminInboxRouteWithChildren
-  AdminPayoutsRoute: typeof AdminPayoutsRoute
-  AdminUsersRoute: typeof AdminUsersRoute
-  AdminVerificationsRoute: typeof AdminVerificationsRouteWithChildren
-  AdminIndexRoute: typeof AdminIndexRoute
+  AdminSplatRoute: typeof AdminSplatRoute;
+  AdminActivityRoute: typeof AdminActivityRoute;
+  AdminComplaintsRoute: typeof AdminComplaintsRoute;
+  AdminInboxRoute: typeof AdminInboxRouteWithChildren;
+  AdminPayoutsRoute: typeof AdminPayoutsRoute;
+  AdminUsersRoute: typeof AdminUsersRoute;
+  AdminVerificationsRoute: typeof AdminVerificationsRouteWithChildren;
+  AdminIndexRoute: typeof AdminIndexRoute;
 }
 
 const AdminRouteChildren: AdminRouteChildren = {
@@ -862,47 +897,48 @@ const AdminRouteChildren: AdminRouteChildren = {
   AdminUsersRoute: AdminUsersRoute,
   AdminVerificationsRoute: AdminVerificationsRouteWithChildren,
   AdminIndexRoute: AdminIndexRoute,
-}
+};
 
-const AdminRouteWithChildren = AdminRoute._addFileChildren(AdminRouteChildren)
+const AdminRouteWithChildren = AdminRoute._addFileChildren(AdminRouteChildren);
 
 interface RetailerCheckoutRouteChildren {
-  RetailerCheckoutCancelledRoute: typeof RetailerCheckoutCancelledRoute
-  RetailerCheckoutFailedRoute: typeof RetailerCheckoutFailedRoute
-  RetailerCheckoutSuccessRoute: typeof RetailerCheckoutSuccessRoute
+  RetailerCheckoutCancelledRoute: typeof RetailerCheckoutCancelledRoute;
+  RetailerCheckoutFailedRoute: typeof RetailerCheckoutFailedRoute;
+  RetailerCheckoutSuccessRoute: typeof RetailerCheckoutSuccessRoute;
 }
 
 const RetailerCheckoutRouteChildren: RetailerCheckoutRouteChildren = {
   RetailerCheckoutCancelledRoute: RetailerCheckoutCancelledRoute,
   RetailerCheckoutFailedRoute: RetailerCheckoutFailedRoute,
   RetailerCheckoutSuccessRoute: RetailerCheckoutSuccessRoute,
-}
+};
 
-const RetailerCheckoutRouteWithChildren =
-  RetailerCheckoutRoute._addFileChildren(RetailerCheckoutRouteChildren)
+const RetailerCheckoutRouteWithChildren = RetailerCheckoutRoute._addFileChildren(
+  RetailerCheckoutRouteChildren,
+);
 
 interface RetailerOrdersRouteChildren {
-  RetailerOrdersOrderIdInvoiceRoute: typeof RetailerOrdersOrderIdInvoiceRoute
+  RetailerOrdersOrderIdInvoiceRoute: typeof RetailerOrdersOrderIdInvoiceRoute;
 }
 
 const RetailerOrdersRouteChildren: RetailerOrdersRouteChildren = {
   RetailerOrdersOrderIdInvoiceRoute: RetailerOrdersOrderIdInvoiceRoute,
-}
+};
 
 const RetailerOrdersRouteWithChildren = RetailerOrdersRoute._addFileChildren(
   RetailerOrdersRouteChildren,
-)
+);
 
 interface RetailerRouteChildren {
-  RetailerSplatRoute: typeof RetailerSplatRoute
-  RetailerCartRoute: typeof RetailerCartRoute
-  RetailerCatalogRoute: typeof RetailerCatalogRoute
-  RetailerCheckoutRoute: typeof RetailerCheckoutRouteWithChildren
-  RetailerComplaintsRoute: typeof RetailerComplaintsRoute
-  RetailerNotificationsRoute: typeof RetailerNotificationsRoute
-  RetailerOrdersRoute: typeof RetailerOrdersRouteWithChildren
-  RetailerSettingsRoute: typeof RetailerSettingsRoute
-  RetailerIndexRoute: typeof RetailerIndexRoute
+  RetailerSplatRoute: typeof RetailerSplatRoute;
+  RetailerCartRoute: typeof RetailerCartRoute;
+  RetailerCatalogRoute: typeof RetailerCatalogRoute;
+  RetailerCheckoutRoute: typeof RetailerCheckoutRouteWithChildren;
+  RetailerComplaintsRoute: typeof RetailerComplaintsRoute;
+  RetailerNotificationsRoute: typeof RetailerNotificationsRoute;
+  RetailerOrdersRoute: typeof RetailerOrdersRouteWithChildren;
+  RetailerSettingsRoute: typeof RetailerSettingsRoute;
+  RetailerIndexRoute: typeof RetailerIndexRoute;
 }
 
 const RetailerRouteChildren: RetailerRouteChildren = {
@@ -915,36 +951,35 @@ const RetailerRouteChildren: RetailerRouteChildren = {
   RetailerOrdersRoute: RetailerOrdersRouteWithChildren,
   RetailerSettingsRoute: RetailerSettingsRoute,
   RetailerIndexRoute: RetailerIndexRoute,
-}
+};
 
-const RetailerRouteWithChildren = RetailerRoute._addFileChildren(
-  RetailerRouteChildren,
-)
+const RetailerRouteWithChildren = RetailerRoute._addFileChildren(RetailerRouteChildren);
 
 interface SupplierProductsRouteChildren {
-  SupplierProductsNewRoute: typeof SupplierProductsNewRoute
-  SupplierProductsProductIdEditRoute: typeof SupplierProductsProductIdEditRoute
+  SupplierProductsNewRoute: typeof SupplierProductsNewRoute;
+  SupplierProductsProductIdEditRoute: typeof SupplierProductsProductIdEditRoute;
 }
 
 const SupplierProductsRouteChildren: SupplierProductsRouteChildren = {
   SupplierProductsNewRoute: SupplierProductsNewRoute,
   SupplierProductsProductIdEditRoute: SupplierProductsProductIdEditRoute,
-}
+};
 
-const SupplierProductsRouteWithChildren =
-  SupplierProductsRoute._addFileChildren(SupplierProductsRouteChildren)
+const SupplierProductsRouteWithChildren = SupplierProductsRoute._addFileChildren(
+  SupplierProductsRouteChildren,
+);
 
 interface SupplierRouteChildren {
-  SupplierSplatRoute: typeof SupplierSplatRoute
-  SupplierCustomersRoute: typeof SupplierCustomersRoute
-  SupplierEarningsRoute: typeof SupplierEarningsRoute
-  SupplierNotificationsRoute: typeof SupplierNotificationsRoute
-  SupplierOrdersRoute: typeof SupplierOrdersRoute
-  SupplierProductsRoute: typeof SupplierProductsRouteWithChildren
-  SupplierReturnsRoute: typeof SupplierReturnsRoute
-  SupplierSettingsRoute: typeof SupplierSettingsRoute
-  SupplierStockRoute: typeof SupplierStockRoute
-  SupplierIndexRoute: typeof SupplierIndexRoute
+  SupplierSplatRoute: typeof SupplierSplatRoute;
+  SupplierCustomersRoute: typeof SupplierCustomersRoute;
+  SupplierEarningsRoute: typeof SupplierEarningsRoute;
+  SupplierNotificationsRoute: typeof SupplierNotificationsRoute;
+  SupplierOrdersRoute: typeof SupplierOrdersRoute;
+  SupplierProductsRoute: typeof SupplierProductsRouteWithChildren;
+  SupplierReturnsRoute: typeof SupplierReturnsRoute;
+  SupplierSettingsRoute: typeof SupplierSettingsRoute;
+  SupplierStockRoute: typeof SupplierStockRoute;
+  SupplierIndexRoute: typeof SupplierIndexRoute;
 }
 
 const SupplierRouteChildren: SupplierRouteChildren = {
@@ -958,19 +993,19 @@ const SupplierRouteChildren: SupplierRouteChildren = {
   SupplierSettingsRoute: SupplierSettingsRoute,
   SupplierStockRoute: SupplierStockRoute,
   SupplierIndexRoute: SupplierIndexRoute,
-}
+};
 
-const SupplierRouteWithChildren = SupplierRoute._addFileChildren(
-  SupplierRouteChildren,
-)
+const SupplierRouteWithChildren = SupplierRoute._addFileChildren(SupplierRouteChildren);
 
 const rootRouteChildren: RootRouteChildren = {
   IndexRoute: IndexRoute,
   SplatRoute: SplatRoute,
   AdminRoute: AdminRouteWithChildren,
+  LoginRoute: LoginRoute,
+  RegisterRoute: RegisterRoute,
   RetailerRoute: RetailerRouteWithChildren,
   SupplierRoute: SupplierRouteWithChildren,
-}
+};
 export const routeTree = rootRouteImport
   ._addFileChildren(rootRouteChildren)
-  ._addFileTypes<FileRouteTypes>()
+  ._addFileTypes<FileRouteTypes>();

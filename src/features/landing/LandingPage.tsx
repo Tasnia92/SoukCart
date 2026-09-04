@@ -1,53 +1,87 @@
-import { useState, type FormEvent } from "react";
-import { ArrowRightIcon, LockKeyholeIcon, PackageIcon, StoreIcon } from "lucide-react";
+import { useState, type FormEvent, type SVGProps } from "react";
+import { Link } from "@tanstack/react-router";
+import { ArrowRightIcon, ChevronDownIcon, GlobeIcon } from "lucide-react";
 import { Brand } from "@/components/ui/Brand";
-import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import {
-  Card,
-  CardAction,
-  CardContent,
-  CardDescription,
-  CardFooter,
-  CardHeader,
-  CardTitle,
-} from "@/components/ui/card";
 import { Field, FieldGroup, FieldLabel } from "@/components/ui/field";
 import { Input } from "@/components/ui/input";
 import { Separator } from "@/components/ui/separator";
-import type { AuthMode, AuthRole } from "../../components/auth/types.ts";
-import { GrowthArt } from "./GrowthArt.tsx";
-import { JourneyArt } from "./JourneyArt.tsx";
 import {
-  FLOW_STEPS,
   FOOTER_COLUMNS,
-  HANDOFF_STEPS,
-  LEGAL_LINKS,
+  HERO_POINTS,
   NAV_LINKS,
   NEWSLETTER_FEEDBACK,
-  PLATFORM_HIGHLIGHTS,
+  RETAILER_SECTION,
+  RETAILER_STEPS,
   SECTION_IDS,
+  SOCIAL_LINKS,
+  SUPPLIER_SECTION,
+  SUPPLIER_STEPS,
 } from "./landing-content.ts";
 
-export type OpenAuth = (options: { mode: AuthMode; role: AuthRole }) => void;
-
-export type LandingPageProps = {
-  /** Opens the shared auth screen pre-set to a mode (login/register) and role. */
-  onOpenAuth: OpenAuth;
-};
-
-function LandingHeader({ onOpenAuth }: { onOpenAuth: OpenAuth }) {
+function FacebookIcon(props: SVGProps<SVGSVGElement>) {
   return (
-    <header className="sticky top-0 border-b bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/80">
-      <div className="mx-auto flex max-w-7xl flex-wrap items-center justify-between gap-4 px-4 py-4 sm:px-6 lg:px-8">
+    <svg
+      fill="none"
+      stroke="currentColor"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+      strokeWidth="2"
+      viewBox="0 0 24 24"
+      {...props}
+    >
+      <path d="M18 2h-3a5 5 0 0 0-5 5v3H7v4h3v8h4v-8h3l1-4h-4V7a1 1 0 0 1 1-1h3z" />
+    </svg>
+  );
+}
+
+function LinkedinIcon(props: SVGProps<SVGSVGElement>) {
+  return (
+    <svg
+      fill="none"
+      stroke="currentColor"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+      strokeWidth="2"
+      viewBox="0 0 24 24"
+      {...props}
+    >
+      <path d="M16 8a6 6 0 0 1 6 6v7h-4v-7a2 2 0 0 0-2-2 2 2 0 0 0-2 2v7h-4v-7a6 6 0 0 1 6-6z" />
+      <rect width="4" height="12" x="2" y="9" />
+      <circle cx="4" cy="4" r="2" />
+    </svg>
+  );
+}
+
+function InstagramIcon(props: SVGProps<SVGSVGElement>) {
+  return (
+    <svg
+      fill="none"
+      stroke="currentColor"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+      strokeWidth="2"
+      viewBox="0 0 24 24"
+      {...props}
+    >
+      <rect width="20" height="20" x="2" y="2" rx="5" ry="5" />
+      <path d="M16 11.37A4 4 0 1 1 12.63 8 4 4 0 0 1 16 11.37z" />
+      <line x1="17.5" x2="17.51" y1="6.5" y2="6.5" />
+    </svg>
+  );
+}
+
+const SOCIAL_ICONS = [FacebookIcon, LinkedinIcon, InstagramIcon];
+
+function LandingHeader() {
+  return (
+    <header className="sticky top-0 z-20 border-b border-border/60 bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/85">
+      <div className="mx-auto flex h-16 max-w-7xl items-center justify-between gap-4 px-4 sm:px-6 lg:px-8">
         <Brand />
-        <nav
-          className="order-last flex w-full items-center gap-1 overflow-x-auto pt-1 md:order-none md:w-auto md:pt-0"
-          aria-label="SoukCart"
-        >
+        <nav className="hidden items-center gap-7 lg:flex" aria-label="SoukCart">
           {NAV_LINKS.map((link) => (
             <a
-              className="rounded-full px-3 py-2 text-sm font-medium text-muted-foreground transition-colors hover:bg-muted hover:text-foreground focus-visible:outline-none focus-visible:ring-[3px] focus-visible:ring-ring/50"
+              className="text-sm font-medium text-foreground/75 transition-colors hover:text-foreground focus-visible:outline-none focus-visible:ring-[3px] focus-visible:ring-ring/50"
               href={link.href}
               key={link.label}
             >
@@ -55,235 +89,221 @@ function LandingHeader({ onOpenAuth }: { onOpenAuth: OpenAuth }) {
             </a>
           ))}
         </nav>
-        <Button
-          type="button"
-          variant="secondary"
-          size="sm"
-          onClick={() => onOpenAuth({ mode: "login", role: "retailer" })}
-        >
-          Sign in
-        </Button>
+        <div className="flex items-center gap-2 sm:gap-4">
+          <Button asChild variant="ghost" className="text-foreground/75 hover:text-foreground">
+            <Link to="/login" search={{ role: "retailer" }}>
+              Log in
+            </Link>
+          </Button>
+          <Button asChild className="px-4">
+            <Link to="/register" search={{ role: "retailer" }}>
+              Get Started
+            </Link>
+          </Button>
+        </div>
       </div>
     </header>
   );
 }
 
-function JourneyScene() {
+function Hero() {
   return (
-    <div className="flex min-w-0 flex-col gap-4">
-      <JourneyArt />
-      <ol
-        className="grid grid-cols-2 gap-3 sm:grid-cols-4"
-        aria-label="How one order moves through SoukCart"
-      >
-        {HANDOFF_STEPS.map((handoff) => (
-          <li data-handoff={handoff.step} key={handoff.step}>
-            <Card className="h-full" size="sm">
-              <CardHeader>
-                <Badge className="w-fit" variant="outline">
-                  {handoff.step}
-                </Badge>
-                <CardTitle>{handoff.title}</CardTitle>
-                <CardDescription>
-                  <small>{handoff.detail}</small>
-                </CardDescription>
-              </CardHeader>
-            </Card>
-          </li>
-        ))}
-      </ol>
-    </div>
-  );
-}
-
-function Hero({ onOpenAuth }: { onOpenAuth: OpenAuth }) {
-  return (
-    <section
-      className="mx-auto grid max-w-7xl items-center gap-12 px-4 py-16 sm:px-6 sm:py-24 lg:grid-cols-[0.9fr_1.1fr] lg:px-8"
-      aria-labelledby="ld-hero-title"
-    >
-      <div className="flex flex-col gap-6">
+    <section className="relative isolate overflow-hidden" aria-labelledby="ld-hero-title">
+      <img
+        src="/hero-bg.png"
+        alt=""
+        aria-hidden="true"
+        className="absolute inset-0 size-full object-cover object-[72%_center]"
+        width={1920}
+        height={1080}
+      />
+      <div
+        className="absolute inset-0 bg-gradient-to-r from-background via-background/80 to-transparent"
+        aria-hidden="true"
+      />
+      <div className="relative mx-auto flex min-h-[38rem] max-w-7xl flex-col justify-center px-4 py-16 sm:px-6 sm:py-20 lg:px-8">
         <h1
-          className="text-balance text-5xl font-semibold tracking-tight sm:text-6xl lg:text-7xl"
+          className="text-4xl font-extrabold leading-[1.15] tracking-tight text-foreground sm:text-5xl"
           id="ld-hero-title"
         >
-          One market.
-          <br />
-          One <em className="not-italic text-primary">order</em> line.
+          <span className="block">Wholesale groceries.</span>
+          <span className="block">Stronger businesses.</span>
+          <span className="block text-primary">Better communities.</span>
         </h1>
-        <div className="flex flex-col gap-3">
-          <p className="text-xl font-medium sm:text-2xl">From supplier stock to your shop shelf.</p>
-          <p className="max-w-xl text-base leading-7 text-muted-foreground">
-            Source wholesale essentials, order against available stock, and follow every handoff in
-            one place.
-          </p>
-        </div>
-        <div className="flex flex-col gap-3 sm:flex-row">
-          <Button
-            type="button"
-            size="lg"
-            onClick={() => onOpenAuth({ mode: "login", role: "retailer" })}
-          >
-            <StoreIcon data-icon="inline-start" aria-hidden="true" />
-            <span>Log in as retailer</span>
-          </Button>
-          <Button
-            type="button"
-            variant="secondary"
-            size="lg"
-            onClick={() => onOpenAuth({ mode: "login", role: "seller" })}
-          >
-            <PackageIcon data-icon="inline-start" aria-hidden="true" />
-            <span>Log in as supplier</span>
-          </Button>
-        </div>
-        <p className="flex max-w-xl items-start gap-2 text-sm text-muted-foreground sm:items-center">
-          <LockKeyholeIcon className="mt-0.5 size-4 shrink-0 sm:mt-0" aria-hidden="true" />
-          <span>Trusted by suppliers and retailers across the market.</span>
+        <p className="mt-6 max-w-md text-base leading-7 text-foreground/70">
+          Soukcart is the B2B marketplace that connects grocery suppliers and retailers to buy and
+          sell smarter, together.
         </p>
+        <div className="mt-8 flex flex-col gap-3 sm:flex-row">
+          <Button asChild size="lg" className="px-5">
+            <Link to="/register" search={{ role: "seller" }}>
+              Join as Supplier
+              <ArrowRightIcon data-icon="inline-end" aria-hidden="true" />
+            </Link>
+          </Button>
+          <Button asChild size="lg" variant="outline" className="bg-background px-5">
+            <Link to="/register" search={{ role: "retailer" }}>
+              Join as Retailer
+              <ArrowRightIcon data-icon="inline-end" aria-hidden="true" />
+            </Link>
+          </Button>
+        </div>
+        <ul className="mt-12 flex flex-wrap gap-x-10 gap-y-5">
+          {HERO_POINTS.map((point) => {
+            const PointIcon = point.icon;
+            return (
+              <li className="flex items-center gap-3" key={point.title}>
+                <span className="grid size-11 shrink-0 place-items-center rounded-lg border border-border bg-background text-primary">
+                  <PointIcon className="size-5" aria-hidden="true" />
+                </span>
+                <span className="flex max-w-40 flex-col">
+                  <span className="text-sm font-semibold text-foreground">{point.title}</span>
+                  <span className="text-xs leading-4 text-muted-foreground">{point.copy}</span>
+                </span>
+              </li>
+            );
+          })}
+        </ul>
       </div>
-      <JourneyScene />
     </section>
   );
 }
 
-function PlatformHighlights() {
+function StepList({ steps }: { steps: (typeof SUPPLIER_STEPS)[number][] }) {
   return (
-    <section
-      className="border-y bg-muted/30"
-      id={SECTION_IDS.platform}
-      aria-labelledby="ld-highlights-title"
-    >
-      <div className="mx-auto flex max-w-7xl flex-col gap-10 px-4 py-16 sm:px-6 sm:py-24 lg:px-8">
-        <div className="grid gap-5 md:grid-cols-[1fr_0.8fr] md:items-end">
-          <div className="flex flex-col gap-2">
-            <p className="text-sm font-medium text-primary">Built for wholesale</p>
-            <h2
-              className="text-balance text-3xl font-semibold tracking-tight sm:text-4xl"
-              id="ld-highlights-title"
-            >
-              Keep your market moving.
-            </h2>
-          </div>
-          <p className="text-base leading-7 text-muted-foreground md:text-right">
-            SoukCart brings the details of every order into one clear, dependable workflow.
-          </p>
-        </div>
-        <div className="grid gap-4 md:grid-cols-3">
-          {PLATFORM_HIGHLIGHTS.map((highlight) => {
-            const HighlightIcon = highlight.icon;
-            return (
-              <article key={highlight.title}>
-                <Card className="h-full">
-                  <CardHeader>
-                    <CardTitle>
-                      <h3>{highlight.title}</h3>
-                    </CardTitle>
-                    <CardDescription>{highlight.copy}</CardDescription>
-                    <CardAction>
-                      <Badge variant="secondary">
-                        <HighlightIcon aria-hidden="true" />
-                      </Badge>
-                    </CardAction>
-                  </CardHeader>
-                </Card>
-              </article>
-            );
-          })}
-        </div>
+    <ul className="flex flex-col gap-3">
+      {steps.map((step) => {
+        const StepIcon = step.icon;
+        return (
+          <li
+            className="flex items-center gap-4 rounded-lg bg-background p-4 shadow-[0_1px_3px_rgba(15,23,42,0.06)] ring-1 ring-foreground/5"
+            key={step.step}
+          >
+            <span className="grid size-6 shrink-0 place-items-center rounded-full bg-primary text-xs font-bold text-primary-foreground">
+              {step.step}
+            </span>
+            <div className="min-w-0 flex-1">
+              <p className="text-[0.9375rem] font-semibold text-foreground">{step.title}</p>
+              <p className="mt-0.5 text-sm leading-5 text-muted-foreground">{step.copy}</p>
+            </div>
+            <span className="grid size-11 shrink-0 place-items-center rounded-lg bg-primary/10 text-primary">
+              <StepIcon className="size-5" aria-hidden="true" />
+            </span>
+          </li>
+        );
+      })}
+    </ul>
+  );
+}
+
+function JourneyColumn({
+  sectionId,
+  icon: SectionIcon,
+  title,
+  steps,
+}: {
+  sectionId: string;
+  icon: typeof SUPPLIER_SECTION.icon;
+  title: string;
+  steps: (typeof SUPPLIER_STEPS)[number][];
+}) {
+  return (
+    <div className="scroll-mt-24" id={sectionId}>
+      <div className="mb-6 flex items-center gap-3">
+        <span className="grid size-11 place-items-center rounded-lg bg-background text-primary shadow-sm ring-1 ring-foreground/5">
+          <SectionIcon className="size-5" aria-hidden="true" />
+        </span>
+        <h3 className="text-xl font-bold text-foreground">{title}</h3>
       </div>
-    </section>
+      <StepList steps={steps} />
+    </div>
   );
 }
 
 function HowItWorks() {
   return (
     <section
-      className="mx-auto flex max-w-7xl flex-col gap-10 px-4 py-16 sm:px-6 sm:py-24 lg:px-8"
+      className="bg-[#F7F5F2] pt-16 sm:pt-20"
       id={SECTION_IDS.howItWorks}
       aria-labelledby="ld-flow-title"
     >
-      <div className="mx-auto flex max-w-2xl flex-col gap-2 text-center">
-        <p className="text-sm font-medium text-primary">How it works</p>
-        <h2
-          className="text-balance text-3xl font-semibold tracking-tight sm:text-4xl"
-          id="ld-flow-title"
-        >
-          One order. End to end.
-        </h2>
-        <p className="text-base leading-7 text-muted-foreground">
-          A simple process that connects suppliers and retailers seamlessly.
-        </p>
+      <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
+        <div className="mx-auto flex max-w-xl flex-col text-center">
+          <p className="text-sm font-bold uppercase tracking-wide text-primary">How It Works</p>
+          <h2
+            className="mt-3 text-balance text-3xl font-bold tracking-tight text-foreground sm:text-[2rem]"
+            id="ld-flow-title"
+          >
+            Built for how grocery businesses trade.
+          </h2>
+          <p className="mx-auto mt-3 max-w-md text-base leading-7 text-muted-foreground">
+            Whether you supply or sell, Soukcart makes the process simple, transparent, and
+            profitable.
+          </p>
+        </div>
+        <div className="mt-12 grid gap-10 lg:grid-cols-2 lg:gap-16">
+          <JourneyColumn
+            sectionId={SECTION_IDS.forSuppliers}
+            icon={SUPPLIER_SECTION.icon}
+            title={SUPPLIER_SECTION.title}
+            steps={SUPPLIER_STEPS}
+          />
+          <JourneyColumn
+            sectionId={SECTION_IDS.forRetailers}
+            icon={RETAILER_SECTION.icon}
+            title={RETAILER_SECTION.title}
+            steps={RETAILER_STEPS}
+          />
+        </div>
       </div>
-      <ol className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
-        {FLOW_STEPS.map((step) => {
-          const StepIcon = step.icon;
-          return (
-            <li key={step.step}>
-              <Card className="h-full">
-                <CardHeader>
-                  <div className="flex size-10 items-center justify-center rounded-full bg-primary/10 text-primary">
-                    <StepIcon className="size-5" aria-hidden="true" />
-                  </div>
-                  <CardTitle>{step.title}</CardTitle>
-                  <CardDescription>{step.copy}</CardDescription>
-                  <CardAction>
-                    <Badge variant="outline">{step.step}</Badge>
-                  </CardAction>
-                </CardHeader>
-              </Card>
-            </li>
-          );
-        })}
-      </ol>
     </section>
   );
 }
 
-function JoinBand({ onOpenAuth }: { onOpenAuth: OpenAuth }) {
+function JoinBand() {
   return (
     <section
-      className="mx-auto max-w-7xl px-4 py-16 sm:px-6 sm:py-24 lg:px-8"
+      className="bg-[#F7F5F2] pb-16 pt-12 sm:pb-20 sm:pt-14"
       id={SECTION_IDS.join}
       aria-labelledby="ld-join-title"
     >
-      <Card>
-        <CardHeader className="text-center">
-          <p className="text-sm font-medium text-primary">Ready to grow your business?</p>
-          <CardTitle>
+      <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
+        <div className="relative overflow-hidden rounded-2xl bg-[#FAF3EE]">
+          <img
+            src="/banner.png"
+            alt=""
+            aria-hidden="true"
+            className="absolute inset-y-0 right-0 h-full w-auto max-w-none"
+            width={1620}
+            height={654}
+          />
+          <div
+            className="absolute inset-0 bg-gradient-to-r from-[#FAF3EE] via-[#FAF3EE]/70 to-transparent"
+            aria-hidden="true"
+          />
+          <div className="relative flex flex-col items-start gap-5 px-6 py-10 sm:px-10 sm:py-14 lg:px-14">
+            <p className="text-sm font-bold uppercase tracking-wide text-primary">
+              Ready to grow together?
+            </p>
             <h2
-              className="text-balance text-3xl font-semibold tracking-tight sm:text-4xl"
+              className="text-balance text-3xl font-bold tracking-tight text-foreground sm:text-4xl"
               id="ld-join-title"
             >
-              Join SoukCart today.
+              <span className="block">One platform.</span>
+              <span className="block">Endless opportunities.</span>
             </h2>
-          </CardTitle>
-          <CardDescription>
-            Whether you&apos;re a retailer or supplier, there&apos;s more when we connect.
-          </CardDescription>
-        </CardHeader>
-        <CardContent className="mx-auto w-full max-w-md">
-          <GrowthArt />
-        </CardContent>
-        <CardFooter className="flex-col justify-center gap-3 border-t sm:flex-row">
-          <Button
-            type="button"
-            size="lg"
-            onClick={() => onOpenAuth({ mode: "register", role: "retailer" })}
-          >
-            <span>Buy for my shop</span>
-            <ArrowRightIcon data-icon="inline-end" aria-hidden="true" />
-          </Button>
-          <Button
-            type="button"
-            variant="secondary"
-            size="lg"
-            onClick={() => onOpenAuth({ mode: "register", role: "seller" })}
-          >
-            Sell on SoukCart
-          </Button>
-        </CardFooter>
-      </Card>
+            <p className="max-w-sm text-base leading-7 text-foreground/70">
+              Join thousands of grocery businesses already growing with Soukcart.
+            </p>
+            <Button asChild size="lg" className="mt-2 px-5">
+              <Link to="/register" search={{ role: "retailer" }}>
+                Get Started Today
+                <ArrowRightIcon data-icon="inline-end" aria-hidden="true" />
+              </Link>
+            </Button>
+          </div>
+        </div>
+      </div>
     </section>
   );
 }
@@ -300,7 +320,7 @@ function NewsletterSignup() {
   return (
     <form className="w-full" onSubmit={submit} noValidate={false}>
       <FieldGroup className="gap-2">
-        <Field orientation="horizontal" className="gap-2">
+        <Field orientation="horizontal" className="relative">
           <FieldLabel className="sr-only" htmlFor="newsletter-email">
             Email address
           </FieldLabel>
@@ -313,8 +333,14 @@ function NewsletterSignup() {
             required
             type="email"
             value={email}
+            className="h-11 border-border bg-background pr-14"
           />
-          <Button type="submit" size="icon" aria-label="Subscribe to SoukCart updates">
+          <Button
+            type="submit"
+            size="icon"
+            aria-label="Subscribe to SoukCart updates"
+            className="absolute right-1.5 top-1.5 size-8 rounded-md"
+          >
             <ArrowRightIcon aria-hidden="true" />
           </Button>
         </Field>
@@ -328,20 +354,38 @@ function NewsletterSignup() {
 
 function LandingFooter() {
   return (
-    <footer className="border-t bg-muted/20">
-      <div className="mx-auto grid max-w-7xl gap-10 px-4 py-14 sm:grid-cols-2 sm:px-6 lg:grid-cols-5 lg:px-8">
-        <div className="flex flex-col gap-3">
-          <p className="text-lg font-semibold">SoukCart</p>
-          <p className="text-sm leading-6 text-muted-foreground">
-            The wholesale commerce platform that connects suppliers and retailers. One market. One
-            order line.
+    <footer className="bg-background">
+      <div className="mx-auto grid max-w-7xl gap-10 px-4 py-14 sm:grid-cols-2 sm:px-6 lg:grid-cols-[1.5fr_1fr_1fr_1fr_1.6fr] lg:gap-8 lg:px-8">
+        <div className="flex flex-col gap-4">
+          <Brand />
+          <p className="max-w-64 text-sm leading-6 text-muted-foreground">
+            Soukcart is a B2B marketplace for grocery suppliers and retailers to trade smarter and
+            grow together.
           </p>
+          <ul className="mt-2 flex gap-2.5">
+            {SOCIAL_LINKS.map((social, index) => {
+              const SocialIcon = SOCIAL_ICONS[index];
+              return (
+                <li key={social.label}>
+                  <a
+                    className="grid size-9 place-items-center rounded-full bg-muted text-foreground transition-colors hover:bg-foreground/10 focus-visible:outline-none focus-visible:ring-[3px] focus-visible:ring-ring/50"
+                    href={social.href}
+                    aria-label={social.label}
+                    rel="noreferrer"
+                    target="_blank"
+                  >
+                    <SocialIcon className="size-4" aria-hidden="true" />
+                  </a>
+                </li>
+              );
+            })}
+          </ul>
         </div>
 
         {FOOTER_COLUMNS.map((column) => (
-          <nav className="flex flex-col gap-3" aria-label={column.title} key={column.title}>
-            <p className="text-sm font-semibold">{column.title}</p>
-            <ul className="flex flex-col gap-2">
+          <nav className="flex flex-col gap-4" aria-label={column.title} key={column.title}>
+            <p className="text-[0.9375rem] font-bold text-foreground">{column.title}</p>
+            <ul className="flex flex-col gap-2.5">
               {column.links.map((link) => (
                 <li key={link.label}>
                   <a
@@ -356,10 +400,10 @@ function LandingFooter() {
           </nav>
         ))}
 
-        <div className="flex flex-col gap-3">
-          <p className="text-sm font-semibold">Stay updated</p>
+        <div className="flex flex-col gap-4">
+          <p className="text-[15px] font-bold text-foreground">Subscribe to our newsletter</p>
           <p className="text-sm leading-6 text-muted-foreground">
-            Get product updates and market insights.
+            Get updates on new features, offers and more.
           </p>
           <NewsletterSignup />
         </div>
@@ -367,35 +411,31 @@ function LandingFooter() {
 
       <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
         <Separator />
-        <div className="flex flex-col gap-4 py-6 text-sm text-muted-foreground sm:flex-row sm:items-center sm:justify-between">
-          <small>© 2024 SoukCart. All rights reserved.</small>
-          <ul className="flex flex-wrap gap-x-5 gap-y-2">
-            {LEGAL_LINKS.map((link) => (
-              <li key={link.label}>
-                <a
-                  className="transition-colors hover:text-foreground focus-visible:outline-none focus-visible:ring-[3px] focus-visible:ring-ring/50"
-                  href={link.href}
-                >
-                  {link.label}
-                </a>
-              </li>
-            ))}
-          </ul>
+        <div className="flex flex-col gap-3 py-6 text-sm text-muted-foreground sm:flex-row sm:items-center sm:justify-between">
+          <small>© 2025 Soukcart. All rights reserved.</small>
+          <button
+            type="button"
+            className="inline-flex items-center gap-2 rounded-lg px-1 py-1 transition-colors hover:text-foreground focus-visible:outline-none focus-visible:ring-[3px] focus-visible:ring-ring/50"
+            aria-label="Change language, current language English"
+          >
+            <GlobeIcon className="size-4" aria-hidden="true" />
+            <span>English</span>
+            <ChevronDownIcon className="size-4" aria-hidden="true" />
+          </button>
         </div>
       </div>
     </footer>
   );
 }
 
-export function LandingPage({ onOpenAuth }: LandingPageProps) {
+export function LandingPage() {
   return (
     <div className="min-h-svh bg-background text-foreground">
-      <LandingHeader onOpenAuth={onOpenAuth} />
+      <LandingHeader />
       <main>
-        <Hero onOpenAuth={onOpenAuth} />
-        <PlatformHighlights />
+        <Hero />
         <HowItWorks />
-        <JoinBand onOpenAuth={onOpenAuth} />
+        <JoinBand />
       </main>
       <LandingFooter />
     </div>

@@ -120,17 +120,6 @@ export function assertCartWithinStock(lines: readonly CartLine[]): void {
   }
 }
 
-export function assertSingleSupplierCart(lines: readonly CartLine[]): void {
-  const sellerIds = new Set(
-    lines
-      .map((line) => line.product.seller_id)
-      .filter((sellerId): sellerId is string => Boolean(sellerId)),
-  );
-  if (sellerIds.size > 1) {
-    throw new Error("Checkout one supplier at a time. Remove items from other suppliers first.");
-  }
-}
-
 export function buildCheckoutBody(
   paymentMethod: PaymentMethod,
   form: CheckoutForm,

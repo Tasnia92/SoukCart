@@ -1,6 +1,6 @@
 import type { SessionState } from "./session.tsx";
 
-export type AuthArea = "root" | "admin" | "retailer" | "supplier" | "public-payment";
+export type AuthArea = "root" | "auth" | "admin" | "retailer" | "supplier" | "public-payment";
 export type AuthDecision =
   | { kind: "render" }
   | { kind: "redirect"; to: "/" | "/admin" | "/retailer" | "/supplier" }
@@ -21,6 +21,22 @@ export function resolveAuthAccess(area: AuthArea, state: SessionState): AuthDeci
         return { kind: "redirect", to: "/supplier" };
       default:
         return { kind: "render" };
+    }
+  }
+
+  // Dedicated /login and /register pages for signed-out visitors.
+  if (area === "auth") {
+    switch (state.status) {
+      case "signed-out":
+        return { kind: "render" };
+      case "admin":
+        return { kind: "redirect", to: "/admin" };
+      case "retailer":
+        return { kind: "redirect", to: "/retailer" };
+      case "seller":
+        return { kind: "redirect", to: "/supplier" };
+      default:
+        return { kind: "redirect", to: "/" };
     }
   }
 
