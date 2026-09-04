@@ -1,4 +1,5 @@
 import tailwindcss from "@tailwindcss/vite";
+import { tanstackRouter } from "@tanstack/router-plugin/vite";
 import { defineConfig } from "vite-plus";
 import { playwright } from "vite-plus/test/browser-playwright";
 
@@ -11,7 +12,15 @@ const srcPath = new URL("./src", import.meta.url).pathname.replace(/^\/([A-Za-z]
 const resolveAlias = { "@": srcPath };
 
 export default defineConfig({
-  plugins: [tailwindcss()],
+  plugins: [
+    // Must run before other plugins so the generated route tree is available to the bundler.
+    tanstackRouter({
+      target: "react",
+      autoCodeSplitting: true,
+      quoteStyle: "double",
+    }),
+    tailwindcss(),
+  ],
   resolve: {
     alias: resolveAlias,
   },
