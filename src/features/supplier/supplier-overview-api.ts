@@ -1,7 +1,9 @@
 import { supabase } from "../../supabase.ts";
 
 export const SUPPLIER_PRODUCT_COLUMNS =
-  "id, name, description, price, unit, stock, min_order_qty, category, image_url, is_active, created_at, reorder_threshold, stock_version";
+  "id, name, description, price, unit, stock, min_order_qty, category, image_url, is_active, created_at, reorder_threshold, stock_version, moderation_status, moderation_reason, moderated_at";
+
+export type ProductModerationStatus = "ok" | "hidden" | "removed";
 
 export type SupplierProduct = {
   id: string;
@@ -17,17 +19,30 @@ export type SupplierProduct = {
   created_at: string;
   reorder_threshold: number;
   stock_version: number;
+  moderation_status: ProductModerationStatus;
+  moderation_reason: string | null;
+  moderated_at: string | null;
 };
 
 type SupplierProductRecord = Omit<
   SupplierProduct,
-  "price" | "category" | "min_order_qty" | "reorder_threshold" | "stock_version"
+  | "price"
+  | "category"
+  | "min_order_qty"
+  | "reorder_threshold"
+  | "stock_version"
+  | "moderation_status"
+  | "moderation_reason"
+  | "moderated_at"
 > & {
   price: number | string;
   min_order_qty: number | string | null;
   category: string | null;
   reorder_threshold?: number | string | null;
   stock_version?: number | string | null;
+  moderation_status?: ProductModerationStatus | null;
+  moderation_reason?: string | null;
+  moderated_at?: string | null;
 };
 
 type SupplierProductsQuery = {
@@ -50,6 +65,10 @@ export function normalizeSupplierProduct(product: SupplierProductRecord): Suppli
   const minQty = Number(product.min_order_qty);
   const reorder = Number(product.reorder_threshold);
   const version = Number(product.stock_version);
+  const moderationStatus =
+    product.moderation_status === "hidden" || product.moderation_status === "removed"
+      ? product.moderation_status
+      : "ok";
   return {
     ...product,
     price: Number(product.price),
@@ -57,7 +76,14 @@ export function normalizeSupplierProduct(product: SupplierProductRecord): Suppli
     category: product.category ?? null,
     reorder_threshold: Number.isInteger(reorder) && reorder >= 0 ? reorder : 5,
     stock_version: Number.isInteger(version) && version >= 0 ? version : 0,
+    moderation_status: moderationStatus,
+    moderation_reason: product.moderation_reason ?? null,
+    moderated_at: product.moderated_at ?? null,
   };
+}
+
+export function isAdminModerated(product: Pick<SupplierProduct, "moderation_status">): boolean {
+  return product.moderation_status === "hidden" || product.moderation_status === "removed";
 }
 
 export async function loadSupplierProducts(

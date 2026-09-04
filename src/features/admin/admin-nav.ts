@@ -6,6 +6,7 @@ import {
   ListChecks,
   MessageSquare,
   Package,
+  ShieldAlert,
   ShieldCheck,
   Truck,
   Users,
@@ -121,6 +122,12 @@ export function adminNavItems(activePath: string): WorkspaceNavItem[] {
       icon: MessageSquare,
       label: "Disputes",
       active: activePath.startsWith("/admin/complaints"),
+    },
+    {
+      to: "/admin/products",
+      icon: ShieldAlert,
+      label: "Products",
+      active: activePath.startsWith("/admin/products"),
     },
     {
       to: "/admin/verifications",

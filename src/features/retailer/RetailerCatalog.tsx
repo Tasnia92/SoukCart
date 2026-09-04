@@ -50,10 +50,17 @@ const ADDED_FEEDBACK_MS = 900;
 const ALL_CATEGORIES = "__all_categories__";
 
 function ProductArt({ product }: { product: RetailerProduct }) {
-  return product.image_url ? (
-    <img className="size-full object-cover" src={product.image_url} alt="" loading="lazy" />
-  ) : (
-    <ShoppingBag className="size-10 text-muted-foreground" aria-hidden="true" />
+  if (!product.image_url) {
+    return <ShoppingBag className="size-10 text-muted-foreground" aria-hidden="true" />;
+  }
+
+  return (
+    <img
+      className="absolute inset-0 size-full object-cover"
+      src={product.image_url}
+      alt=""
+      loading="lazy"
+    />
   );
 }
 
@@ -300,22 +307,26 @@ function ProductCard({
 
   return (
     <article className="h-full">
-      <Card className="h-full">
-        <div className="flex aspect-[4/3] items-center justify-center overflow-hidden bg-muted">
+      <Card className="h-full gap-0 overflow-hidden py-0">
+        <div className="relative flex aspect-[4/3] w-full shrink-0 items-center justify-center overflow-hidden bg-muted">
           <ProductArt product={product} />
         </div>
-        <CardHeader>
+        <CardHeader className="pt-(--card-spacing)">
           <CardTitle>
-            <h3>{product.name}</h3>
+            <h3 className="line-clamp-2 min-h-[2.75rem] leading-snug">{product.name}</h3>
           </CardTitle>
-          <CardDescription>{product.seller_name || "SoukCart sample"}</CardDescription>
+          <CardDescription className="truncate">
+            {product.seller_name || "SoukCart sample"}
+          </CardDescription>
           <CardAction>
             <Badge variant="outline">{formatPrice(product.price)}</Badge>
           </CardAction>
         </CardHeader>
         <CardContent className="flex flex-1 flex-col gap-3">
-          <p className="line-clamp-3 text-sm text-muted-foreground">{product.description}</p>
-          <div className="flex flex-wrap gap-2">
+          <p className="line-clamp-3 min-h-[3.75rem] text-sm text-muted-foreground">
+            {product.description}
+          </p>
+          <div className="flex min-h-7 flex-wrap content-start gap-2">
             <Badge variant={outOfStock ? "destructive" : "secondary"}>
               {outOfStock ? "Out of stock" : `${product.stock} in stock`}
             </Badge>
@@ -326,7 +337,7 @@ function ProductCard({
             {!outOfStock ? <Badge variant="outline">Per {product.unit}</Badge> : null}
           </div>
         </CardContent>
-        <CardFooter className="flex-col items-stretch gap-3 sm:flex-row sm:items-center sm:justify-between">
+        <CardFooter className="mt-auto flex-col items-stretch gap-3 border-t pt-(--card-spacing) pb-(--card-spacing) sm:flex-row sm:items-center sm:justify-between">
           <div
             className="flex items-center gap-2"
             role="group"

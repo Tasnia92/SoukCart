@@ -40,11 +40,25 @@ export function StockChip({ product }: { product: Pick<SupplierProduct, "is_acti
   return <Badge>Active</Badge>;
 }
 
-export function ProductThumb({ product }: { product: Pick<SupplierProduct, "image_url"> }) {
-  return product.image_url ? (
-    <img src={product.image_url} alt="" loading="lazy" className="size-full object-cover" />
-  ) : (
-    <ShoppingBag aria-hidden="true" />
+export function ProductThumb({
+  product,
+  fill = false,
+}: {
+  product: Pick<SupplierProduct, "image_url">;
+  /** Absolute fill for fixed media frames (product cards). */
+  fill?: boolean;
+}) {
+  if (!product.image_url) {
+    return <ShoppingBag aria-hidden="true" />;
+  }
+
+  return (
+    <img
+      src={product.image_url}
+      alt=""
+      loading="lazy"
+      className={fill ? "absolute inset-0 size-full object-cover" : "size-full object-cover"}
+    />
   );
 }
 

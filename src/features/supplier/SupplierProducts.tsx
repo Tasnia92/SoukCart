@@ -71,6 +71,7 @@ import {
   type ProductSort,
   type SupplierProduct,
 } from "./supplier-products-api.ts";
+import { isAdminModerated } from "./supplier-overview-api.ts";
 import {
   consumeSupplierNotice,
   ProductThumb,
@@ -116,10 +117,13 @@ function ProductCard({
   onDelete: (product: SupplierProduct) => void;
 }) {
   return (
-    <Card className="overflow-hidden py-0" data-selected={selected ? "true" : undefined}>
-      <div className="relative flex aspect-[4/3] items-center justify-center bg-muted text-muted-foreground">
-        <ProductThumb product={product} />
-        <div className="absolute top-2 left-2">
+    <Card
+      className="h-full gap-0 overflow-hidden py-0"
+      data-selected={selected ? "true" : undefined}
+    >
+      <div className="relative flex aspect-[4/3] w-full shrink-0 items-center justify-center overflow-hidden bg-muted text-muted-foreground">
+        <ProductThumb product={product} fill />
+        <div className="absolute top-2 left-2 z-10">
           <Checkbox
             checked={selected}
             onCheckedChange={(value) => onToggleSelected(value === true)}
@@ -128,9 +132,9 @@ function ProductCard({
           />
         </div>
       </div>
-      <CardHeader>
-        <CardTitle className="truncate">{product.name}</CardTitle>
-        <CardDescription>
+      <CardHeader className="pt-(--card-spacing)">
+        <CardTitle className="line-clamp-2 min-h-[2.75rem] leading-snug">{product.name}</CardTitle>
+        <CardDescription className="truncate">
           {formatPrice(product.price)} per {product.unit}
         </CardDescription>
         <CardAction>
@@ -149,10 +153,16 @@ function ProductCard({
             <DropdownMenuContent align="end">
               <DropdownMenuGroup>
                 <DropdownMenuItem
-                  disabled={busy || (product.is_active && product.stock <= 0)}
+                  disabled={
+                    busy || isAdminModerated(product) || (product.is_active && product.stock <= 0)
+                  }
                   onClick={() => onToggleActive(product)}
                 >
-                  {product.is_active ? "Hide from retailers" : "Show to retailers"}
+                  {product.is_active
+                    ? "Hide from retailers"
+                    : isAdminModerated(product)
+                      ? "Hidden by admin"
+                      : "Show to retailers"}
                 </DropdownMenuItem>
                 <DropdownMenuItem disabled={busy} onClick={() => onDuplicate(product)}>
                   <Copy />
@@ -163,7 +173,7 @@ function ProductCard({
               <DropdownMenuGroup>
                 <DropdownMenuItem
                   variant="destructive"
-                  disabled={busy}
+                  disabled={busy || product.moderation_status === "removed"}
                   onClick={() => onDelete(product)}
                 >
                   <Trash2 />
@@ -174,13 +184,19 @@ function ProductCard({
           </DropdownMenu>
         </CardAction>
       </CardHeader>
-      <CardContent className="flex flex-col gap-4">
-        <p className="line-clamp-2 text-sm text-muted-foreground">
+      <CardContent className="flex flex-1 flex-col gap-4">
+        <p className="line-clamp-2 min-h-[2.5rem] text-sm text-muted-foreground">
           {product.description || "Add a description to help retailers understand this product."}
         </p>
-        <div className="flex flex-wrap items-center gap-2">
+        <div className="flex min-h-7 flex-wrap content-start items-center gap-2">
           <StockChip product={product} />
           {product.category ? <Badge variant="outline">{product.category}</Badge> : null}
+          {product.moderation_status === "hidden" ? (
+            <Badge variant="destructive">Hidden by admin</Badge>
+          ) : null}
+          {product.moderation_status === "removed" ? (
+            <Badge variant="destructive">Removed by admin</Badge>
+          ) : null}
           {product.is_active && isProductLowStock(product) ? (
             <Badge variant="outline">Low stock</Badge>
           ) : null}
@@ -188,6 +204,11 @@ function ProductCard({
             <Badge variant="destructive">Out of stock</Badge>
           ) : null}
         </div>
+        {product.moderation_reason ? (
+          <p className="rounded-md border border-destructive/30 bg-destructive/5 px-3 py-2 text-xs text-destructive">
+            <strong>Admin reason:</strong> {product.moderation_reason}
+          </p>
+        ) : null}
         <Item variant="muted" size="sm">
           <ItemContent>
             <ItemDescription>Available stock</ItemDescription>
@@ -200,7 +221,7 @@ function ProductCard({
           </ItemActions>
         </Item>
       </CardContent>
-      <CardFooter className="justify-between border-t">
+      <CardFooter className="mt-auto justify-between border-t pt-(--card-spacing) pb-(--card-spacing)">
         <span className="text-xs text-muted-foreground">
           Added {formatDate(product.created_at)}
         </span>
@@ -306,6 +327,13 @@ export function SupplierProducts({ loadProducts = loadSupplierProducts }: Suppli
   }
 
   const onToggleActive = (product: SupplierProduct) => {
+    if (isAdminModerated(product)) {
+      setNotice({
+        message: "An administrator moderated this product. You cannot show it again yourself.",
+        state: "error",
+      });
+      return;
+    }
     const nextActive = !product.is_active;
     const previous = product.is_active;
     setBusyId(product.id);
@@ -404,21 +432,34 @@ export function SupplierProducts({ loadProducts = loadSupplierProducts }: Suppli
     .map(([id]) => id);
 
   const runBulkVisibility = (isActive: boolean) => {
-    if (!selectedIds.length) return;
+    if (!selectedIds.length || !products) return;
+    const targets = products.filter((product) => selectedIds.includes(product.id));
+    const actionable = isActive ? targets.filter((product) => !isAdminModerated(product)) : targets;
+    const skipped = targets.length - actionable.length;
+    if (!actionable.length) {
+      setNotice({
+        message: "Selected products were moderated by an administrator and cannot be shown again.",
+        state: "error",
+      });
+      return;
+    }
+    const ids = actionable.map((product) => product.id);
     setBulkBusy(true);
-    void setProductsActive(sellerId, selectedIds, isActive)
+    void setProductsActive(sellerId, ids, isActive)
       .then(() => {
         setProducts(
           (prev) =>
             prev?.map((item) =>
-              selectedIds.includes(item.id) ? { ...item, is_active: isActive } : item,
+              ids.includes(item.id) ? { ...item, is_active: isActive } : item,
             ) ?? prev,
         );
         setSelected({});
         setNotice({
           message: isActive
-            ? `Showed ${selectedIds.length} product${selectedIds.length === 1 ? "" : "s"}.`
-            : `Hid ${selectedIds.length} product${selectedIds.length === 1 ? "" : "s"}.`,
+            ? `Showed ${ids.length} product${ids.length === 1 ? "" : "s"}${
+                skipped ? ` (${skipped} admin-moderated skipped)` : ""
+              }.`
+            : `Hid ${ids.length} product${ids.length === 1 ? "" : "s"}.`,
           state: "success",
         });
       })

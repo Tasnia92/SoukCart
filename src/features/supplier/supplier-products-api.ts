@@ -113,6 +113,12 @@ export function friendlyProductError(error: unknown): string {
   if (lower.includes("violates check constraint") && lower.includes("stock")) {
     return "Stock must be a whole number of 0 or more.";
   }
+  if (lower.includes("moderated by an administrator")) {
+    return "An administrator moderated this product. You cannot show it again yourself.";
+  }
+  if (lower.includes("only an administrator can moderate")) {
+    return "Only an administrator can change moderation on this product.";
+  }
   if (lower.includes("violates row-level security") || lower.includes("permission denied")) {
     return "You do not have permission to change this product.";
   }

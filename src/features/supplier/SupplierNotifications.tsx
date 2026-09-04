@@ -63,6 +63,11 @@ function notificationIcon(type: string): LucideIcon {
       return PackageCheck;
     case "supplier_verified":
       return BadgeCheck;
+    case "product_hidden":
+    case "product_removed":
+      return Ban;
+    case "product_restored":
+      return PackageCheck;
     case "order_support_requested":
       return LifeBuoy;
     default:

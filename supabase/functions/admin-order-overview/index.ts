@@ -150,7 +150,7 @@ async function listActivity(): Promise<Response> {
   const { data, error } = await admin
     .from("orders")
     .select(
-      "id, status, cancel_requested, cancellation_initiator, cancellation_reason, payment_status, payment_method, created_at, delivered_at, delivery_verified_at, delivery_phone, delivery_address, delivery_city, delivery_postcode, platform_charge, delivery_charge, delivery_payment_status, refund_amount, manual_refund_status, refund_completed_at, retailer_id, users!orders_retailer_id_fkey(name, email), order_items(id, product_id, quantity, unit_price, products(id, name, seller_id, users(name, email)))",
+      "id, status, cancel_requested, cancellation_initiator, cancellation_reason, payment_status, payment_method, created_at, delivered_at, delivery_verified_at, delivery_phone, delivery_address, delivery_city, delivery_postcode, platform_charge, delivery_charge, delivery_payment_status, refund_amount, manual_refund_status, refund_completed_at, retailer_id, users!orders_retailer_id_fkey(name, email), order_items(id, product_id, quantity, unit_price, products(id, name, seller_id, users!products_seller_id_fkey(name, email)))",
     )
     .order("created_at", { ascending: false })
     .limit(1000);

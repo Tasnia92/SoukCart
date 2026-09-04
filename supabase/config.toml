@@ -4,6 +4,9 @@ verify_jwt = true
 [functions.admin-supplier-verifications]
 verify_jwt = true
 
+[functions.admin-product-moderation]
+verify_jwt = true
+
 [functions.sslcommerz-checkout]
 verify_jwt = true
 
