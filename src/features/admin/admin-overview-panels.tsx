@@ -1,5 +1,5 @@
 import { useNavigate } from "@tanstack/react-router";
-import { useState, type FormEvent, type MouseEvent } from "react";
+import { useState, type MouseEvent } from "react";
 import { ArrowRight, Mail, MapPin, Package, Phone, ShieldCheck } from "lucide-react";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import {
@@ -15,16 +15,6 @@ import {
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Checkbox } from "@/components/ui/checkbox";
-import {
-  Dialog,
-  DialogContent,
-  DialogDescription,
-  DialogFooter,
-  DialogHeader,
-  DialogTitle,
-} from "@/components/ui/dialog";
-import { Field, FieldError, FieldGroup, FieldLabel } from "@/components/ui/field";
-import { Input } from "@/components/ui/input";
 import {
   Item,
   ItemActions,
@@ -71,7 +61,6 @@ import {
   completeManualRefund,
   updateOrderStatus,
   type ActivityOrder,
-  type CancellationCharges,
 } from "./admin-activity-api.ts";
 import { resolveComplaint } from "./admin-complaints-api.ts";
 import {
@@ -102,18 +91,12 @@ type AdminActionWorkspaceProps = {
 type PendingMutation =
   | { type: "confirm"; order: ActivityOrder }
   | { type: "reject-cancel"; order: ActivityOrder }
-  | { type: "approve-cancel"; order: ActivityOrder; charges: CancellationCharges }
+  | { type: "approve-cancel"; order: ActivityOrder }
   | { type: "settle"; order: ActivityOrder }
   | { type: "resolve"; item: AdminQueueItem }
   | { type: "batch-confirm"; orders: ActivityOrder[] }
   | { type: "batch-settle"; orders: ActivityOrder[] }
   | { type: "batch-resolve"; items: AdminQueueItem[] };
-
-type ChargeDraft = {
-  order: ActivityOrder;
-  platformCharge: string;
-  deliveryCharge: string;
-};
 
 export const KIND_FILTERS: { value: QueueKindFilter; label: string }[] = [
   { value: "all", label: "All" },
@@ -132,29 +115,12 @@ export const QUEUE_KIND_LABELS: Record<AdminQueueKind, string> = {
   verification: "Verification",
 };
 
-function parseCharge(value: string): number {
-  if (!value.trim()) return NaN;
-  const amount = Number(value);
-  return Number.isFinite(amount) && amount >= 0 ? Math.round(amount * 100) / 100 : NaN;
-}
-
-function initialCharge(value: number): string {
-  return value > 0 ? value.toFixed(2) : "";
-}
-
-function needsCancellationCharges(order: ActivityOrder): boolean {
-  return (
-    order.payment_method === "online" &&
-    order.payment_status === "paid" &&
-    order.cancellation_initiator !== "supplier"
-  );
-}
-
-function refundAmountFor(order: ActivityOrder, charges: CancellationCharges): number {
+function cancelRefundAmount(order: ActivityOrder): number {
   if (order.payment_method !== "online" || order.payment_status !== "paid") return 0;
-  const paidTotal = order.total + order.delivery_charge;
-  if (order.cancellation_initiator === "supplier") return paidTotal;
-  return Math.max(paidTotal - charges.platformCharge, 0);
+  if (order.cancellation_initiator === "supplier") {
+    return Math.max(order.total + order.delivery_charge, 0);
+  }
+  return Math.max(order.total, 0);
 }
 
 function slaVariant(sla: AdminSlaBucket): "destructive" | "default" | "outline" {
@@ -275,8 +241,6 @@ export function AdminActionWorkspace({
   const [selected, setSelected] = useState<ReadonlySet<string>>(new Set());
   const [sheet, setSheet] = useState<AdminQueueItem | null>(null);
   const [pending, setPending] = useState<PendingMutation | null>(null);
-  const [chargeDraft, setChargeDraft] = useState<ChargeDraft | null>(null);
-  const [chargeError, setChargeError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
 
   const disputesFailure = failureFor(dashboard.failures, ADMIN_DISPUTES_SECTION);
@@ -349,12 +313,14 @@ export function AdminActionWorkspace({
       return;
     }
     if (pending.type === "approve-cancel") {
-      const { order, charges } = pending;
-      const refund = refundAmountFor(order, charges);
+      const { order } = pending;
+      const refund = cancelRefundAmount(order);
       run(
-        () => updateOrderStatus(order.id, "cancelled", charges),
+        () => updateOrderStatus(order.id, "cancelled"),
         refund
-          ? `Order #${shortId(order.id)} was cancelled. Manual refund ${formatPrice(refund)} is pending.`
+          ? order.cancellation_initiator === "supplier"
+            ? `Order #${shortId(order.id)} was cancelled. Manual refund ${formatPrice(refund)} (merchandise + delivery) is pending.`
+            : `Order #${shortId(order.id)} was cancelled. Manual refund ${formatPrice(refund)} for merchandise is pending. Prepaid delivery is retained.`
           : `Order #${shortId(order.id)} was cancelled. No advance refund is required.`,
       );
       return;
@@ -406,39 +372,7 @@ export function AdminActionWorkspace({
   };
 
   const requestApproveCancel = (order: ActivityOrder) => {
-    if (needsCancellationCharges(order)) {
-      setChargeError(null);
-      setChargeDraft({
-        order,
-        platformCharge: initialCharge(order.platform_charge),
-        deliveryCharge: "0",
-      });
-      return;
-    }
-    setPending({
-      type: "approve-cancel",
-      order,
-      charges: { platformCharge: 0 },
-    });
-  };
-
-  const onSubmitCharges = (event: FormEvent<HTMLFormElement>) => {
-    event.preventDefault();
-    if (!chargeDraft) return;
-    const platformCharge = parseCharge(chargeDraft.platformCharge);
-    const paidTotal = chargeDraft.order.total + chargeDraft.order.delivery_charge;
-    if (!Number.isFinite(platformCharge)) {
-      setChargeError("Enter a valid non-negative platform charge.");
-      return;
-    }
-    if (platformCharge > paidTotal) {
-      setChargeError("Cancellation charges cannot exceed the paid order total.");
-      return;
-    }
-    const { order } = chargeDraft;
-    setChargeDraft(null);
-    setChargeError(null);
-    setPending({ type: "approve-cancel", order, charges: { platformCharge } });
+    setPending({ type: "approve-cancel", order });
   };
 
   const startBatch = () => {
@@ -471,10 +405,13 @@ export function AdminActionWorkspace({
       return `Reject the cancellation request for order #${shortId(pending.order.id)}?`;
     }
     if (pending.type === "approve-cancel") {
-      const refund = refundAmountFor(pending.order, pending.charges);
-      return `Cancel order #${shortId(pending.order.id)} for ${pending.order.retailer_name}?${
-        refund ? ` Record a pending manual refund of ${formatPrice(refund)}.` : ""
-      }`;
+      const refund = cancelRefundAmount(pending.order);
+      const refundNote = refund
+        ? pending.order.cancellation_initiator === "supplier"
+          ? ` Record a pending manual refund of ${formatPrice(refund)} (merchandise + delivery).`
+          : ` Record a pending manual refund of ${formatPrice(refund)} for merchandise. Prepaid delivery is retained; no platform charge.`
+        : "";
+      return `Cancel order #${shortId(pending.order.id)} for ${pending.order.retailer_name}?${refundNote}`;
     }
     if (pending.type === "settle") {
       return `Confirm that the manual refund of ${formatPrice(pending.order.refund_amount)} for order #${shortId(pending.order.id)} has been paid?`;
@@ -918,69 +855,6 @@ export function AdminActionWorkspace({
           </SheetFooter>
         </SheetContent>
       </Sheet>
-
-      <Dialog
-        open={Boolean(chargeDraft)}
-        onOpenChange={(open) => {
-          if (!open) {
-            setChargeDraft(null);
-            setChargeError(null);
-          }
-        }}
-      >
-        <DialogContent>
-          <DialogHeader>
-            <DialogTitle>Cancellation charges</DialogTitle>
-            <DialogDescription>
-              Enter any platform retention to deduct from the paid merchandise and delivery total.
-              Prepaid delivery is not edited here.
-            </DialogDescription>
-          </DialogHeader>
-          <form onSubmit={onSubmitCharges} noValidate>
-            <FieldGroup>
-              <Field data-invalid={Boolean(chargeError) || undefined}>
-                <FieldLabel htmlFor="overview-platform-charge">
-                  Platform charge to deduct (BDT)
-                </FieldLabel>
-                <Input
-                  id="overview-platform-charge"
-                  type="number"
-                  inputMode="decimal"
-                  min="0"
-                  step="0.01"
-                  value={chargeDraft?.platformCharge ?? ""}
-                  aria-invalid={Boolean(chargeError) || undefined}
-                  onChange={(event) =>
-                    setChargeDraft((current) =>
-                      current ? { ...current, platformCharge: event.target.value } : current,
-                    )
-                  }
-                />
-                {chargeError ? <FieldError>{chargeError}</FieldError> : null}
-              </Field>
-              {chargeDraft ? (
-                <p className="text-sm text-muted-foreground">
-                  Prepaid delivery: {formatPrice(chargeDraft.order.delivery_charge)}. Paid total:{" "}
-                  {formatPrice(chargeDraft.order.total + chargeDraft.order.delivery_charge)}.
-                </p>
-              ) : null}
-            </FieldGroup>
-            <DialogFooter className="mt-6">
-              <Button
-                type="button"
-                variant="outline"
-                onClick={() => {
-                  setChargeDraft(null);
-                  setChargeError(null);
-                }}
-              >
-                Cancel
-              </Button>
-              <Button type="submit">Continue</Button>
-            </DialogFooter>
-          </form>
-        </DialogContent>
-      </Dialog>
 
       <AlertDialog
         open={Boolean(pending)}
