@@ -33,7 +33,7 @@ export const ADMIN_ORDER_VIEWS: readonly AdminOrderViewMeta[] = [
     label: "All orders",
     icon: ClipboardList,
     title: "All orders",
-    copy: "Browse every order. Confirm, cancel, refund, or collect COD from here.",
+    copy: "Browse every order. Update delivery status, cancel, refund, or collect COD from here.",
     search: {},
   },
   {
@@ -49,7 +49,7 @@ export const ADMIN_ORDER_VIEWS: readonly AdminOrderViewMeta[] = [
     label: "To ship",
     icon: Package,
     title: "To ship",
-    copy: "Confirmed orders waiting on the seller to send them out.",
+    copy: "Confirmed orders waiting for you to mark shipped.",
     search: { view: "confirmed" },
   },
   {
@@ -57,7 +57,7 @@ export const ADMIN_ORDER_VIEWS: readonly AdminOrderViewMeta[] = [
     label: "In transit",
     icon: Truck,
     title: "In transit",
-    copy: "Shipped orders that have not been marked delivered yet.",
+    copy: "Shipped orders waiting for you to mark delivered.",
     search: { view: "shipped" },
   },
   {

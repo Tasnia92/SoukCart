@@ -15,8 +15,6 @@ import {
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
-import { Field, FieldLabel } from "@/components/ui/field";
 import {
   Item,
   ItemActions,
@@ -25,14 +23,7 @@ import {
   ItemGroup,
   ItemTitle,
 } from "@/components/ui/item";
-import {
-  Select,
-  SelectContent,
-  SelectGroup,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select";
+import { Spinner } from "@/components/ui/spinner";
 import {
   Table,
   TableBody,
@@ -55,6 +46,11 @@ import {
   type NoticeState,
 } from "../../components/ui/Workspace.tsx";
 import { useSessionSnapshot, useSessionStore } from "../../session.tsx";
+import {
+  DeliveryStatusCard,
+  nextDeliveryActionLabel,
+  nextDeliveryStatus,
+} from "../orders/DeliveryStatus.tsx";
 import {
   DeliveryDetails,
   OrderRow,
@@ -95,20 +91,8 @@ type PendingStatusChange = {
   message: string;
 };
 
-function nextStatuses(order: ActivityOrder): string[] {
-  const unpaidOnline = !canFulfillOrder(order);
-  switch (order.status) {
-    case "pending":
-      return unpaidOnline ? ["pending", "cancelled"] : ["pending", "confirmed", "cancelled"];
-    case "confirmed":
-      return unpaidOnline ? ["confirmed", "cancelled"] : ["confirmed", "shipped", "cancelled"];
-    case "shipped":
-      return unpaidOnline ? ["shipped", "cancelled"] : ["shipped", "delivered", "cancelled"];
-    case "delivered":
-      return ["delivered", "cancelled"];
-    default:
-      return ["cancelled"];
-  }
+function canCancelOrder(order: ActivityOrder): boolean {
+  return order.status !== "cancelled";
 }
 
 function cancelRefundAmount(order: ActivityOrder): number {
@@ -314,9 +298,35 @@ export function AdminActivity({ loadActivity = loadAdminActivity }: AdminActivit
       .finally(() => setBusyId(null));
   };
 
-  const onSelectChange = (order: ActivityOrder, value: string) => {
-    if (value === order.status && !order.cancel_requested) return;
-    requestStatusChange(order, value);
+  const applyDeliveryStatus = (order: ActivityOrder) => {
+    const next = nextDeliveryStatus(order.status);
+    if (!next) return;
+    if (!canFulfillOrder(order)) {
+      setNotice({
+        message: "Delivery must be paid before this order can move forward.",
+        state: "error",
+      });
+      return;
+    }
+    setBusyId(order.id);
+    void updateOrderStatus(order.id, next)
+      .then(() => {
+        setNotice({
+          message: `Order #${shortId(order.id)} is now ${statusLabel(next)}.`,
+          state: "success",
+        });
+        setLoadVersion((version) => version + 1);
+      })
+      .catch((statusError: unknown) => {
+        setNotice({
+          message:
+            statusError instanceof Error
+              ? statusError.message
+              : "The order status could not be updated.",
+          state: "error",
+        });
+      })
+      .finally(() => setBusyId(null));
   };
 
   const orders = data?.orders ?? null;
@@ -522,91 +532,87 @@ export function AdminActivity({ loadActivity = loadAdminActivity }: AdminActivit
                                 </AlertDescription>
                               </Alert>
                             ) : null}
-                            <Card size="sm">
-                              <CardHeader>
-                                <CardTitle>Admin controls</CardTitle>
-                                <CardDescription>
-                                  Update status, review cancellation requests, and record refunds.
-                                </CardDescription>
-                              </CardHeader>
-                              <CardContent className="flex flex-col gap-4 lg:flex-row lg:items-end lg:justify-between">
-                                <Field className="max-w-xs">
-                                  <FieldLabel htmlFor={`order-status-${order.id}`}>
-                                    Status
-                                  </FieldLabel>
-                                  <Select
-                                    value={order.status}
+                            <DeliveryStatusCard
+                              status={order.status}
+                              audience="admin"
+                              nextLabel={nextDeliveryActionLabel(order.status)}
+                              nextDisabled={!canFulfillOrder(order)}
+                              busy={busyId === order.id}
+                              onNext={
+                                nextDeliveryStatus(order.status)
+                                  ? () => applyDeliveryStatus(order)
+                                  : undefined
+                              }
+                            />
+                            {!canFulfillOrder(order) && order.status !== "cancelled" ? (
+                              <Alert>
+                                <AlertTitle>Waiting on payment</AlertTitle>
+                                <AlertDescription>
+                                  Delivery must be paid before this order can move forward.
+                                </AlertDescription>
+                              </Alert>
+                            ) : null}
+                            <div className="flex flex-wrap items-center gap-2">
+                              {order.cancel_requested ? (
+                                <>
+                                  <OrderFlag>
+                                    {`Cancellation requested by ${order.cancellation_initiator}`}
+                                  </OrderFlag>
+                                  <Button
+                                    variant="destructive"
+                                    size="sm"
+                                    type="button"
                                     disabled={busyId === order.id}
-                                    onValueChange={(value) => onSelectChange(order, value)}
+                                    onClick={() => requestStatusChange(order, "cancelled")}
                                   >
-                                    <SelectTrigger
-                                      id={`order-status-${order.id}`}
-                                      className="w-full min-w-32"
-                                      aria-label={`Order status for #${shortId(order.id)}`}
-                                    >
-                                      <SelectValue />
-                                    </SelectTrigger>
-                                    <SelectContent>
-                                      <SelectGroup>
-                                        {nextStatuses(order).map((value) => (
-                                          <SelectItem value={value} key={value}>
-                                            {statusLabel(value)}
-                                          </SelectItem>
-                                        ))}
-                                      </SelectGroup>
-                                    </SelectContent>
-                                  </Select>
-                                </Field>
-                                <div className="flex flex-wrap items-center gap-2">
-                                  {order.cancel_requested ? (
-                                    <>
-                                      <OrderFlag>
-                                        {`Cancellation requested by ${order.cancellation_initiator}`}
-                                      </OrderFlag>
-                                      <Button
-                                        variant="destructive"
-                                        size="sm"
-                                        type="button"
-                                        disabled={busyId === order.id}
-                                        onClick={() => requestStatusChange(order, "cancelled")}
-                                      >
-                                        Approve &amp; cancel
-                                      </Button>
-                                      <Button
-                                        variant="ghost"
-                                        size="sm"
-                                        type="button"
-                                        disabled={busyId === order.id}
-                                        onClick={() => requestStatusChange(order, order.status)}
-                                      >
-                                        Reject request
-                                      </Button>
-                                    </>
-                                  ) : null}
-                                  {needsCodCollection(order) ? (
-                                    <Button
-                                      type="button"
-                                      size="sm"
-                                      variant="outline"
-                                      disabled={busyId === order.id}
-                                      onClick={() => setCodConfirmation(order)}
-                                    >
-                                      Record cash collected
-                                    </Button>
-                                  ) : null}
-                                  {order.manual_refund_status === "pending" ? (
-                                    <Button
-                                      type="button"
-                                      size="sm"
-                                      disabled={busyId === order.id}
-                                      onClick={() => setRefundConfirmation(order)}
-                                    >
-                                      Mark manual refund completed
-                                    </Button>
-                                  ) : null}
-                                </div>
-                              </CardContent>
-                            </Card>
+                                    {busyId === order.id ? (
+                                      <Spinner data-icon="inline-start" />
+                                    ) : null}
+                                    Approve &amp; cancel
+                                  </Button>
+                                  <Button
+                                    variant="ghost"
+                                    size="sm"
+                                    type="button"
+                                    disabled={busyId === order.id}
+                                    onClick={() => requestStatusChange(order, order.status)}
+                                  >
+                                    Reject request
+                                  </Button>
+                                </>
+                              ) : canCancelOrder(order) ? (
+                                <Button
+                                  variant="destructive"
+                                  size="sm"
+                                  type="button"
+                                  disabled={busyId === order.id}
+                                  onClick={() => requestStatusChange(order, "cancelled")}
+                                >
+                                  Cancel order
+                                </Button>
+                              ) : null}
+                              {needsCodCollection(order) ? (
+                                <Button
+                                  type="button"
+                                  size="sm"
+                                  variant="outline"
+                                  disabled={busyId === order.id}
+                                  onClick={() => setCodConfirmation(order)}
+                                >
+                                  Record cash collected
+                                </Button>
+                              ) : null}
+                              {order.manual_refund_status === "pending" ? (
+                                <Button
+                                  type="button"
+                                  size="sm"
+                                  disabled={busyId === order.id}
+                                  onClick={() => setRefundConfirmation(order)}
+                                >
+                                  Mark manual refund completed
+                                </Button>
+                              ) : null}
+                            </div>
                           </div>
                         }
                       />

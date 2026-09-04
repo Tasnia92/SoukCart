@@ -15,9 +15,3 @@ verify_jwt = false
 
 [functions.sslcommerz-return]
 verify_jwt = false
-
-[functions.pathao-courier]
-verify_jwt = true
-
-[functions.pathao-webhook]
-verify_jwt = false

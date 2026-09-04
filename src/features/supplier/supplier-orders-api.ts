@@ -12,37 +12,6 @@ export type SupplierOrderItem = {
   line_total: number;
 };
 
-export type ShipmentStatus =
-  | "shipped"
-  | "in_transit"
-  | "out_for_delivery"
-  | "delivered"
-  | "exception";
-
-export type ShipmentEvent = {
-  id: string;
-  event_type: string;
-  message: string;
-  occurred_at: string;
-};
-
-export type SupplierShipment = {
-  id: string;
-  carrier: string;
-  tracking_number: string;
-  tracking_url: string;
-  status: ShipmentStatus;
-  notes: string;
-  shipped_at: string;
-  updated_at: string;
-  provider: "manual" | "pathao";
-  consignment_id: string | null;
-  pathao_status: string | null;
-  pathao_delivery_fee: number | null;
-  collected_amount: number;
-  events: ShipmentEvent[];
-};
-
 export type SupplierOrder = {
   id: string;
   status: SupplierOrderStatus;
@@ -68,24 +37,6 @@ export type SupplierOrder = {
   accepted_at: string | null;
   items: SupplierOrderItem[];
   supplier_total: number;
-  shipment: SupplierShipment | null;
-};
-
-export const SHIPMENT_CARRIERS = [
-  "Pathao",
-  "Steadfast",
-  "RedX",
-  "Paperfly",
-  "Sundarban",
-  "SA Paribahan",
-  "Other",
-] as const;
-
-export type ShipOrderInput = {
-  carrier: string;
-  trackingNumber: string;
-  trackingUrl?: string;
-  notes?: string;
 };
 
 type SupplierOrderRow = Omit<
@@ -94,7 +45,6 @@ type SupplierOrderRow = Omit<
   | "items"
   | "cancel_requested"
   | "accepted_at"
-  | "shipment"
   | "delivery_charge"
   | "delivery_payment_status"
   | "delivery_paid_at"
@@ -105,50 +55,11 @@ type SupplierOrderRow = Omit<
   delivery_paid_at?: string | null;
   cancel_requested: boolean | null;
   accepted_at: string | null;
-  shipment?:
-    | (Omit<
-        SupplierShipment,
-        | "events"
-        | "provider"
-        | "consignment_id"
-        | "pathao_status"
-        | "pathao_delivery_fee"
-        | "collected_amount"
-      > & {
-        provider?: string | null;
-        consignment_id?: string | null;
-        pathao_status?: string | null;
-        pathao_delivery_fee?: number | string | null;
-        collected_amount?: number | string | null;
-        events?: ShipmentEvent[] | null;
-      })
-    | null;
   items: (Omit<SupplierOrderItem, "unit_price" | "line_total"> & {
     unit_price: number | string;
     line_total: number | string;
   })[];
 };
-
-function normalizeShipment(shipment: SupplierOrderRow["shipment"]): SupplierShipment | null {
-  if (!shipment || typeof shipment !== "object" || !shipment.id) return null;
-  return {
-    id: shipment.id,
-    carrier: shipment.carrier ?? "",
-    tracking_number: shipment.tracking_number ?? "",
-    tracking_url: shipment.tracking_url ?? "",
-    status: (shipment.status as ShipmentStatus) || "shipped",
-    notes: shipment.notes ?? "",
-    shipped_at: shipment.shipped_at,
-    updated_at: shipment.updated_at,
-    provider: shipment.provider === "pathao" ? "pathao" : "manual",
-    consignment_id: shipment.consignment_id ?? null,
-    pathao_status: shipment.pathao_status ?? null,
-    pathao_delivery_fee:
-      shipment.pathao_delivery_fee == null ? null : Number(shipment.pathao_delivery_fee),
-    collected_amount: Number(shipment.collected_amount ?? 0),
-    events: Array.isArray(shipment.events) ? shipment.events : [],
-  };
-}
 
 function normalizeOrder(row: SupplierOrderRow): SupplierOrder {
   const deliveryStatus = row.delivery_payment_status;
@@ -168,7 +79,6 @@ function normalizeOrder(row: SupplierOrderRow): SupplierOrder {
     delivery_city: row.delivery_city ?? null,
     delivery_postcode: row.delivery_postcode ?? null,
     supplier_total: Number(row.supplier_total),
-    shipment: normalizeShipment(row.shipment),
     items: (row.items ?? []).map((item) => ({
       ...item,
       unit_price: Number(item.unit_price),
@@ -183,151 +93,16 @@ export async function loadSupplierOrders(): Promise<SupplierOrder[]> {
   return ((Array.isArray(data) ? data : []) as SupplierOrderRow[]).map(normalizeOrder);
 }
 
-export async function setSupplierOrderStatus(
-  orderId: string,
-  status: "confirmed" | "delivered",
-): Promise<"confirmed" | "delivered"> {
+export async function setSupplierOrderStatus(orderId: string): Promise<"confirmed"> {
   const { data, error } = await supabase.rpc("seller_set_order_status", {
     p_order_id: orderId,
-    p_status: status,
+    p_status: "confirmed",
   });
   if (error) throw new Error(error.message || "The order status could not be updated.");
-  if (data !== "confirmed" && data !== "delivered") {
+  if (data !== "confirmed") {
     throw new Error("The order status was not updated.");
   }
   return data;
-}
-
-export async function shipSupplierOrder(orderId: string, input: ShipOrderInput): Promise<void> {
-  const { data, error } = await supabase.rpc("seller_ship_order", {
-    p_order_id: orderId,
-    p_carrier: input.carrier.trim(),
-    p_tracking_number: input.trackingNumber.trim(),
-    p_tracking_url: input.trackingUrl?.trim() || "",
-    p_notes: input.notes?.trim() || "",
-  });
-  if (error) throw new Error(error.message || "The order could not be marked shipped.");
-  if (
-    typeof data !== "object" ||
-    data === null ||
-    !("status" in data) ||
-    data.status !== "shipped"
-  ) {
-    throw new Error("Shipment was not created.");
-  }
-}
-
-export type PathaoShipInput = {
-  itemWeight?: number;
-  notes?: string;
-};
-
-async function pathaoFunctionError(
-  error: { message?: string; context?: Response } | null,
-  data: { error?: string } | null | undefined,
-  fallback: string,
-): Promise<string> {
-  if (data?.error) return data.error;
-  const context = error?.context;
-  if (context && typeof context.json === "function") {
-    try {
-      const body = (await context.clone().json()) as { error?: string };
-      if (body?.error) return body.error;
-    } catch {
-      // Fall through to the generic message.
-    }
-  }
-  return error?.message || fallback;
-}
-
-export async function shipSupplierOrderWithPathao(
-  orderId: string,
-  input: PathaoShipInput = {},
-): Promise<{ consignmentId: string }> {
-  const { data, error } = await supabase.functions.invoke<{
-    error?: string;
-    consignmentId?: string;
-    status?: string;
-  }>("pathao-courier", {
-    body: {
-      action: "ship",
-      orderId,
-      itemWeight: input.itemWeight ?? 0.5,
-      notes: input.notes?.trim() || "",
-    },
-  });
-
-  if (error || data?.error) {
-    throw new Error(await pathaoFunctionError(error, data, "Pathao could not book this shipment."));
-  }
-  if (!data?.consignmentId || data.status !== "shipped") {
-    throw new Error("Pathao did not confirm the shipment.");
-  }
-  return { consignmentId: data.consignmentId };
-}
-
-export async function syncPathaoShipment(orderId: string): Promise<void> {
-  const { data, error } = await supabase.functions.invoke<{ error?: string; status?: string }>(
-    "pathao-courier",
-    {
-      body: { action: "sync", orderId },
-    },
-  );
-  if (error || data?.error) {
-    throw new Error(
-      await pathaoFunctionError(error, data, "Pathao status could not be refreshed."),
-    );
-  }
-}
-
-export async function updateSupplierShipment(
-  orderId: string,
-  input: {
-    carrier?: string;
-    trackingNumber?: string;
-    trackingUrl?: string;
-    status?: ShipmentStatus;
-    notes?: string;
-    eventMessage?: string;
-  },
-): Promise<void> {
-  const { data, error } = await supabase.rpc("seller_update_shipment", {
-    p_order_id: orderId,
-    p_carrier: input.carrier ?? null,
-    p_tracking_number: input.trackingNumber ?? null,
-    p_tracking_url: input.trackingUrl ?? null,
-    p_status: input.status ?? null,
-    p_notes: input.notes ?? null,
-    p_event_message: input.eventMessage ?? null,
-  });
-  if (error) throw new Error(error.message || "Shipment tracking could not be updated.");
-  if (typeof data !== "object" || data === null || !("shipmentId" in data)) {
-    throw new Error("Shipment tracking was not updated.");
-  }
-}
-
-export function carrierValidationError(value: string): string | null {
-  const carrier = value.trim();
-  if (carrier.length < 2 || carrier.length > 80) {
-    return "Enter a carrier name (2–80 characters).";
-  }
-  return null;
-}
-
-export function trackingNumberValidationError(value: string): string | null {
-  const tracking = value.trim();
-  if (tracking.length < 3 || tracking.length > 80) {
-    return "Enter a tracking number (3–80 characters).";
-  }
-  return null;
-}
-
-export function trackingUrlValidationError(value: string): string | null {
-  const url = value.trim();
-  if (!url) return null;
-  if (url.length > 500) return "Tracking URL must be 500 characters or fewer.";
-  if (!/^https?:\/\//i.test(url)) return "Tracking URL must start with http:// or https://.";
-  return null;
 }
 
 export async function requestSupplierCancellation(orderId: string, reason: string): Promise<void> {
@@ -355,14 +130,6 @@ export function canFulfillPayment(
 
 export function canConfirmOrder(order: SupplierOrder): boolean {
   return order.status === "pending" && !order.cancel_requested && canFulfillPayment(order);
-}
-
-export function canShipOrder(order: SupplierOrder): boolean {
-  return order.status === "confirmed" && !order.cancel_requested && canFulfillPayment(order);
-}
-
-export function canMarkDelivered(order: SupplierOrder): boolean {
-  return order.status === "shipped" && !order.cancel_requested && canFulfillPayment(order);
 }
 
 export function canSupplierCancel(order: SupplierOrder): boolean {

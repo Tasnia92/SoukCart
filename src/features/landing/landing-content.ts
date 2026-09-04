@@ -100,8 +100,8 @@ export const SUPPLIER_STEPS: {
   {
     icon: TruckIcon,
     step: "4",
-    title: "Pack & Deliver",
-    copy: "Process orders and ship on time.",
+    title: "Confirm Orders",
+    copy: "Accept orders. Admin updates delivery for the retailer.",
   },
   {
     icon: TrendingUpIcon,
@@ -139,7 +139,7 @@ export const RETAILER_STEPS: {
     icon: TruckIcon,
     step: "4",
     title: "Track & Receive",
-    copy: "Track your order and get it delivered to your store.",
+    copy: "Watch delivery status as admin marks your order shipped and delivered.",
   },
   {
     icon: StoreIcon,

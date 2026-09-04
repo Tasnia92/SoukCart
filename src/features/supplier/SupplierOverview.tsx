@@ -207,13 +207,13 @@ function focusItems(dashboard: SupplierDashboard): ActionQueueEntry[] {
     items.push({
       id: "to-ship",
       icon: Truck,
-      title: `${summary.toShip} order${summary.toShip === 1 ? "" : "s"} to ship`,
-      detail: "Confirmed orders ready for dispatch.",
+      title: `${summary.toShip} order${summary.toShip === 1 ? "" : "s"} waiting on delivery`,
+      detail: "Confirmed. Admin will mark these shipped and delivered.",
       severity: "attention",
-      marker: "To ship",
+      marker: "Waiting",
       to: "/supplier/orders",
       search: { filter: "to-ship" },
-      actionLabel: "Ship",
+      actionLabel: "View",
     });
   }
 

@@ -32,7 +32,7 @@ import {
 } from "../../components/ui/Workspace.tsx";
 import { RouterLink } from "../../components/ui/RouterLink.tsx";
 import { useSessionSnapshot, useSessionStore } from "../../session.tsx";
-import { OrderTrackingPanel } from "../orders/OrderTracking.tsx";
+import { DeliveryStatusCard } from "../orders/DeliveryStatus.tsx";
 import {
   DeliveryDetails,
   OrderRow,
@@ -451,7 +451,7 @@ export function RetailerOrders({
       <PageHeader
         eyebrow="Order history"
         title="My orders."
-        copy="Track deliveries, confirm receipt, and manage cancellations in one place."
+        copy="See delivery status as admin updates it. Confirm receipt and manage cancellations here."
         actions={
           <Button asChild>
             <RouterLink to="/retailer/catalog">
@@ -590,14 +590,7 @@ export function RetailerOrders({
                               city={order.delivery_city}
                               postcode={order.delivery_postcode}
                             />
-                            {order.status === "shipped" ||
-                            order.status === "delivered" ||
-                            order.shipment ? (
-                              <div className="flex flex-col gap-2">
-                                <p className="text-sm font-medium">Shipment tracking</p>
-                                <OrderTrackingPanel shipment={order.shipment} />
-                              </div>
-                            ) : null}
+                            <DeliveryStatusCard status={order.status} audience="retailer" />
                             {order.notes ? (
                               <Alert role="note">
                                 <MessageSquare />

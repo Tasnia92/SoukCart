@@ -5,9 +5,11 @@ import {
   Ban,
   Banknote,
   Bell,
+  CircleCheckBig,
   CircleX,
   LifeBuoy,
   PackageCheck,
+  Truck,
   Wallet,
   type LucideIcon,
 } from "lucide-react";
@@ -47,6 +49,11 @@ function notificationIcon(type: string): LucideIcon {
       return Banknote;
     case "cod_collected":
       return Wallet;
+    case "order_confirmed":
+      return CircleCheckBig;
+    case "order_shipped":
+      return Truck;
+    case "order_delivered":
     case "delivery_verified":
       return PackageCheck;
     case "supplier_verified":

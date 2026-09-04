@@ -33,7 +33,6 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog";
 import { Field, FieldGroup, FieldLabel } from "@/components/ui/field";
-import { Input } from "@/components/ui/input";
 import {
   Select,
   SelectContent,
@@ -66,7 +65,7 @@ import {
 } from "../../components/ui/Workspace.tsx";
 import { useSessionSnapshot, useSessionStore } from "../../session.tsx";
 import { useTableChanges } from "../../workspace-realtime.ts";
-import { OrderTrackingPanel } from "../orders/OrderTracking.tsx";
+import { DeliveryStatusCard } from "../orders/DeliveryStatus.tsx";
 import {
   DeliveryDetails,
   OrderRow,
@@ -80,22 +79,11 @@ import { RouterLink } from "../workspace/WorkspaceShell.tsx";
 import { SupplierWorkspaceShell } from "./supplier-shared.tsx";
 import {
   canConfirmOrder,
-  canMarkDelivered,
-  canShipOrder,
   canSupplierCancel,
-  carrierValidationError,
   filterSupplierOrders,
   loadSupplierOrders,
   requestSupplierCancellation,
   setSupplierOrderStatus,
-  shipSupplierOrder,
-  shipSupplierOrderWithPathao,
-  SHIPMENT_CARRIERS,
-  syncPathaoShipment,
-  trackingNumberValidationError,
-  trackingUrlValidationError,
-  updateSupplierShipment,
-  type ShipmentStatus,
   type SupplierOrder,
 } from "./supplier-orders-api.ts";
 import { requestSellerReturn } from "./supplier-returns-api.ts";
@@ -116,7 +104,7 @@ type OrderFilter =
   | "cancelled"
   | "all";
 type OrderSort = "oldest" | "newest" | "value" | "city";
-type FulfillAction = "confirmed" | "shipped" | "delivered";
+type FulfillAction = "confirmed";
 
 const ORDER_FILTERS = new Set<OrderFilter>([
   "action",
@@ -130,7 +118,7 @@ const ORDER_FILTERS = new Set<OrderFilter>([
   "all",
 ]);
 
-const ORDERS_LIVE_TABLES = ["orders", "order_shipments"] as const;
+const ORDERS_LIVE_TABLES = ["orders"] as const;
 
 function parseOrderFilter(value: string | null): OrderFilter {
   if (value && ORDER_FILTERS.has(value as OrderFilter)) return value as OrderFilter;
@@ -138,12 +126,7 @@ function parseOrderFilter(value: string | null): OrderFilter {
 }
 
 function needsAction(order: SupplierOrder): boolean {
-  return (
-    canConfirmOrder(order) ||
-    canShipOrder(order) ||
-    canMarkDelivered(order) ||
-    order.cancel_requested
-  );
+  return canConfirmOrder(order) || order.cancel_requested;
 }
 
 function isAwaitingPayment(order: SupplierOrder): boolean {
@@ -161,7 +144,7 @@ function matchesFilter(order: SupplierOrder, filter: OrderFilter): boolean {
   if (filter === "action") return needsAction(order);
   if (filter === "awaiting-payment") return isAwaitingPayment(order);
   if (filter === "to-confirm") return canConfirmOrder(order);
-  if (filter === "to-ship") return canShipOrder(order);
+  if (filter === "to-ship") return order.status === "confirmed" && !order.cancel_requested;
   if (filter === "in-transit") return order.status === "shipped" && !order.cancel_requested;
   if (filter === "delivered") return order.status === "delivered";
   if (filter === "cancellation-requested") {
@@ -229,45 +212,16 @@ function exportOrdersCsv(orders: readonly SupplierOrder[]): void {
   URL.revokeObjectURL(url);
 }
 
-function fulfillCopy(action: Exclude<FulfillAction, "shipped">): {
+function fulfillCopy(): {
   title: string;
   body: string;
   confirm: string;
 } {
-  if (action === "confirmed") {
-    return {
-      title: "Confirm order",
-      body: "Confirm that you can fulfill this order. The retailer will see it as confirmed.",
-      confirm: "Confirm order",
-    };
-  }
   return {
-    title: "Mark delivered",
-    body: "Mark this order as delivered. The retailer can then verify receipt.",
-    confirm: "Mark delivered",
+    title: "Confirm order",
+    body: "Confirm that you can fulfill this order. Admin will update delivery status after that.",
+    confirm: "Confirm order",
   };
-}
-
-function ShipmentSummary({
-  order,
-  onRefresh,
-  refreshing,
-}: {
-  order: SupplierOrder;
-  onRefresh?: (order: SupplierOrder) => void;
-  refreshing?: boolean;
-}) {
-  if (!order.shipment) return null;
-  return (
-    <OrderTrackingPanel
-      shipment={order.shipment}
-      compact
-      refreshing={refreshing}
-      onRefresh={
-        order.shipment.provider === "pathao" && onRefresh ? () => onRefresh(order) : undefined
-      }
-    />
-  );
 }
 
 function OrderActions({
@@ -275,14 +229,12 @@ function OrderActions({
   disabled,
   onFulfill,
   onCancel,
-  onTrack,
   onReturn,
 }: {
   order: SupplierOrder;
   disabled: boolean;
   onFulfill: (order: SupplierOrder, action: FulfillAction) => void;
   onCancel: (order: SupplierOrder) => void;
-  onTrack: (order: SupplierOrder) => void;
   onReturn: (order: SupplierOrder) => void;
 }) {
   if (order.status === "cancelled") {
@@ -334,37 +286,6 @@ function OrderActions({
           Confirm order
         </Button>
       ) : null}
-      {canShipOrder(order) ? (
-        <Button
-          size="sm"
-          type="button"
-          disabled={disabled}
-          onClick={() => onFulfill(order, "shipped")}
-        >
-          Mark shipped
-        </Button>
-      ) : null}
-      {canMarkDelivered(order) ? (
-        <Button
-          size="sm"
-          type="button"
-          disabled={disabled}
-          onClick={() => onFulfill(order, "delivered")}
-        >
-          Mark delivered
-        </Button>
-      ) : null}
-      {order.shipment && order.status === "shipped" && !order.cancel_requested ? (
-        <Button
-          variant="outline"
-          size="sm"
-          type="button"
-          disabled={disabled}
-          onClick={() => onTrack(order)}
-        >
-          {order.shipment?.provider === "pathao" ? "View tracking" : "Update tracking"}
-        </Button>
-      ) : null}
       {canOpenReturn(order) ? (
         <Button
           variant="outline"
@@ -406,8 +327,6 @@ function OrderMobileCard({
   busy,
   onFulfill,
   onCancel,
-  onTrack,
-  onRefreshPathao,
   onReturn,
 }: {
   order: SupplierOrder;
@@ -415,8 +334,6 @@ function OrderMobileCard({
   busy: boolean;
   onFulfill: (order: SupplierOrder, action: FulfillAction) => void;
   onCancel: (order: SupplierOrder) => void;
-  onTrack: (order: SupplierOrder) => void;
-  onRefreshPathao: (order: SupplierOrder) => void;
   onReturn: (order: SupplierOrder) => void;
 }) {
   return (
@@ -440,13 +357,12 @@ function OrderMobileCard({
       {order.cancel_requested ? (
         <Badge variant="destructive">Cancel requested by {order.cancellation_initiator}</Badge>
       ) : null}
-      <ShipmentSummary order={order} refreshing={busy} onRefresh={onRefreshPathao} />
+      <DeliveryStatusCard status={order.status} audience="supplier" />
       <OrderActions
         order={order}
         disabled={busy}
         onFulfill={onFulfill}
         onCancel={onCancel}
-        onTrack={onTrack}
         onReturn={onReturn}
       />
     </div>
@@ -472,23 +388,8 @@ export function SupplierOrders({ loadOrders = loadSupplierOrders }: SupplierOrde
   const [busyId, setBusyId] = useState<string | null>(null);
   const [fulfillTarget, setFulfillTarget] = useState<{
     order: SupplierOrder;
-    action: Exclude<FulfillAction, "shipped">;
+    action: FulfillAction;
   } | null>(null);
-  const [shipTarget, setShipTarget] = useState<SupplierOrder | null>(null);
-  const [shipMode, setShipMode] = useState<"pathao" | "manual">("pathao");
-  const [shipCarrier, setShipCarrier] = useState<string>(SHIPMENT_CARRIERS[0]);
-  const [shipTracking, setShipTracking] = useState("");
-  const [shipUrl, setShipUrl] = useState("");
-  const [shipNotes, setShipNotes] = useState("");
-  const [shipWeight, setShipWeight] = useState("0.5");
-  const [shipErrors, setShipErrors] = useState<{
-    carrier?: string;
-    tracking?: string;
-    url?: string;
-    weight?: string;
-  }>({});
-  const [trackTarget, setTrackTarget] = useState<SupplierOrder | null>(null);
-  const [trackStatus, setTrackStatus] = useState<ShipmentStatus>("in_transit");
   const [cancelTarget, setCancelTarget] = useState<SupplierOrder | null>(null);
   const [cancelReason, setCancelReason] = useState("");
   const [cancelInvalid, setCancelInvalid] = useState(false);
@@ -544,7 +445,8 @@ export function SupplierOrders({ loadOrders = loadSupplierOrders }: SupplierOrde
       action: list.filter(needsAction).length,
       awaitingPayment: list.filter(isAwaitingPayment).length,
       toConfirm: list.filter(canConfirmOrder).length,
-      toShip: list.filter(canShipOrder).length,
+      toShip: list.filter((order) => order.status === "confirmed" && !order.cancel_requested)
+        .length,
       inTransit: list.filter((order) => order.status === "shipped" && !order.cancel_requested)
         .length,
       delivered: list.filter((order) => order.status === "delivered").length,
@@ -585,31 +487,12 @@ export function SupplierOrders({ loadOrders = loadSupplierOrders }: SupplierOrde
   };
 
   const openFulfill = (order: SupplierOrder, action: FulfillAction) => {
-    if (action === "shipped") {
-      setShipMode("pathao");
-      setShipCarrier(SHIPMENT_CARRIERS[0]);
-      setShipTracking("");
-      setShipUrl("");
-      setShipNotes("");
-      setShipWeight("0.5");
-      setShipErrors({});
-      setShipTarget(order);
-      return;
-    }
     setFulfillTarget({ order, action });
   };
   const openCancel = (order: SupplierOrder) => {
     setCancelReason("");
     setCancelInvalid(false);
     setCancelTarget(order);
-  };
-  const openTrack = (order: SupplierOrder) => {
-    setTrackStatus(
-      order.shipment?.status === "shipped"
-        ? "in_transit"
-        : (order.shipment?.status ?? "in_transit"),
-    );
-    setTrackTarget(order);
   };
   const openReturn = (order: SupplierOrder) => {
     setReturnReason("");
@@ -632,13 +515,13 @@ export function SupplierOrders({ loadOrders = loadSupplierOrders }: SupplierOrde
   const confirmFulfill = () => {
     const target = fulfillTarget;
     if (!target) return;
-    const { order, action } = target;
+    const { order } = target;
     setFulfillTarget(null);
     setBusyId(order.id);
-    void setSupplierOrderStatus(order.id, action)
+    void setSupplierOrderStatus(order.id)
       .then((status) => {
         setNotice({
-          message: `Order #${shortId(order.id)} is now ${status}.`,
+          message: `Order #${shortId(order.id)} is now ${status}. Admin will update delivery next.`,
           state: "success",
         });
         retry();
@@ -649,130 +532,6 @@ export function SupplierOrders({ loadOrders = loadSupplierOrders }: SupplierOrde
             fulfillError instanceof Error
               ? fulfillError.message
               : "The order could not be updated.",
-          state: "error",
-        });
-      })
-      .finally(() => setBusyId(null));
-  };
-
-  const confirmShip = () => {
-    const order = shipTarget;
-    if (!order) return;
-
-    if (shipMode === "pathao") {
-      const weight = Number(shipWeight);
-      if (!Number.isFinite(weight) || weight < 0.5 || weight > 10) {
-        setShipErrors({ weight: "Parcel weight must be between 0.5 and 10 kg." });
-        return;
-      }
-      setShipTarget(null);
-      setBusyId(order.id);
-      void shipSupplierOrderWithPathao(order.id, {
-        itemWeight: weight,
-        notes: shipNotes,
-      })
-        .then((result) => {
-          setNotice({
-            message: `Order #${shortId(order.id)} booked with Pathao · ${result.consignmentId}.`,
-            state: "success",
-          });
-          retry();
-        })
-        .catch((shipError: unknown) => {
-          setNotice({
-            message:
-              shipError instanceof Error
-                ? shipError.message
-                : "Pathao could not book this shipment.",
-            state: "error",
-          });
-        })
-        .finally(() => setBusyId(null));
-      return;
-    }
-
-    const carrierError = carrierValidationError(shipCarrier);
-    const trackingError = trackingNumberValidationError(shipTracking);
-    const urlError = trackingUrlValidationError(shipUrl);
-    if (carrierError || trackingError || urlError) {
-      setShipErrors({
-        carrier: carrierError ?? undefined,
-        tracking: trackingError ?? undefined,
-        url: urlError ?? undefined,
-      });
-      return;
-    }
-    setShipTarget(null);
-    setBusyId(order.id);
-    void shipSupplierOrder(order.id, {
-      carrier: shipCarrier,
-      trackingNumber: shipTracking,
-      trackingUrl: shipUrl,
-      notes: shipNotes,
-    })
-      .then(() => {
-        setNotice({
-          message: `Order #${shortId(order.id)} shipped via ${shipCarrier.trim()}.`,
-          state: "success",
-        });
-        retry();
-      })
-      .catch((shipError: unknown) => {
-        setNotice({
-          message:
-            shipError instanceof Error ? shipError.message : "The order could not be shipped.",
-          state: "error",
-        });
-      })
-      .finally(() => setBusyId(null));
-  };
-
-  const refreshPathaoTracking = (order: SupplierOrder) => {
-    setBusyId(order.id);
-    void syncPathaoShipment(order.id)
-      .then(() => {
-        setNotice({
-          message: `Pathao status refreshed for #${shortId(order.id)}.`,
-          state: "success",
-        });
-        retry();
-      })
-      .catch((syncError: unknown) => {
-        setNotice({
-          message:
-            syncError instanceof Error
-              ? syncError.message
-              : "Pathao status could not be refreshed.",
-          state: "error",
-        });
-      })
-      .finally(() => setBusyId(null));
-  };
-
-  const confirmTrackUpdate = () => {
-    const order = trackTarget;
-    if (!order) return;
-    if (order.shipment?.provider === "pathao") {
-      setTrackTarget(null);
-      refreshPathaoTracking(order);
-      return;
-    }
-    setTrackTarget(null);
-    setBusyId(order.id);
-    void updateSupplierShipment(order.id, { status: trackStatus })
-      .then(() => {
-        setNotice({
-          message: `Tracking for #${shortId(order.id)} updated to ${trackStatus.replaceAll("_", " ")}.`,
-          state: "success",
-        });
-        retry();
-      })
-      .catch((trackError: unknown) => {
-        setNotice({
-          message:
-            trackError instanceof Error
-              ? trackError.message
-              : "Shipment tracking could not be updated.",
           state: "error",
         });
       })
@@ -854,7 +613,7 @@ export function SupplierOrders({ loadOrders = loadSupplierOrders }: SupplierOrde
       <PageHeader
         eyebrow="Fulfillment"
         title="Order work queue"
-        copy="Confirm and hand orders to the SoukCart delivery partner. Cash on delivery is collected by SoukCart, not by you."
+        copy="Confirm orders you can fulfill. Admin updates delivery status for the retailer."
         actions={
           <>
             {updatedAt ? (
@@ -890,7 +649,7 @@ export function SupplierOrders({ loadOrders = loadSupplierOrders }: SupplierOrde
           <StatCard
             label="Needs action"
             value={counts.action}
-            detail="Confirm, ship, deliver, or review"
+            detail="Confirm or review cancellations"
           />
           <StatCard
             label="To confirm"
@@ -902,11 +661,11 @@ export function SupplierOrders({ loadOrders = loadSupplierOrders }: SupplierOrde
             }
           />
           <StatCard
-            label="To ship"
+            label="Waiting on delivery"
             value={counts.toShip}
             detail={
               <span className="inline-flex items-center gap-1">
-                <Truck aria-hidden="true" /> Confirmed, awaiting shipment
+                <Truck aria-hidden="true" /> Confirmed, admin will ship
               </span>
             }
           />
@@ -939,7 +698,7 @@ export function SupplierOrders({ loadOrders = loadSupplierOrders }: SupplierOrde
                       Awaiting payment ({counts.awaitingPayment})
                     </TabsTrigger>
                     <TabsTrigger value="to-confirm">To confirm ({counts.toConfirm})</TabsTrigger>
-                    <TabsTrigger value="to-ship">To ship ({counts.toShip})</TabsTrigger>
+                    <TabsTrigger value="to-ship">Waiting on delivery ({counts.toShip})</TabsTrigger>
                     <TabsTrigger value="in-transit">In transit ({counts.inTransit})</TabsTrigger>
                     <TabsTrigger value="delivered">Delivered ({counts.delivered})</TabsTrigger>
                     <TabsTrigger value="cancellation-requested">
@@ -986,8 +745,6 @@ export function SupplierOrders({ loadOrders = loadSupplierOrders }: SupplierOrde
                         busy={busyId === order.id}
                         onFulfill={openFulfill}
                         onCancel={openCancel}
-                        onTrack={openTrack}
-                        onRefreshPathao={refreshPathaoTracking}
                         onReturn={openReturn}
                       />
                     ))}
@@ -1103,17 +860,12 @@ export function SupplierOrders({ loadOrders = loadSupplierOrders }: SupplierOrde
                                   {order.cancellation_reason}
                                 </p>
                               ) : null}
-                              <ShipmentSummary
-                                order={order}
-                                refreshing={busyId === order.id}
-                                onRefresh={refreshPathaoTracking}
-                              />
+                              <DeliveryStatusCard status={order.status} audience="supplier" />
                               <OrderActions
                                 order={order}
                                 disabled={busyId === order.id}
                                 onFulfill={openFulfill}
                                 onCancel={openCancel}
-                                onTrack={openTrack}
                                 onReturn={openReturn}
                               />
                             </div>
@@ -1152,218 +904,20 @@ export function SupplierOrders({ loadOrders = loadSupplierOrders }: SupplierOrde
         <AlertDialogContent>
           <AlertDialogHeader>
             <AlertDialogTitle>
-              {fulfillTarget
-                ? `${fulfillCopy(fulfillTarget.action).title} #${shortId(fulfillTarget.order.id)}?`
-                : ""}
+              {fulfillTarget ? `${fulfillCopy().title} #${shortId(fulfillTarget.order.id)}?` : ""}
             </AlertDialogTitle>
             <AlertDialogDescription>
-              {fulfillTarget ? fulfillCopy(fulfillTarget.action).body : null}
+              {fulfillTarget ? fulfillCopy().body : null}
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
             <AlertDialogCancel type="button">Cancel</AlertDialogCancel>
             <AlertDialogAction type="button" onClick={confirmFulfill}>
-              {fulfillTarget ? fulfillCopy(fulfillTarget.action).confirm : "Confirm"}
+              {fulfillTarget ? fulfillCopy().confirm : "Confirm"}
             </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
-
-      <Dialog
-        open={shipTarget !== null}
-        onOpenChange={(open) => {
-          if (!open) setShipTarget(null);
-        }}
-      >
-        <DialogContent>
-          <DialogHeader>
-            <DialogTitle>Ship order{shipTarget ? ` #${shortId(shipTarget.id)}` : ""}</DialogTitle>
-            <DialogDescription>
-              Book Pathao pickup by default. Pathao collects COD cash and settles with SoukCart—not
-              with you. Manual carriers remain available as a fallback.
-            </DialogDescription>
-          </DialogHeader>
-          <FieldGroup>
-            <Field>
-              <FieldLabel htmlFor="ship-mode">Shipping method</FieldLabel>
-              <Select
-                value={shipMode}
-                onValueChange={(value) => setShipMode(value as "pathao" | "manual")}
-              >
-                <SelectTrigger id="ship-mode" className="w-full">
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectGroup>
-                    <SelectItem value="pathao">Pathao (recommended)</SelectItem>
-                    <SelectItem value="manual">Manual carrier / tracking</SelectItem>
-                  </SelectGroup>
-                </SelectContent>
-              </Select>
-            </Field>
-            {shipMode === "pathao" ? (
-              <>
-                {shipTarget?.payment_method === "cod" ? (
-                  <p className="text-sm text-muted-foreground">
-                    COD collect amount: {formatPrice(shipTarget.supplier_total)} (merchandise only;
-                    delivery is already prepaid).
-                  </p>
-                ) : (
-                  <p className="text-sm text-muted-foreground">
-                    Online order — Pathao will deliver with no cash collection.
-                  </p>
-                )}
-                <Field data-invalid={shipErrors.weight ? true : undefined}>
-                  <FieldLabel htmlFor="ship-weight">Parcel weight (kg)</FieldLabel>
-                  <Input
-                    id="ship-weight"
-                    type="number"
-                    min={0.5}
-                    max={10}
-                    step={0.1}
-                    value={shipWeight}
-                    aria-invalid={shipErrors.weight ? true : undefined}
-                    onChange={(event) => {
-                      setShipWeight(event.target.value);
-                      setShipErrors((prev) => ({ ...prev, weight: undefined }));
-                    }}
-                  />
-                  {shipErrors.weight ? (
-                    <p className="text-sm text-destructive">{shipErrors.weight}</p>
-                  ) : null}
-                </Field>
-              </>
-            ) : (
-              <>
-                <Field data-invalid={shipErrors.carrier ? true : undefined}>
-                  <FieldLabel htmlFor="ship-carrier">Carrier</FieldLabel>
-                  <Select value={shipCarrier} onValueChange={setShipCarrier}>
-                    <SelectTrigger id="ship-carrier" className="w-full">
-                      <SelectValue placeholder="Select carrier" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectGroup>
-                        {SHIPMENT_CARRIERS.map((carrier) => (
-                          <SelectItem key={carrier} value={carrier}>
-                            {carrier}
-                          </SelectItem>
-                        ))}
-                      </SelectGroup>
-                    </SelectContent>
-                  </Select>
-                  {shipErrors.carrier ? (
-                    <p className="text-sm text-destructive">{shipErrors.carrier}</p>
-                  ) : null}
-                </Field>
-                <Field data-invalid={shipErrors.tracking ? true : undefined}>
-                  <FieldLabel htmlFor="ship-tracking">Tracking number</FieldLabel>
-                  <Input
-                    id="ship-tracking"
-                    value={shipTracking}
-                    aria-invalid={shipErrors.tracking ? true : undefined}
-                    onChange={(event) => {
-                      setShipTracking(event.target.value);
-                      if (event.target.value.trim()) {
-                        setShipErrors((prev) => ({ ...prev, tracking: undefined }));
-                      }
-                    }}
-                    placeholder="e.g. SF123456789BD"
-                  />
-                  {shipErrors.tracking ? (
-                    <p className="text-sm text-destructive">{shipErrors.tracking}</p>
-                  ) : null}
-                </Field>
-                <Field data-invalid={shipErrors.url ? true : undefined}>
-                  <FieldLabel htmlFor="ship-url">Tracking URL (optional)</FieldLabel>
-                  <Input
-                    id="ship-url"
-                    value={shipUrl}
-                    aria-invalid={shipErrors.url ? true : undefined}
-                    onChange={(event) => setShipUrl(event.target.value)}
-                    placeholder="https://"
-                  />
-                  {shipErrors.url ? (
-                    <p className="text-sm text-destructive">{shipErrors.url}</p>
-                  ) : null}
-                </Field>
-              </>
-            )}
-            <Field>
-              <FieldLabel htmlFor="ship-notes">Notes (optional)</FieldLabel>
-              <Textarea
-                id="ship-notes"
-                value={shipNotes}
-                onChange={(event) => setShipNotes(event.target.value)}
-                placeholder="Packing or courier notes"
-              />
-            </Field>
-          </FieldGroup>
-          <DialogFooter>
-            <Button variant="outline" type="button" onClick={() => setShipTarget(null)}>
-              Back
-            </Button>
-            <Button type="button" onClick={confirmShip}>
-              {shipMode === "pathao" ? "Book Pathao shipment" : "Mark shipped"}
-            </Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
-
-      <Dialog
-        open={trackTarget !== null}
-        onOpenChange={(open) => {
-          if (!open) setTrackTarget(null);
-        }}
-      >
-        <DialogContent>
-          <DialogHeader>
-            <DialogTitle>
-              {trackTarget?.shipment?.provider === "pathao" ? "Pathao tracking" : "Update tracking"}
-              {trackTarget ? ` #${shortId(trackTarget.id)}` : ""}
-            </DialogTitle>
-            <DialogDescription>
-              {trackTarget?.shipment?.provider === "pathao"
-                ? "Pathao updates this timeline automatically. Refresh to pull the latest courier status."
-                : "Record the latest carrier status for this shipment."}
-            </DialogDescription>
-          </DialogHeader>
-          {trackTarget?.shipment ? <OrderTrackingPanel shipment={trackTarget.shipment} /> : null}
-          {trackTarget?.shipment?.provider === "pathao" ? null : (
-            <FieldGroup>
-              <Field>
-                <FieldLabel htmlFor="track-status">Shipment status</FieldLabel>
-                <Select
-                  value={trackStatus}
-                  onValueChange={(value) => setTrackStatus(value as ShipmentStatus)}
-                >
-                  <SelectTrigger id="track-status" className="w-full">
-                    <SelectValue />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectGroup>
-                      <SelectItem value="shipped">Shipped</SelectItem>
-                      <SelectItem value="in_transit">In transit</SelectItem>
-                      <SelectItem value="out_for_delivery">Out for delivery</SelectItem>
-                      <SelectItem value="delivered">Delivered (carrier)</SelectItem>
-                      <SelectItem value="exception">Exception</SelectItem>
-                    </SelectGroup>
-                  </SelectContent>
-                </Select>
-              </Field>
-            </FieldGroup>
-          )}
-          <DialogFooter>
-            <Button variant="outline" type="button" onClick={() => setTrackTarget(null)}>
-              Back
-            </Button>
-            <Button type="button" onClick={confirmTrackUpdate}>
-              {trackTarget?.shipment?.provider === "pathao"
-                ? "Refresh from Pathao"
-                : "Save tracking"}
-            </Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
 
       <Dialog
         open={returnTarget !== null}
