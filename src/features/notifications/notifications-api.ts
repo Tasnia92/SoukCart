@@ -12,12 +12,18 @@ export type OrderNotification = {
 
 type NotificationRow = OrderNotification;
 
-export async function loadNotifications(): Promise<OrderNotification[]> {
+const DEFAULT_NOTIFICATION_LIMIT = 50;
+
+export async function loadNotifications(
+  limit: number = DEFAULT_NOTIFICATION_LIMIT,
+): Promise<OrderNotification[]> {
+  const safeLimit =
+    Number.isFinite(limit) && limit > 0 ? Math.trunc(limit) : DEFAULT_NOTIFICATION_LIMIT;
   const { data, error } = await supabase
     .from("notifications")
     .select("id, order_id, type, title, message, created_at, read_at")
     .order("created_at", { ascending: false })
-    .limit(10);
+    .limit(safeLimit);
   if (error) throw new Error(error.message);
   return (data ?? []) as NotificationRow[];
 }
@@ -30,4 +36,11 @@ export async function markNotificationRead(notificationId: string): Promise<stri
     .eq("id", notificationId);
   if (error) throw new Error(error.message);
   return readAt;
+}
+
+export async function markAllNotificationsRead(): Promise<number> {
+  const { data, error } = await supabase.rpc("mark_all_notifications_read");
+  if (error) throw new Error(error.message);
+  const count = Number(data);
+  return Number.isFinite(count) ? Math.trunc(count) : 0;
 }

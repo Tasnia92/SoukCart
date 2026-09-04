@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import {
   BadgeCheck,
   Ban,
@@ -21,12 +21,16 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
+import { RouterLink } from "../../components/ui/RouterLink.tsx";
+import { useTableChanges } from "../../workspace-realtime.ts";
 import { formatDateTime } from "../workspace/format.ts";
 import {
   loadNotifications,
   markNotificationRead,
   type OrderNotification,
 } from "./notifications-api.ts";
+
+const BELL_NOTIFICATION_LIMIT = 10;
 
 function notificationIcon(type: string): LucideIcon {
   switch (type) {
@@ -52,12 +56,18 @@ function notificationIcon(type: string): LucideIcon {
   }
 }
 
-export function NotificationsBell() {
+export function NotificationsBell({
+  viewAllTo,
+}: {
+  viewAllTo?: "/supplier/notifications";
+} = {}) {
   const [notifications, setNotifications] = useState<OrderNotification[]>([]);
+  const [loadVersion, setLoadVersion] = useState(0);
+  const reload = useCallback(() => setLoadVersion((version) => version + 1), []);
 
   useEffect(() => {
     let current = true;
-    void loadNotifications()
+    void loadNotifications(BELL_NOTIFICATION_LIMIT)
       .then((items) => {
         if (current) setNotifications(items);
       })
@@ -67,7 +77,14 @@ export function NotificationsBell() {
     return () => {
       current = false;
     };
-  }, []);
+  }, [loadVersion]);
+
+  useTableChanges({
+    enabled: true,
+    tables: ["notifications"],
+    onChange: reload,
+    coalesceMs: 800,
+  });
 
   const markRead = (notification: OrderNotification) => {
     if (notification.read_at) return;
@@ -140,6 +157,16 @@ export function NotificationsBell() {
             </DropdownMenuItem>
           </DropdownMenuGroup>
         )}
+        {viewAllTo ? (
+          <>
+            <DropdownMenuSeparator />
+            <DropdownMenuGroup>
+              <DropdownMenuItem asChild>
+                <RouterLink to={viewAllTo}>View all notifications</RouterLink>
+              </DropdownMenuItem>
+            </DropdownMenuGroup>
+          </>
+        ) : null}
       </DropdownMenuContent>
     </DropdownMenu>
   );

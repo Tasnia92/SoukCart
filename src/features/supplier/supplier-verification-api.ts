@@ -157,11 +157,19 @@ export type SupplierVerificationGateway = {
         value: string,
       ) => { maybeSingle: () => Promise<SupplierVerificationQuery> };
     };
-    upsert: (
-      values: Record<string, unknown>,
-      options: { onConflict: string },
-    ) => Promise<{ error: { message: string } | null }>;
   };
+  rpc: (
+    fn: "submit_supplier_application",
+    args: {
+      p_shop_name: string;
+      p_shop_details: string;
+      p_location: string;
+      p_trade_license_number: string;
+      p_contact_phone: string;
+      p_nid_front_path: string;
+      p_nid_back_path: string;
+    },
+  ) => Promise<{ error: { message: string } | null }>;
 };
 
 const verificationGateway = supabase as unknown as SupplierVerificationGateway;
@@ -199,29 +207,27 @@ export async function uploadSupplierDocument(
   return objectPath;
 }
 
+/** Remove an uploaded NID object after a failed submit so partial uploads do not linger. */
+export async function removeSupplierDocument(objectPath: string): Promise<void> {
+  if (!objectPath.trim()) return;
+  await supabase.storage.from(TRADE_LICENSES_BUCKET).remove([objectPath]);
+}
+
 export async function submitSupplierApplication(
-  userId: string,
+  _userId: string,
   input: SupplierApplicationInput,
   documents: SupplierApplicationDocuments,
   gateway: SupplierVerificationGateway = verificationGateway,
 ): Promise<void> {
-  const { error } = await gateway.from("supplier_profiles").upsert(
-    {
-      user_id: userId,
-      shop_name: input.shopName.trim(),
-      shop_details: input.shopDetails.trim(),
-      location: input.location.trim(),
-      trade_license_number: input.tradeLicenseNumber.trim(),
-      nid_front_path: documents.nidFrontPath,
-      nid_back_path: documents.nidBackPath,
-      contact_phone: input.contactPhone.trim(),
-      status: "pending",
-      review_note: null,
-      reviewed_by: null,
-      reviewed_at: null,
-    },
-    { onConflict: "user_id" },
-  );
+  const { error } = await gateway.rpc("submit_supplier_application", {
+    p_shop_name: input.shopName.trim(),
+    p_shop_details: input.shopDetails.trim(),
+    p_location: input.location.trim(),
+    p_trade_license_number: input.tradeLicenseNumber.trim(),
+    p_contact_phone: input.contactPhone.trim(),
+    p_nid_front_path: documents.nidFrontPath,
+    p_nid_back_path: documents.nidBackPath,
+  });
   if (error) throw new Error(error.message);
 }
 

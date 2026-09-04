@@ -39,6 +39,11 @@ const expectedRoutes = {
   "/supplier/products/new": "supplier",
   "/supplier/products/$productId/edit": "supplier",
   "/supplier/stock": "supplier",
+  "/supplier/earnings": "supplier",
+  "/supplier/returns": "supplier",
+  "/supplier/customers": "supplier",
+  "/supplier/notifications": "supplier",
+  "/supplier/settings": "supplier",
 };
 
 type BeforeLoad = (options: {

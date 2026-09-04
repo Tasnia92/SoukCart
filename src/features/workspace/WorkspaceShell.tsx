@@ -60,7 +60,12 @@ export type WorkspacePath =
   | "/supplier"
   | "/supplier/orders"
   | "/supplier/products"
-  | "/supplier/stock";
+  | "/supplier/stock"
+  | "/supplier/earnings"
+  | "/supplier/returns"
+  | "/supplier/customers"
+  | "/supplier/notifications"
+  | "/supplier/settings";
 
 export type WorkspaceNavMenuChoice = {
   id: string;
@@ -382,7 +387,9 @@ export function WorkspaceShell({
           <Separator orientation="vertical" className="mr-1 h-4" />
           <WorkspaceBreadcrumb items={items} />
           <div className="ml-auto flex items-center gap-1">
-            <NotificationsBell />
+            <NotificationsBell
+              viewAllTo={role.home === "/supplier" ? "/supplier/notifications" : undefined}
+            />
           </div>
         </header>
       }

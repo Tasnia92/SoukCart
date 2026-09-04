@@ -39,6 +39,7 @@ import {
   applicationValidationError,
   loadSupplierVerification,
   resolveSupplierGate,
+  removeSupplierDocument,
   submitSupplierApplication,
   uploadSupplierDocument,
   type SupplierVerification,
@@ -211,14 +212,21 @@ function OnboardingForm({
     }
 
     setSubmitting(true);
+    const uploadedPaths: string[] = [];
     try {
       setFeedback({ message: "Uploading your documents…", state: "info" });
       const [nidFrontPath, nidBackPath] = await Promise.all([
         files.nidFront
-          ? uploadSupplierDocument(userId, files.nidFront, "nid-front")
+          ? uploadSupplierDocument(userId, files.nidFront, "nid-front").then((path) => {
+              uploadedPaths.push(path);
+              return path;
+            })
           : Promise.resolve(verification?.nid_front_path ?? ""),
         files.nidBack
-          ? uploadSupplierDocument(userId, files.nidBack, "nid-back")
+          ? uploadSupplierDocument(userId, files.nidBack, "nid-back").then((path) => {
+              uploadedPaths.push(path);
+              return path;
+            })
           : Promise.resolve(verification?.nid_back_path ?? ""),
       ]);
       await submitSupplierApplication(userId, input, {
@@ -227,6 +235,7 @@ function OnboardingForm({
       });
       onSubmitted();
     } catch (submitError) {
+      await Promise.all(uploadedPaths.map((path) => removeSupplierDocument(path)));
       setFeedback({
         message:
           submitError instanceof Error

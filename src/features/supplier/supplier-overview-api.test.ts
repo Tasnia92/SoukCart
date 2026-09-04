@@ -29,6 +29,8 @@ describe("supplier overview API", () => {
               image_url: null,
               is_active: true,
               created_at: "2026-08-31T09:00:00.000Z",
+              reorder_threshold: 5,
+              stock_version: 2,
             },
           ],
           error: null,
@@ -60,6 +62,8 @@ describe("supplier overview API", () => {
         image_url: null,
         is_active: true,
         created_at: "2026-08-31T09:00:00.000Z",
+        reorder_threshold: 5,
+        stock_version: 2,
       },
     ]);
     expect(calls).toEqual([

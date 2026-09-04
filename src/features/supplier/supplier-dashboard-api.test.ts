@@ -3,8 +3,10 @@ import type { SupplierOrder, SupplierOrderItem } from "./supplier-orders-api.ts"
 import type { SupplierProduct } from "./supplier-overview-api.ts";
 import {
   buildSupplierDashboard,
+  EMPTY_SELLER_EARNINGS,
   loadSupplierDashboard,
   LOW_STOCK_THRESHOLD,
+  normalizeSellerEarnings,
   SUPPLIER_QUEUE_LIMIT,
   SUPPLIER_RECENT_LISTING_LIMIT,
 } from "./supplier-dashboard-api.ts";
@@ -51,6 +53,7 @@ function order(overrides: Partial<SupplierOrder>): SupplierOrder {
     accepted_at: null,
     items: [item({})],
     supplier_total: 200,
+    shipment: null,
     ...overrides,
   };
 }
@@ -68,6 +71,8 @@ function product(overrides: Partial<SupplierProduct>): SupplierProduct {
     image_url: null,
     is_active: true,
     created_at: iso(10),
+    reorder_threshold: LOW_STOCK_THRESHOLD,
+    stock_version: 0,
     ...overrides,
   };
 }
@@ -106,6 +111,9 @@ describe("buildSupplierDashboard", () => {
     );
 
     expect(dashboard.summary.awaitingFulfillment).toBe(2);
+    expect(dashboard.summary.toConfirm).toBe(1);
+    expect(dashboard.summary.toShip).toBe(1);
+    expect(dashboard.summary.awaitingPayment).toBe(1);
     expect(dashboard.summary.cancellationRequests).toBe(1);
     expect(dashboard.queue.map((entry) => entry.id)).toEqual(["waiting", "to-ship", "requested"]);
   });
@@ -245,5 +253,91 @@ describe("loadSupplierDashboard", () => {
     expect(requested).toEqual(["seller-1"]);
     expect(dashboard.summary.sales).toBe(300);
     expect(dashboard.summary.outOfStock).toBe(1);
+  });
+});
+
+describe("normalizeSellerEarnings", () => {
+  it("defaults to empty totals and an empty ledger", () => {
+    expect(normalizeSellerEarnings(null)).toEqual(EMPTY_SELLER_EARNINGS);
+    expect(normalizeSellerEarnings({ commissionRate: "0.05" }).rows).toEqual([]);
+  });
+
+  it("keeps valid ledger rows and drops malformed ones", () => {
+    const parsed = normalizeSellerEarnings({
+      commissionRate: 0.05,
+      available: 120,
+      paid: 80,
+      commission: 10,
+      rows: [
+        {
+          id: "payout-1",
+          orderId: "00000000-0000-0000-0000-000000000099",
+          gross: 200,
+          commissionRate: 0.05,
+          commissionAmount: 10,
+          netPayable: 190,
+          status: "available",
+          accruedAt: "2026-09-01T10:00:00.000Z",
+          paidAt: null,
+        },
+        {
+          id: "payout-2",
+          orderId: "00000000-0000-0000-0000-000000000088",
+          gross: 100,
+          commissionRate: 0.05,
+          commissionAmount: 5,
+          netPayable: 95,
+          status: "paid",
+          accruedAt: "2026-08-20T10:00:00.000Z",
+          paidAt: "2026-08-25T12:00:00.000Z",
+        },
+        { id: "bad", gross: 50 },
+        "skip-me",
+      ],
+    });
+
+    expect(parsed.commissionRate).toBe(0.05);
+    expect(parsed.available).toBe(120);
+    expect(parsed.paid).toBe(80);
+    expect(parsed.commission).toBe(10);
+    expect(parsed.rows).toEqual([
+      {
+        id: "payout-1",
+        orderId: "00000000-0000-0000-0000-000000000099",
+        gross: 200,
+        commissionRate: 0.05,
+        commissionAmount: 10,
+        netPayable: 190,
+        status: "available",
+        accruedAt: "2026-09-01T10:00:00.000Z",
+        paidAt: null,
+      },
+      {
+        id: "payout-2",
+        orderId: "00000000-0000-0000-0000-000000000088",
+        gross: 100,
+        commissionRate: 0.05,
+        commissionAmount: 5,
+        netPayable: 95,
+        status: "paid",
+        accruedAt: "2026-08-20T10:00:00.000Z",
+        paidAt: "2026-08-25T12:00:00.000Z",
+      },
+    ]);
+  });
+
+  it("normalizes unknown status values to available", () => {
+    const parsed = normalizeSellerEarnings({
+      rows: [
+        {
+          id: "payout-3",
+          orderId: "order-3",
+          status: "mystery",
+          accruedAt: "2026-09-01T00:00:00.000Z",
+        },
+      ],
+    });
+
+    expect(parsed.rows[0]?.status).toBe("available");
   });
 });

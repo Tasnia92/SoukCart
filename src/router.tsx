@@ -25,11 +25,16 @@ import { RetailerComplaints } from "./features/retailer/RetailerComplaints.tsx";
 import { RetailerInvoice } from "./features/retailer/RetailerInvoice.tsx";
 import { RetailerOrders } from "./features/retailer/RetailerOrders.tsx";
 import { RetailerOverview } from "./features/retailer/RetailerOverview.tsx";
+import { SupplierCustomers } from "./features/supplier/SupplierCustomers.tsx";
+import { SupplierEarnings } from "./features/supplier/SupplierEarnings.tsx";
+import { SupplierNotifications } from "./features/supplier/SupplierNotifications.tsx";
 import { SupplierOrders } from "./features/supplier/SupplierOrders.tsx";
 import { SupplierGate } from "./features/supplier/SupplierGate.tsx";
 import { SupplierOverview } from "./features/supplier/SupplierOverview.tsx";
 import { SupplierProductForm } from "./features/supplier/SupplierProductForm.tsx";
 import { SupplierProducts } from "./features/supplier/SupplierProducts.tsx";
+import { SupplierReturns } from "./features/supplier/SupplierReturns.tsx";
+import { SupplierSettings } from "./features/supplier/SupplierSettings.tsx";
 import { SupplierStock } from "./features/supplier/SupplierStock.tsx";
 import { sessionStore, type SessionStore, useSessionSnapshot } from "./session.tsx";
 
@@ -67,6 +72,11 @@ export const routeContract = [
   { path: "/supplier/products/new", target: "supplier" },
   { path: "/supplier/products/$productId/edit", target: "supplier" },
   { path: "/supplier/stock", target: "supplier" },
+  { path: "/supplier/earnings", target: "supplier" },
+  { path: "/supplier/returns", target: "supplier" },
+  { path: "/supplier/customers", target: "supplier" },
+  { path: "/supplier/notifications", target: "supplier" },
+  { path: "/supplier/settings", target: "supplier" },
 ] as const;
 
 export const fallbackRouteContract = [
@@ -180,6 +190,11 @@ function resolveSupplierPage(pathname: string): ReactElement | null {
   if (pathname === "/supplier/products/new") return <SupplierProductForm />;
   if (pathname === "/supplier/stock") return <SupplierStock />;
   if (pathname === "/supplier/orders") return <SupplierOrders />;
+  if (pathname === "/supplier/earnings") return <SupplierEarnings />;
+  if (pathname === "/supplier/returns") return <SupplierReturns />;
+  if (pathname === "/supplier/customers") return <SupplierCustomers />;
+  if (pathname === "/supplier/notifications") return <SupplierNotifications />;
+  if (pathname === "/supplier/settings") return <SupplierSettings />;
   const editMatch = SUPPLIER_EDIT_PATTERN.exec(pathname);
   if (editMatch) return <SupplierProductForm productId={editMatch[1]} />;
   return null;

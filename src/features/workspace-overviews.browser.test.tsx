@@ -340,6 +340,8 @@ const supplierProducts: SupplierProduct[] = [
     image_url: null,
     is_active: true,
     created_at: iso(1),
+    reorder_threshold: 5,
+    stock_version: 0,
   },
   {
     id: "product-2",
@@ -353,6 +355,8 @@ const supplierProducts: SupplierProduct[] = [
     image_url: "https://example.test/olive-oil.jpg",
     is_active: true,
     created_at: iso(2),
+    reorder_threshold: 5,
+    stock_version: 0,
   },
   {
     id: "product-3",
@@ -366,6 +370,8 @@ const supplierProducts: SupplierProduct[] = [
     image_url: null,
     is_active: false,
     created_at: iso(3),
+    reorder_threshold: 5,
+    stock_version: 0,
   },
   {
     id: "product-4",
@@ -379,6 +385,8 @@ const supplierProducts: SupplierProduct[] = [
     image_url: null,
     is_active: true,
     created_at: iso(4),
+    reorder_threshold: 5,
+    stock_version: 0,
   },
 ];
 
@@ -414,6 +422,7 @@ const supplierOrders: SupplierOrder[] = [
       },
     ],
     supplier_total: 1200,
+    shipment: null,
   },
 ];
 

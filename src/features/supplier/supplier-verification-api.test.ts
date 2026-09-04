@@ -139,9 +139,9 @@ describe("supplier verification queries", () => {
               },
             };
           },
-          upsert: async () => ({ error: null }),
         };
       },
+      rpc: async () => ({ error: null }),
     } as unknown as SupplierVerificationGateway;
 
     await expect(loadSupplierVerification("seller-1", gateway)).resolves.toEqual(row);
@@ -152,17 +152,16 @@ describe("supplier verification queries", () => {
     ]);
   });
 
-  it("submits a trimmed, pending application keyed on user_id", async () => {
-    let upserted: { values: Record<string, unknown>; options: { onConflict: string } } | null =
-      null;
+  it("submits a trimmed application through the server RPC", async () => {
+    let rpcArgs: Record<string, string> | null = null;
     const gateway = {
       from: () => ({
         select: () => ({ eq: () => ({ maybeSingle: async () => ({ data: null, error: null }) }) }),
-        upsert: async (values: Record<string, unknown>, options: { onConflict: string }) => {
-          upserted = { values, options };
-          return { error: null };
-        },
       }),
+      rpc: async (_fn: "submit_supplier_application", args: Record<string, string>) => {
+        rpcArgs = args;
+        return { error: null };
+      },
     } as unknown as SupplierVerificationGateway;
 
     await submitSupplierApplication(
@@ -181,22 +180,14 @@ describe("supplier verification queries", () => {
       gateway,
     );
 
-    expect(upserted).toEqual({
-      values: {
-        user_id: "seller-1",
-        shop_name: "Rahman Traders",
-        shop_details: "Wholesale rice.",
-        location: "Dhaka",
-        trade_license_number: "TRAD/DNCC/1234/2024",
-        nid_front_path: "seller-1/nid-front.jpg",
-        nid_back_path: "seller-1/nid-back.jpg",
-        contact_phone: "01712345678",
-        status: "pending",
-        review_note: null,
-        reviewed_by: null,
-        reviewed_at: null,
-      },
-      options: { onConflict: "user_id" },
+    expect(rpcArgs).toEqual({
+      p_shop_name: "Rahman Traders",
+      p_shop_details: "Wholesale rice.",
+      p_location: "Dhaka",
+      p_trade_license_number: "TRAD/DNCC/1234/2024",
+      p_contact_phone: "01712345678",
+      p_nid_front_path: "seller-1/nid-front.jpg",
+      p_nid_back_path: "seller-1/nid-back.jpg",
     });
   });
 
@@ -208,8 +199,8 @@ describe("supplier verification queries", () => {
             maybeSingle: async () => ({ data: null, error: { message: "Row unavailable." } }),
           }),
         }),
-        upsert: async () => ({ error: null }),
       }),
+      rpc: async () => ({ error: null }),
     } as unknown as SupplierVerificationGateway;
 
     await expect(loadSupplierVerification("seller-1", gateway)).rejects.toThrow("Row unavailable.");
