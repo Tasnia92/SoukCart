@@ -166,8 +166,8 @@ export function AdminComplaints({
   if (error) {
     return (
       <WorkspaceError
-        eyebrow="Admin workspace"
-        title="We could not load the admin workspace."
+        eyebrow="Admin"
+        title="We could not load disputes."
         message={error}
         onRetry={retry}
         onLogout={onLogout}
@@ -211,9 +211,9 @@ export function AdminComplaints({
       onLogout={onLogout}
     >
       <PageHeader
-        eyebrow="Retailer support"
-        title="Disputes & Claims."
-        copy="Filed by retailers, with status."
+        eyebrow="Disputes"
+        title="Disputes."
+        copy="Retailer complaints. Resolve open ones here, or from Needs attention."
       />
       <InlineNotice message={notice?.message} state={notice?.state} />
       {complaints && stats ? (
@@ -278,7 +278,7 @@ export function AdminComplaints({
           )}
         </>
       ) : (
-        <LoadingState title="Loading the admin workspace…" />
+        <LoadingState title="Loading disputes…" />
       )}
     </AdminWorkspaceShell>
   );

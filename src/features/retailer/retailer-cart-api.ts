@@ -17,7 +17,23 @@ export type CheckoutForm = {
   notes: string | null;
 };
 
-export type CheckoutOutcome = { method: "cod" } | { url: string };
+export type CheckoutOutcome = { url: string };
+
+/** Flat prepaid delivery fee charged on every order (BDT). */
+export const DEFAULT_DELIVERY_CHARGE = 60;
+
+export function cartDeliveryCharge(): number {
+  return DEFAULT_DELIVERY_CHARGE;
+}
+
+export function cartOrderTotal(lines: readonly CartLine[]): number {
+  return cartSubtotal(lines) + cartDeliveryCharge();
+}
+
+/** Amount collected online at checkout: delivery only for COD, full total otherwise. */
+export function cartPayableNow(lines: readonly CartLine[], method: PaymentMethod): number {
+  return method === "cod" ? cartDeliveryCharge() : cartOrderTotal(lines);
+}
 
 type CartLineLoaders = {
   products: () => Promise<RetailerProduct[]>;
@@ -160,7 +176,6 @@ export async function initiateCheckout(
   const { data, error } = await supabase.functions.invoke("sslcommerz-checkout", { body });
   if (error) throw new Error(functionErrorMessage(error));
   const payload = isRecord(data) ? data : null;
-  if (payload?.method === "cod") return { method: "cod" };
   const url = typeof payload?.url === "string" ? payload.url : "";
   if (!url) throw new Error("The payment could not be started. Please try again.");
   return { url };

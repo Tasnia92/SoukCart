@@ -250,7 +250,7 @@ export function AdminSupplierVerificationDetail({
   if (error) {
     return (
       <WorkspaceError
-        eyebrow="Admin workspace"
+        eyebrow="Admin"
         title="We could not load this application."
         message={error}
         onRetry={retry}
@@ -284,7 +284,7 @@ export function AdminSupplierVerificationDetail({
           </RouterLink>
         </Button>
         <PageHeader
-          eyebrow="Supplier onboarding"
+          eyebrow="Verifications"
           title="Application not found."
           copy="This supplier application no longer exists or has not been submitted yet."
         />
@@ -330,7 +330,7 @@ export function AdminSupplierVerificationDetail({
         </RouterLink>
       </Button>
       <PageHeader
-        eyebrow="Supplier onboarding"
+        eyebrow="Verifications"
         title={verification.shop_name}
         copy="Review the trade licence number, NID card, and contact info, then approve or reject the supplier."
         actions={

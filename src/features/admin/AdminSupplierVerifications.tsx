@@ -206,8 +206,8 @@ export function AdminSupplierVerifications({
   if (error) {
     return (
       <WorkspaceError
-        eyebrow="Admin workspace"
-        title="We could not load supplier verifications."
+        eyebrow="Admin"
+        title="We could not load verifications."
         message={error}
         onRetry={retry}
         onLogout={onLogout}
@@ -228,8 +228,8 @@ export function AdminSupplierVerifications({
       onLogout={onLogout}
     >
       <PageHeader
-        eyebrow="Supplier onboarding"
-        title="Supplier verifications."
+        eyebrow="Verifications"
+        title="Supplier applications."
         copy="Open a submission to review the trade licence number, NID card, and contact info, then approve or reject it."
       />
       {verifications && stats ? (
@@ -272,7 +272,7 @@ export function AdminSupplierVerifications({
           )}
         </>
       ) : (
-        <LoadingState title="Loading supplier verifications…" />
+        <LoadingState title="Loading verifications…" />
       )}
     </AdminWorkspaceShell>
   );

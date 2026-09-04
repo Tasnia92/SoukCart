@@ -45,12 +45,16 @@ import { formatDate, formatPrice } from "../workspace/format.ts";
 import { RouterLink, WorkspaceShell } from "../workspace/WorkspaceShell.tsx";
 import {
   canCancelOrder,
+  canRequestCodDeliveryRefund,
   clearCart,
   confirmOrderDelivery,
   loadCartCount,
   loadRetailerOrders,
+  needsGatewayPaymentVerification,
+  orderMerchandiseTotal,
   orderTotal,
   queryPaymentStatus,
+  requestCodDeliveryRefund,
   requestOrderCancellation,
   type RetailerOrder,
 } from "./retailer-orders-api.ts";
@@ -67,11 +71,13 @@ function CancelAction({
   disabled,
   onCancel,
   onVerifyDelivery,
+  onRequestDeliveryRefund,
 }: {
   order: RetailerOrder;
   disabled: boolean;
   onCancel: (order: RetailerOrder) => void;
   onVerifyDelivery: (order: RetailerOrder) => void;
+  onRequestDeliveryRefund: (order: RetailerOrder) => void;
 }) {
   if (order.status === "cancelled") {
     if (order.manual_refund_status === "review_required") {
@@ -82,15 +88,31 @@ function CancelAction({
     if (order.manual_refund_status === "pending") {
       return (
         <p className="text-sm text-muted-foreground">
-          Manual refund pending · {formatPrice(order.refund_amount)}
+          {order.payment_method === "cod" ? "Delivery refund pending" : "Manual refund pending"} ·{" "}
+          {formatPrice(order.refund_amount)}
         </p>
       );
     }
     if (order.manual_refund_status === "completed") {
       return (
         <p className="text-sm text-muted-foreground">
-          Refund completed · {formatPrice(order.refund_amount)}
+          {order.payment_method === "cod" ? "Delivery refund completed" : "Refund completed"} ·{" "}
+          {formatPrice(order.refund_amount)}
         </p>
+      );
+    }
+    if (canRequestCodDeliveryRefund(order)) {
+      return (
+        <Button
+          type="button"
+          variant="outline"
+          size="sm"
+          disabled={disabled}
+          onClick={() => onRequestDeliveryRefund(order)}
+        >
+          <RefreshCw data-icon="inline-start" />
+          Request delivery refund
+        </Button>
       );
     }
     return (
@@ -219,8 +241,22 @@ export function RetailerOrders({
         if (result === "paid") {
           await clearCart(retailerId);
           setCartCount(0);
+          if (order.payment_method === "cod") {
+            updateOrder(order.id, { delivery_payment_status: "paid" });
+          } else {
+            updateOrder(order.id, {
+              payment_status: result,
+              delivery_payment_status: "paid",
+            });
+          }
+        } else if (order.payment_method === "cod") {
+          updateOrder(order.id, { delivery_payment_status: result });
+        } else {
+          updateOrder(order.id, {
+            payment_status: result,
+            delivery_payment_status: result,
+          });
         }
-        updateOrder(order.id, { payment_status: result });
         setBusyId(null);
       } else {
         setBusyId(null);
@@ -256,8 +292,15 @@ export function RetailerOrders({
 
   const onCancel = (order: RetailerOrder) => {
     if (!canCancelOrder(order)) return;
-    const paidInAdvance = order.payment_method === "online" && order.payment_status === "paid";
-    const message = `Request cancellation of order #${shortId(order.id)}? The admin team will review it${paidInAdvance ? " and manually refund the eligible amount after platform and delivery charges" : ""}.`;
+    const paidOnline = order.payment_method === "online" && order.payment_status === "paid";
+    const prepaidDelivery =
+      order.payment_method === "cod" && order.delivery_payment_status === "paid";
+    const refundHint = paidOnline
+      ? " and manually refund the eligible paid amount (a platform retention may be deducted)"
+      : prepaidDelivery
+        ? ". Prepaid delivery is not refunded automatically when you cancel"
+        : "";
+    const message = `Request cancellation of order #${shortId(order.id)}? The admin team will review it${refundHint}.`;
     if (!window.confirm(message)) return;
 
     setBusyId(order.id);
@@ -278,6 +321,40 @@ export function RetailerOrders({
             cancelError instanceof Error
               ? cancelError.message
               : "The cancellation request could not be submitted.",
+          state: "error",
+        });
+      })
+      .finally(() => setBusyId(null));
+  };
+
+  const onRequestDeliveryRefund = (order: RetailerOrder) => {
+    if (!canRequestCodDeliveryRefund(order)) return;
+    if (
+      !window.confirm(
+        `Request a refund of the ${formatPrice(order.delivery_charge)} prepaid delivery charge for order #${shortId(order.id)}?`,
+      )
+    ) {
+      return;
+    }
+
+    setBusyId(order.id);
+    void requestCodDeliveryRefund(order.id)
+      .then((result) => {
+        updateOrder(order.id, {
+          manual_refund_status: "pending",
+          refund_amount: result.refundAmount,
+        });
+        setNotice({
+          message: `Delivery refund of ${formatPrice(result.refundAmount)} was requested for order #${shortId(order.id)}.`,
+          state: "info",
+        });
+      })
+      .catch((refundError: unknown) => {
+        setNotice({
+          message:
+            refundError instanceof Error
+              ? refundError.message
+              : "The delivery refund request could not be submitted.",
           state: "error",
         });
       })
@@ -384,6 +461,40 @@ export function RetailerOrders({
                             </li>
                           ))}
                         </ul>
+                        <dl className="grid grid-cols-2 gap-2 text-sm sm:max-w-sm">
+                          <dt className="text-muted-foreground">Subtotal</dt>
+                          <dd className="text-right tabular-nums">
+                            {formatPrice(orderMerchandiseTotal(order))}
+                          </dd>
+                          <dt className="text-muted-foreground">Delivery</dt>
+                          <dd className="text-right tabular-nums">
+                            {formatPrice(order.delivery_charge)}
+                          </dd>
+                          <dt className="font-medium">Total</dt>
+                          <dd className="text-right font-medium tabular-nums">
+                            {formatPrice(orderTotal(order))}
+                          </dd>
+                          {order.payment_method === "cod" ? (
+                            <>
+                              <dt className="text-muted-foreground">Delivery payment</dt>
+                              <dd className="text-right">
+                                {order.delivery_payment_status === "paid"
+                                  ? "Paid online"
+                                  : order.delivery_payment_status === "failed"
+                                    ? "Failed"
+                                    : order.delivery_payment_status === "cancelled"
+                                      ? "Cancelled"
+                                      : "Unpaid"}
+                              </dd>
+                              <dt className="text-muted-foreground">Products</dt>
+                              <dd className="text-right">
+                                {order.payment_status === "paid"
+                                  ? "Cash collected"
+                                  : "Pay in cash on arrival"}
+                              </dd>
+                            </>
+                          ) : null}
+                        </dl>
                         <DeliveryDetails
                           phone={order.delivery_phone}
                           address={order.delivery_address}
@@ -421,7 +532,7 @@ export function RetailerOrders({
                               </RouterLink>
                             </Button>
                           ) : null}
-                          {order.payment_status === "unpaid" && order.tran_id ? (
+                          {needsGatewayPaymentVerification(order) ? (
                             <Button
                               type="button"
                               variant="outline"
@@ -438,6 +549,7 @@ export function RetailerOrders({
                             disabled={busyId === order.id}
                             onCancel={onCancel}
                             onVerifyDelivery={onVerifyDelivery}
+                            onRequestDeliveryRefund={onRequestDeliveryRefund}
                           />
                         </div>
                       </div>

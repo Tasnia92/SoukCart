@@ -25,7 +25,12 @@ import { Brand } from "../../components/ui/Brand.tsx";
 import { PageHeader } from "../../components/ui/Workspace.tsx";
 import { useSessionSnapshot, useSessionStore } from "../../session.tsx";
 import { WorkspaceShell } from "../workspace/WorkspaceShell.tsx";
-import { clearCart, completePayment, getSessionUserId } from "./payment-return-api.ts";
+import {
+  clearCart,
+  completePayment,
+  getSessionUserId,
+  paymentSuccessPath,
+} from "./payment-return-api.ts";
 import { RETAILER_NOTICE_KEY } from "./retailer-flash.ts";
 
 type CheckoutKind = "success" | "failed" | "cancelled";
@@ -64,18 +69,18 @@ export function CheckoutResult() {
         return;
       }
 
-      const { paid, orderId } = await completePayment(tranId, valId, status);
+      const { paid, orderId, merchandisePaid } = await completePayment(tranId, valId, status);
       if (cancelled) return;
 
       if (paid && kind === "success" && userId) {
         await clearCart(userId);
         sessionStorage.setItem(
           RETAILER_NOTICE_KEY,
-          "Payment received. Your order is with the suppliers.",
+          merchandisePaid
+            ? "Payment received. Your order is with the suppliers."
+            : "Delivery payment received. Pay for products in cash when your order arrives.",
         );
-        window.location.assign(
-          orderId ? `/retailer/orders/${orderId}/invoice` : "/retailer/orders",
-        );
+        window.location.assign(paymentSuccessPath({ orderId, merchandisePaid }));
         return;
       }
 

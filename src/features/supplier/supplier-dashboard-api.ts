@@ -546,17 +546,20 @@ export function normalizeSupplierDashboard(data: unknown): SupplierDashboard {
           const product = listing as Record<string, unknown>;
           try {
             return normalizeSupplierProduct({
-              id: String(product.id ?? ""),
-              name: String(product.name ?? ""),
-              description: String(product.description ?? ""),
+              id: typeof product.id === "string" ? product.id : "",
+              name: typeof product.name === "string" ? product.name : "",
+              description: typeof product.description === "string" ? product.description : "",
               price: product.price as number | string,
-              unit: String(product.unit ?? "unit"),
+              unit: typeof product.unit === "string" ? product.unit : "unit",
               stock: asInt(product.stock),
               min_order_qty: product.min_order_qty as number | string | null,
-              category: (product.category as string | null) ?? null,
-              image_url: (product.image_url as string | null) ?? null,
+              category: typeof product.category === "string" ? product.category : null,
+              image_url: typeof product.image_url === "string" ? product.image_url : null,
               is_active: product.is_active !== false,
-              created_at: String(product.created_at ?? new Date(0).toISOString()),
+              created_at:
+                typeof product.created_at === "string"
+                  ? product.created_at
+                  : new Date(0).toISOString(),
             });
           } catch {
             return null;

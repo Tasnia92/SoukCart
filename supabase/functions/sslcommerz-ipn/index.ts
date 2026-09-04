@@ -45,7 +45,7 @@ Deno.serve(async (request) => {
 
     const { data: order, error: orderError } = await admin
       .from("orders")
-      .select("id, payment_status")
+      .select("id, payment_method, payment_status, delivery_payment_status")
       .eq("tran_id", tranId)
       .maybeSingle();
     if (orderError) {
@@ -56,53 +56,51 @@ Deno.serve(async (request) => {
       return new Response("Order not found.", { status: 404 });
     }
 
-    if (order.payment_status === "paid") {
+    if (isAlreadyCaptured(order)) {
       return new Response("OK");
     }
-    if (order.payment_status !== "unpaid") {
+    if (!isCheckoutOpen(order)) {
       // Superseded or expired checkouts stay failed/cancelled. Applying this
       // leftover gateway tab would mark a dead order paid and re-reserve stock.
-      console.error(`IPN capture refused for ${tranId}: payment_status=${order.payment_status}`);
+      console.error(
+        `IPN capture refused for ${tranId}: payment_method=${order.payment_method} payment_status=${order.payment_status} delivery_payment_status=${order.delivery_payment_status}`,
+      );
       return new Response("OK");
     }
 
     let paid = false;
+    let paidAmount: number | null = null;
     if (status === "VALID" && valId) {
       const validation = await validateTransaction(valId);
+      const expected = await orderTotal(order.id);
       paid =
         (validation.status === "VALID" || validation.status === "VALIDATED") &&
-        validation.amount === (await orderTotal(order.id));
+        validation.amount === expected;
+      paidAmount = validation.amount;
     }
 
-    if (paid) {
-      const { error: paymentError } = await admin
-        .from("orders")
-        .update({
-          payment_status: "paid",
-          val_id: valId,
-          paid_at: new Date().toISOString(),
-        })
-        .eq("id", order.id)
-        .eq("payment_status", "unpaid");
-      if (paymentError) {
-        console.error("Paid order could not reserve stock", paymentError);
+    if (paid && paidAmount !== null) {
+      const { error: captureError } = await admin.rpc("capture_gateway_payment", {
+        p_order_id: order.id,
+        p_amount: paidAmount,
+        p_val_id: valId,
+        p_bank_tran_id: null,
+      });
+      if (captureError) {
+        console.error("Paid order could not be captured", captureError);
         return new Response("Payment requires administrator review.", { status: 409 });
       }
     } else if (isTerminalFailure(status)) {
       // A failed or cancelled gateway result must release the reserved stock
-      // without waiting for the buyer to return to the app. Downgrading only
-      // an "unpaid" order fires handle_order_inventory_reservation, which
-      // returns the units to sellable stock. The unpaid guard makes this a
-      // no-op if the order was already paid or already released (e.g. by the
-      // expire_stale_unpaid_orders job), so stock is never released twice.
+      // without waiting for the buyer to return to the app.
       const nextStatus = status === "CANCELLED" ? "cancelled" : "failed";
-      const { error: releaseError } = await admin
-        .from("orders")
-        .update({ payment_status: nextStatus, val_id: valId || null })
-        .eq("id", order.id)
-        .eq("payment_status", "unpaid");
+      const { error: releaseError } = await admin.rpc("fail_gateway_payment", {
+        p_order_id: order.id,
+        p_status: nextStatus,
+        p_val_id: valId || null,
+      });
       if (releaseError) {
-        console.error("Failed online order could not release stock", releaseError);
+        console.error("Failed gateway order could not release stock", releaseError);
         return new Response("IPN handling failed.", { status: 500 });
       }
     }
@@ -113,6 +111,31 @@ Deno.serve(async (request) => {
     return new Response("IPN handling failed.", { status: 500 });
   }
 });
+
+type OrderPaymentRow = {
+  id: string;
+  payment_method: string | null;
+  payment_status: string | null;
+  delivery_payment_status: string | null;
+};
+
+function isAlreadyCaptured(order: OrderPaymentRow): boolean {
+  if (order.payment_method === "cod") {
+    return order.delivery_payment_status === "paid";
+  }
+  return order.payment_status === "paid" && order.delivery_payment_status === "paid";
+}
+
+function isCheckoutOpen(order: OrderPaymentRow): boolean {
+  if (order.payment_method === "cod") {
+    return (
+      order.delivery_payment_status === "unpaid" &&
+      order.payment_status !== "failed" &&
+      order.payment_status !== "cancelled"
+    );
+  }
+  return order.payment_status === "unpaid";
+}
 
 async function validateTransaction(valId: string): Promise<{
   status: string;
@@ -141,20 +164,17 @@ async function validateTransaction(valId: string): Promise<{
 }
 
 async function orderTotal(orderId: string): Promise<number> {
-  const { data: items, error } = await admin
-    .from("order_items")
-    .select("quantity, unit_price")
-    .eq("order_id", orderId);
+  const { data, error } = await admin.rpc("order_gateway_amount", {
+    p_order_id: orderId,
+  });
   if (error) {
     throw error;
   }
-  return round2(
-    (items ?? []).reduce(
-      (sum: number, item: { quantity: number; unit_price: number }) =>
-        sum + Number(item.unit_price) * Number(item.quantity),
-      0,
-    ),
-  );
+  const amount = Number(data);
+  if (!Number.isFinite(amount)) {
+    throw new Error("The gateway amount could not be determined.");
+  }
+  return round2(amount);
 }
 
 function readText(value: FormDataEntryValue | null): string {

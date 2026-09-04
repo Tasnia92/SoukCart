@@ -40,6 +40,7 @@ export type ActivityOrder = {
   delivery_postcode: string | null;
   platform_charge: number;
   delivery_charge: number;
+  delivery_payment_status: "unpaid" | "paid" | "failed" | "cancelled";
   refund_amount: number;
   manual_refund_status: "not_required" | "review_required" | "pending" | "completed";
   refund_completed_at: string | null;
@@ -65,8 +66,12 @@ export type ActivityResponse = {
 
 export type CancellationCharges = {
   platformCharge: number;
-  deliveryCharge: number;
+  deliveryCharge?: number;
 };
+
+export function orderPaidTotal(order: Pick<ActivityOrder, "total" | "delivery_charge">): number {
+  return Math.max(order.total + order.delivery_charge, 0);
+}
 
 export async function loadAdminActivity(): Promise<ActivityResponse> {
   return invokeAdmin<ActivityResponse>({ action: "list" }, ADMIN_ACTIVITY_FUNCTION);
@@ -75,10 +80,16 @@ export async function loadAdminActivity(): Promise<ActivityResponse> {
 export async function updateOrderStatus(
   orderId: string,
   status: string,
-  charges: CancellationCharges = { platformCharge: 0, deliveryCharge: 0 },
+  charges: CancellationCharges = { platformCharge: 0 },
 ): Promise<void> {
   await invokeAdmin<unknown>(
-    { action: "update-status", orderId, status, ...charges },
+    {
+      action: "update-status",
+      orderId,
+      status,
+      platformCharge: charges.platformCharge,
+      deliveryCharge: 0,
+    },
     ADMIN_ACTIVITY_FUNCTION,
   );
 }
@@ -88,17 +99,23 @@ export async function completeManualRefund(orderId: string): Promise<void> {
 }
 
 export function canFulfillOrder(
-  order: Pick<ActivityOrder, "payment_method" | "payment_status">,
+  order: Pick<ActivityOrder, "payment_method" | "payment_status" | "delivery_payment_status">,
 ): boolean {
+  if (order.delivery_payment_status !== "paid") return false;
   return order.payment_method === "cod" || order.payment_status === "paid";
 }
 
 export function needsCodCollection(
-  order: Pick<ActivityOrder, "payment_method" | "payment_status" | "status">,
+  order: Pick<
+    ActivityOrder,
+    "payment_method" | "payment_status" | "delivery_payment_status" | "status"
+  >,
 ): boolean {
   return (
     order.payment_method === "cod" &&
+    order.delivery_payment_status === "paid" &&
     order.payment_status === "unpaid" &&
+    order.status !== "pending" &&
     order.status !== "cancelled"
   );
 }

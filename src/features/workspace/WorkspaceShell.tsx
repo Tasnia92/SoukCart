@@ -45,8 +45,7 @@ export { RouterLink };
 export type WorkspacePath =
   | "/"
   | "/admin"
-  | "/admin/inbox/urgent"
-  | "/admin/inbox/queue"
+  | "/admin/inbox"
   | "/admin/users"
   | "/admin/activity"
   | "/admin/complaints"

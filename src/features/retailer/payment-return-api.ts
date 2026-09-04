@@ -16,7 +16,27 @@ function isRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === "object" && value !== null && !Array.isArray(value);
 }
 
-export type PaymentSettlement = { paid: boolean; orderId: string };
+export type PaymentSettlement = {
+  paid: boolean;
+  /** True when merchandise was captured (online). COD delivery-only stays false. */
+  merchandisePaid: boolean;
+  orderId: string;
+};
+
+/** Online full capture or COD prepaid delivery both count as a successful gateway return. */
+export function isGatewayPaymentSettled(payload: Record<string, unknown> | null): boolean {
+  if (!payload) return false;
+  return payload.paymentStatus === "paid" || payload.deliveryPaymentStatus === "paid";
+}
+
+export function paymentSuccessPath(
+  settlement: Pick<PaymentSettlement, "orderId" | "merchandisePaid">,
+): string {
+  if (settlement.merchandisePaid && settlement.orderId) {
+    return `/retailer/orders/${settlement.orderId}/invoice`;
+  }
+  return "/retailer/orders";
+}
 
 export async function completePayment(
   tranId: string,
@@ -28,31 +48,53 @@ export async function completePayment(
   });
   const payload = isRecord(data) ? data : null;
   return {
-    paid: !error && payload?.paymentStatus === "paid",
+    paid: !error && isGatewayPaymentSettled(payload),
+    merchandisePaid: !error && payload?.paymentStatus === "paid",
     orderId: typeof payload?.orderId === "string" ? payload.orderId : "",
   };
 }
 
-export type PaymentQuery = { paymentStatus: string; orderId: string };
+export type PaymentQuery = {
+  paymentStatus: string;
+  deliveryPaymentStatus: string;
+  orderId: string;
+  paid: boolean;
+};
 
 export async function queryPayment(tranId: string): Promise<PaymentQuery> {
   const { data } = await supabase.functions.invoke("sslcommerz-checkout", {
     body: { action: "query", tranId },
   });
   const payload = isRecord(data) ? data : null;
+  const paymentStatus = typeof payload?.paymentStatus === "string" ? payload.paymentStatus : "";
+  const deliveryPaymentStatus =
+    typeof payload?.deliveryPaymentStatus === "string" ? payload.deliveryPaymentStatus : "";
   return {
-    paymentStatus: typeof payload?.paymentStatus === "string" ? payload.paymentStatus : "",
+    paymentStatus,
+    deliveryPaymentStatus,
     orderId: typeof payload?.orderId === "string" ? payload.orderId : "",
+    paid: isGatewayPaymentSettled(payload),
   };
 }
 
-export type RecentOrder = { id: string; tran_id: string | null; payment_status: string | null };
+export type RecentOrder = {
+  id: string;
+  tran_id: string | null;
+  payment_status: string | null;
+  payment_method: string | null;
+  delivery_payment_status: string | null;
+};
+
+export function isRecentOrderSettled(order: RecentOrder): boolean {
+  if (order.payment_status === "paid") return true;
+  return order.payment_method === "cod" && order.delivery_payment_status === "paid";
+}
 
 export async function loadLatestRecentOrder(userId: string): Promise<RecentOrder | null> {
   const since = new Date(Date.now() - 60 * 60 * 1000).toISOString();
   const { data } = await supabase
     .from("orders")
-    .select("id, tran_id, payment_status")
+    .select("id, tran_id, payment_status, payment_method, delivery_payment_status")
     .eq("retailer_id", userId)
     .gte("created_at", since)
     .order("created_at", { ascending: false })

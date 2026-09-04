@@ -75,7 +75,10 @@ create table if not exists public.orders (
   delivery_phone text,
   delivery_address text,
   delivery_city text,
-  delivery_postcode text
+  delivery_postcode text,
+  delivery_payment_status text not null default 'unpaid'
+    check (delivery_payment_status in ('unpaid', 'paid', 'failed', 'cancelled')),
+  delivery_paid_at timestamptz
 );
 
 alter table public.orders enable row level security;

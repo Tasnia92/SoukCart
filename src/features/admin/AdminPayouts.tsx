@@ -159,7 +159,7 @@ export function AdminPayouts({
   if (error) {
     return (
       <WorkspaceError
-        eyebrow="Admin workspace"
+        eyebrow="Admin"
         title="We could not load payouts."
         message={error}
         onRetry={retry}

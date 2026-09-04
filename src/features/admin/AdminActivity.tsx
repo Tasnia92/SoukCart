@@ -1,4 +1,4 @@
-import { useRouterState } from "@tanstack/react-router";
+import { useNavigate, useRouterState } from "@tanstack/react-router";
 import { useEffect, useState, type FormEvent } from "react";
 import { Activity, RefreshCw, Search } from "lucide-react";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
@@ -50,6 +50,7 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
+import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group";
 import {
   EmptyState,
   InlineNotice,
@@ -74,7 +75,7 @@ import {
 import { formatDate, formatPrice, initials } from "../workspace/format.ts";
 import { recordIdFromHash, searchParam } from "../workspace/search.ts";
 import { AdminWorkspaceShell } from "./admin-workspace-shell.tsx";
-import { adminOrderViewMeta } from "./admin-nav.ts";
+import { ADMIN_ORDER_VIEWS, adminOrderViewMeta } from "./admin-nav.ts";
 import {
   canFulfillOrder,
   collectCodPayment,
@@ -145,11 +146,22 @@ function OrderFlag({ children }: { children: string }) {
 export function AdminActivity({ loadActivity = loadAdminActivity }: AdminActivityProps) {
   const { state } = useSessionSnapshot();
   const store = useSessionStore();
+  const navigate = useNavigate();
   const location = useRouterState({ select: (routerState) => routerState.location });
   const focusedOrderId =
     searchParam(location.searchStr, "order") ?? recordIdFromHash(location.hash, "order");
   const orderView = parseAdminOrderView(searchParam(location.searchStr, "view"));
   const viewMeta = adminOrderViewMeta(orderView);
+
+  const setOrderView = (view: string) => {
+    const next = parseAdminOrderView(view);
+    const search: Record<string, string> = {
+      ...ADMIN_ORDER_VIEWS.find((item) => item.id === next)?.search,
+    };
+    const order = searchParam(location.searchStr, "order");
+    if (order) search.order = order;
+    void navigate({ to: "/admin/activity", search, hash: location.hash || undefined } as never);
+  };
   const [data, setData] = useState<ActivityResponse | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [loadVersion, setLoadVersion] = useState(0);
@@ -202,8 +214,8 @@ export function AdminActivity({ loadActivity = loadAdminActivity }: AdminActivit
   if (error) {
     return (
       <WorkspaceError
-        eyebrow="Admin workspace"
-        title="We could not load the admin workspace."
+        eyebrow="Admin"
+        title="We could not load orders."
         message={error}
         onRetry={retry}
         onLogout={onLogout}
@@ -218,11 +230,12 @@ export function AdminActivity({ loadActivity = loadAdminActivity }: AdminActivit
   ) => {
     const approved = status === "cancelled" && order.status !== "cancelled";
     const rejecting = order.cancel_requested && status === order.status;
+    const paidTotal = order.total + order.delivery_charge;
     const refundAmount =
       order.payment_method === "online" && order.payment_status === "paid"
         ? order.cancellation_initiator === "supplier"
-          ? order.total
-          : Math.max(order.total - charges.platformCharge - charges.deliveryCharge, 0)
+          ? paidTotal
+          : Math.max(paidTotal - charges.platformCharge, 0)
         : 0;
     const message = rejecting
       ? `Reject the cancellation request for order #${shortId(order.id)}?`
@@ -255,12 +268,12 @@ export function AdminActivity({ loadActivity = loadAdminActivity }: AdminActivit
         order,
         status,
         platformCharge: initialCharge(order.platform_charge),
-        deliveryCharge: initialCharge(order.delivery_charge),
+        deliveryCharge: "0",
       });
       return;
     }
 
-    queueStatusConfirmation(order, status, { platformCharge: 0, deliveryCharge: 0 });
+    queueStatusConfirmation(order, status, { platformCharge: 0 });
   };
 
   const onSubmitCharges = (event: FormEvent<HTMLFormElement>) => {
@@ -268,14 +281,14 @@ export function AdminActivity({ loadActivity = loadAdminActivity }: AdminActivit
     if (!chargeDraft) return;
 
     const platformCharge = parseCharge(chargeDraft.platformCharge);
-    const deliveryCharge = parseCharge(chargeDraft.deliveryCharge);
-    if (!Number.isFinite(platformCharge) || !Number.isFinite(deliveryCharge)) {
-      const message = "Enter valid non-negative cancellation charges.";
+    const paidTotal = chargeDraft.order.total + chargeDraft.order.delivery_charge;
+    if (!Number.isFinite(platformCharge)) {
+      const message = "Enter a valid non-negative platform charge.";
       setChargeError(message);
       setNotice({ message, state: "error" });
       return;
     }
-    if (platformCharge + deliveryCharge > chargeDraft.order.total) {
+    if (platformCharge > paidTotal) {
       const message = "Cancellation charges cannot exceed the paid order total.";
       setChargeError(message);
       setNotice({ message, state: "error" });
@@ -285,7 +298,7 @@ export function AdminActivity({ loadActivity = loadAdminActivity }: AdminActivit
     const { order, status } = chargeDraft;
     setChargeDraft(null);
     setChargeError(null);
-    queueStatusConfirmation(order, status, { platformCharge, deliveryCharge });
+    queueStatusConfirmation(order, status, { platformCharge });
   };
 
   const confirmStatusChange = () => {
@@ -405,6 +418,24 @@ export function AdminActivity({ loadActivity = loadAdminActivity }: AdminActivit
       <InlineNotice message={notice?.message} state={notice?.state} />
       {data && orders && summary ? (
         <>
+          <ToggleGroup
+            type="single"
+            variant="outline"
+            size="sm"
+            value={orderView}
+            onValueChange={(value) => {
+              if (value) setOrderView(value);
+            }}
+            className="flex flex-wrap"
+            aria-label="Filter orders"
+          >
+            {ADMIN_ORDER_VIEWS.map((view) => (
+              <ToggleGroupItem value={view.id} key={view.id}>
+                {view.label}
+              </ToggleGroupItem>
+            ))}
+          </ToggleGroup>
+
           <StatGrid label="Order activity summary">
             <StatCard label="Orders" value={summary.orders} detail="All time" />
             <StatCard label="Revenue" value={formatPrice(summary.revenue)} detail="Paid only" />
@@ -539,13 +570,21 @@ export function AdminActivity({ loadActivity = loadAdminActivity }: AdminActivit
                                 <AlertDescription>{order.cancellation_reason}</AlertDescription>
                               </Alert>
                             ) : null}
+                            <Alert>
+                              <AlertTitle>Delivery</AlertTitle>
+                              <AlertDescription>
+                                {formatPrice(order.delivery_charge)} ·{" "}
+                                {order.delivery_payment_status === "paid"
+                                  ? "delivery paid"
+                                  : `delivery ${order.delivery_payment_status}`}
+                              </AlertDescription>
+                            </Alert>
                             {order.manual_refund_status !== "not_required" ? (
                               <Alert>
                                 <AlertTitle>Manual refund</AlertTitle>
                                 <AlertDescription>
-                                  {formatPrice(order.refund_amount)} · platform charge{" "}
-                                  {formatPrice(order.platform_charge)} · delivery charge{" "}
-                                  {formatPrice(order.delivery_charge)}
+                                  {formatPrice(order.refund_amount)} · platform retention{" "}
+                                  {formatPrice(order.platform_charge)}
                                 </AlertDescription>
                               </Alert>
                             ) : null}
@@ -661,7 +700,7 @@ export function AdminActivity({ loadActivity = loadAdminActivity }: AdminActivit
           )}
         </>
       ) : (
-        <LoadingState title="Loading order activity…" />
+        <LoadingState title="Loading orders…" />
       )}
 
       <Dialog
@@ -677,7 +716,9 @@ export function AdminActivity({ loadActivity = loadAdminActivity }: AdminActivit
           <DialogHeader>
             <DialogTitle>Cancellation charges</DialogTitle>
             <DialogDescription>
-              Enter the charges to deduct before calculating the retailer&apos;s manual refund.
+              Enter any platform retention to deduct from the paid merchandise and delivery total
+              before recording the retailer&apos;s manual refund. Prepaid delivery is not edited
+              here.
             </DialogDescription>
           </DialogHeader>
           <form onSubmit={onSubmitCharges} noValidate>
@@ -700,27 +741,15 @@ export function AdminActivity({ loadActivity = loadAdminActivity }: AdminActivit
                     )
                   }
                 />
-              </Field>
-              <Field data-invalid={Boolean(chargeError) || undefined}>
-                <FieldLabel htmlFor="delivery-cancellation-charge">
-                  Delivery charge to deduct (BDT)
-                </FieldLabel>
-                <Input
-                  id="delivery-cancellation-charge"
-                  type="number"
-                  inputMode="decimal"
-                  min="0"
-                  step="0.01"
-                  value={chargeDraft?.deliveryCharge ?? ""}
-                  aria-invalid={Boolean(chargeError) || undefined}
-                  onChange={(event) =>
-                    setChargeDraft((current) =>
-                      current ? { ...current, deliveryCharge: event.target.value } : current,
-                    )
-                  }
-                />
                 {chargeError ? <FieldError>{chargeError}</FieldError> : null}
               </Field>
+              {chargeDraft ? (
+                <p className="text-sm text-muted-foreground">
+                  Prepaid delivery on this order: {formatPrice(chargeDraft.order.delivery_charge)}.
+                  Paid total:{" "}
+                  {formatPrice(chargeDraft.order.total + chargeDraft.order.delivery_charge)}.
+                </p>
+              ) : null}
             </FieldGroup>
             <DialogFooter className="mt-6">
               <Button

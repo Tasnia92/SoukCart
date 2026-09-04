@@ -1,4 +1,3 @@
-import { useNavigate } from "@tanstack/react-router";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { Activity, Clock3, MessageSquare, RefreshCw, ShieldCheck, Users } from "lucide-react";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
@@ -13,7 +12,6 @@ import {
   CardTitle,
 } from "@/components/ui/card";
 import { Spinner } from "@/components/ui/spinner";
-import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group";
 import { cn } from "@/lib/utils";
 import {
   DashboardLink,
@@ -32,7 +30,7 @@ import { useSessionSnapshot, useSessionStore } from "../../session.tsx";
 import { formatPrice, formatUpdatedAt } from "../workspace/format.ts";
 import { useTableChanges } from "../../workspace-realtime.ts";
 import { loadAdminDashboard, type AdminDashboard } from "./admin-dashboard-api.ts";
-import { AdminRecentOrders, type QueueKindFilter } from "./admin-overview-panels.tsx";
+import { AdminNeedsYouNow, AdminRecentOrders } from "./admin-overview-panels.tsx";
 import { AdminWorkspaceShell } from "./admin-workspace-shell.tsx";
 
 type AdminOverviewProps = {
@@ -131,8 +129,8 @@ export function AdminOverview({ loadDashboard = loadAdminDashboard }: AdminOverv
   if (error) {
     return (
       <WorkspaceError
-        eyebrow="Admin workspace"
-        title="We could not load the admin workspace."
+        eyebrow="Admin"
+        title="We could not load the admin home."
         message={error}
         onRetry={retry}
         onLogout={onLogout}
@@ -148,9 +146,9 @@ export function AdminOverview({ loadDashboard = loadAdminDashboard }: AdminOverv
       onLogout={onLogout}
     >
       <PageHeader
-        eyebrow="Operations"
-        title="Command center."
-        copy="Marketplace performance for the last 30 days. Open Inbox for SLA risk and the action queue."
+        eyebrow="Home"
+        title="Marketplace at a glance."
+        copy="See sales for the last 30 days and jump straight into work that needs you."
         actions={
           <div className="flex flex-wrap items-center gap-2">
             {updatedAt ? (
@@ -185,24 +183,17 @@ export function AdminOverview({ loadDashboard = loadAdminDashboard }: AdminOverv
       {dashboard ? (
         <AdminOverviewBody dashboard={dashboard} />
       ) : (
-        <DashboardSkeleton label="Loading the admin workspace…" />
+        <DashboardSkeleton label="Loading the admin home…" />
       )}
     </AdminWorkspaceShell>
   );
 }
 
 function AdminOverviewBody({ dashboard }: { dashboard: AdminDashboard }) {
-  const navigate = useNavigate();
   const summary = dashboard.summary;
   const period = `Last ${dashboard.windowDays} days`;
   const showAccountsMetric = summary.accountsNeedingSetup > 0;
-
-  const openQueue = (kind: QueueKindFilter) => {
-    void navigate({
-      to: "/admin/inbox/queue",
-      search: kind === "all" ? {} : { kind },
-    } as never);
-  };
+  const awaitingSeverity = severityFor(summary.ordersAwaitingAction, summary.refundsToComplete > 0);
 
   return (
     <>
@@ -213,25 +204,23 @@ function AdminOverviewBody({ dashboard }: { dashboard: AdminDashboard }) {
           value={formatPrice(summary.orderValue)}
           period={period}
           delta={summary.orderValueDelta}
-          hint="Gross merchandise value: non-cancelled order totals in this window. This is not settled revenue."
-          context={`Paid ${formatPrice(summary.paidOrderValue)} · ${summary.orders} orders placed in this period`}
+          hint="Total of non-cancelled orders in this window. This is not settled revenue."
+          context={`Paid ${formatPrice(summary.paidOrderValue)} · ${summary.orders} orders placed`}
           to="/admin/activity"
-          linkLabel="Open order activity"
+          linkLabel="Open orders"
         />
         <Card
           size="sm"
           data-slot="metric-card"
           className={cn(
             "db-metric",
-            severityFor(summary.ordersAwaitingAction, summary.refundsToComplete > 0) ===
-              "critical" && "ring-destructive/40",
-            severityFor(summary.ordersAwaitingAction, summary.refundsToComplete > 0) ===
-              "attention" && "ring-primary/30",
+            awaitingSeverity === "critical" && "ring-destructive/40",
+            awaitingSeverity === "attention" && "ring-primary/30",
           )}
         >
           <CardHeader>
             <CardDescription className="text-xs font-medium tracking-widest uppercase">
-              <span className="db-metric-label">Orders awaiting action</span>
+              <span className="db-metric-label">Needs action</span>
             </CardDescription>
             <CardAction>
               <span className="flex size-9 items-center justify-center rounded-xl bg-muted text-muted-foreground">
@@ -243,32 +232,11 @@ function AdminOverviewBody({ dashboard }: { dashboard: AdminDashboard }) {
             </CardTitle>
           </CardHeader>
           <CardContent className="flex flex-col gap-2">
-            <p className="text-xs text-muted-foreground">Opens the action queue</p>
-            <ToggleGroup
-              type="single"
-              variant="outline"
-              size="sm"
-              orientation="vertical"
-              value=""
-              onValueChange={(value) => {
-                if (value) openQueue(value as QueueKindFilter);
-              }}
-              className="w-full"
-              aria-label="Orders awaiting action"
-            >
-              <ToggleGroupItem value="confirmation" className="w-full justify-between">
-                Awaiting confirmation
-                <strong className="tabular-nums">{summary.pendingOrders}</strong>
-              </ToggleGroupItem>
-              <ToggleGroupItem value="cancellation" className="w-full justify-between">
-                Cancellation requests
-                <strong className="tabular-nums">{summary.cancellationRequests}</strong>
-              </ToggleGroupItem>
-              <ToggleGroupItem value="refund" className="w-full justify-between">
-                Refunds due
-                <strong className="tabular-nums">{summary.refundsToComplete}</strong>
-              </ToggleGroupItem>
-            </ToggleGroup>
+            <p className="text-xs text-muted-foreground">
+              {summary.pendingOrders} confirmations · {summary.cancellationRequests} cancellations ·{" "}
+              {summary.refundsToComplete} refunds
+            </p>
+            <DashboardLink to="/admin/inbox">Open needs attention</DashboardLink>
           </CardContent>
         </Card>
         <MetricCard
@@ -290,7 +258,7 @@ function AdminOverviewBody({ dashboard }: { dashboard: AdminDashboard }) {
             context={`${summary.accounts} accounts · ${summary.newAccounts} joined this week · ${summary.activeAccounts} signed in recently`}
             severity={severityFor(summary.accountsNeedingSetup)}
             to="/admin/users"
-            linkLabel="Open the directory"
+            linkLabel="Open users"
           />
         ) : (
           <MetricCard
@@ -298,7 +266,7 @@ function AdminOverviewBody({ dashboard }: { dashboard: AdminDashboard }) {
             label="Pending verifications"
             value={summary.pendingVerifications}
             period="Open right now"
-            hint="Supplier shop applications waiting for an admin decision."
+            hint="Supplier shop applications waiting for a decision."
             context={
               summary.pendingVerifications
                 ? "Supplier applications waiting for review"
@@ -333,12 +301,13 @@ function AdminOverviewBody({ dashboard }: { dashboard: AdminDashboard }) {
               kind: "line",
             },
           ]}
-          summary={`${formatPrice(summary.orderValue)} GMV across ${summary.orders} orders in the last ${dashboard.windowDays} days. Paid ${formatPrice(summary.paidOrderValue)}. ${summary.orderValueDelta.label}.`}
+          summary={`${formatPrice(summary.orderValue)} order value across ${summary.orders} orders in the last ${dashboard.windowDays} days. Paid ${formatPrice(summary.paidOrderValue)}. ${summary.orderValueDelta.label}.`}
           action={<DashboardLink to="/admin/activity">All orders</DashboardLink>}
           emptyCopy="No orders were placed in this window, so there is no trend to read yet."
         />
       </DashboardRow>
 
+      <AdminNeedsYouNow dashboard={dashboard} />
       <AdminRecentOrders dashboard={dashboard} />
     </>
   );

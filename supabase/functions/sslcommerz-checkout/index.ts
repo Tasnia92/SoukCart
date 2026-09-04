@@ -74,7 +74,18 @@ type CartLine = {
 type ReservedCheckout = {
   orderId: string;
   total: number;
+  merchandiseTotal: number;
+  deliveryCharge: number;
+  payableNow: number;
+  paymentMethod: "online" | "cod";
   lines: CartLine[];
+};
+
+type OrderPaymentRow = {
+  id: string;
+  payment_method: string | null;
+  payment_status: string | null;
+  delivery_payment_status: string | null;
 };
 
 async function initiate(userId: string, body: Record<string, unknown>): Promise<Response> {
@@ -90,7 +101,8 @@ async function initiate(userId: string, body: Record<string, unknown>): Promise<
 
   const paymentMethod = readText(body.paymentMethod).trim() === "cod" ? "cod" : "online";
   const baseUrl = readText(body.baseUrl).trim().replace(/\/+$/, "");
-  if (paymentMethod === "online" && (!baseUrl || !baseUrl.startsWith("http"))) {
+  // Online and COD both open SSLCommerz (COD prepays delivery only).
+  if (!baseUrl || !baseUrl.startsWith("http")) {
     return json({ error: "A valid callback base URL is required." }, 400);
   }
 
@@ -121,10 +133,6 @@ async function initiate(userId: string, body: Record<string, unknown>): Promise<
     throw new Error("The reserved order returned invalid details.");
   }
 
-  if (paymentMethod === "cod") {
-    return json({ orderId: reserved.orderId, paymentStatus: "unpaid", method: "cod" });
-  }
-
   const ipnUrl = readText(body.ipnUrl).trim();
   const tranId = `SOUK-${reserved.orderId.replaceAll("-", "").slice(0, 12).toUpperCase()}`;
   const { error: referenceError } = await admin
@@ -142,10 +150,11 @@ async function initiate(userId: string, body: Record<string, unknown>): Promise<
     ? `${supabaseUrl.replace(/\/+$/, "")}/functions/v1/sslcommerz-return`
     : "";
   const appParam = encodeURIComponent(baseUrl);
+  const gatewayAmount = Number(reserved.payableNow);
   const params = new URLSearchParams({
     store_id: storeId,
     store_passwd: storePasswd,
-    total_amount: reserved.total.toFixed(2),
+    total_amount: gatewayAmount.toFixed(2),
     currency: "BDT",
     tran_id: tranId,
     success_url: returnEndpoint ? `${returnEndpoint}?app=${appParam}` : `${baseUrl}/`,
@@ -208,7 +217,18 @@ async function initiate(userId: string, body: Record<string, unknown>): Promise<
 function parseReservedCheckout(value: unknown): ReservedCheckout | null {
   if (!isRecord(value)) return null;
   const orderId = readText(value.orderId);
-  const total = Number(value.total);
+  const merchandiseTotal = Number(
+    value.merchandiseTotal !== undefined ? value.merchandiseTotal : value.total,
+  );
+  const deliveryCharge = Number(value.deliveryCharge ?? 0);
+  const paymentMethod = readText(value.paymentMethod).trim() === "cod" ? "cod" : "online";
+  const total = Number.isFinite(Number(value.total)) ? Number(value.total) : merchandiseTotal;
+  let payableNow = Number(value.payableNow);
+  if (!Number.isFinite(payableNow)) {
+    payableNow =
+      paymentMethod === "cod" ? deliveryCharge : round2(merchandiseTotal + deliveryCharge);
+  }
+
   const rawLines = Array.isArray(value.lines) ? value.lines : [];
   const lines: CartLine[] = [];
 
@@ -233,20 +253,65 @@ function parseReservedCheckout(value: unknown): ReservedCheckout | null {
     lines.push(line);
   }
 
-  return orderId && Number.isFinite(total) && total > 0 && lines.length
-    ? { orderId, total, lines }
+  return orderId &&
+    Number.isFinite(merchandiseTotal) &&
+    merchandiseTotal > 0 &&
+    Number.isFinite(total) &&
+    total > 0 &&
+    Number.isFinite(deliveryCharge) &&
+    deliveryCharge >= 0 &&
+    Number.isFinite(payableNow) &&
+    payableNow > 0 &&
+    lines.length
+    ? {
+        orderId,
+        total,
+        merchandiseTotal,
+        deliveryCharge,
+        payableNow,
+        paymentMethod,
+        lines,
+      }
     : null;
 }
 
 async function failReservedOrder(orderId: string): Promise<void> {
-  const { error } = await admin
-    .from("orders")
-    .update({ payment_status: "failed" })
-    .eq("id", orderId)
-    .neq("payment_status", "paid");
+  const { error } = await admin.rpc("fail_gateway_payment", {
+    p_order_id: orderId,
+    p_status: "failed",
+    p_val_id: null,
+  });
   if (error) {
     console.error("Reserved stock could not be released", error);
   }
+}
+
+function isAlreadyCaptured(order: OrderPaymentRow): boolean {
+  if (order.payment_method === "cod") {
+    return order.delivery_payment_status === "paid";
+  }
+  return order.payment_status === "paid" && order.delivery_payment_status === "paid";
+}
+
+function isCheckoutOpen(order: OrderPaymentRow): boolean {
+  if (order.payment_method === "cod") {
+    return (
+      order.delivery_payment_status === "unpaid" &&
+      order.payment_status !== "failed" &&
+      order.payment_status !== "cancelled"
+    );
+  }
+  return order.payment_status === "unpaid";
+}
+
+function settlementResponse(order: OrderPaymentRow, extra: Record<string, unknown> = {}): Response {
+  return json({
+    orderId: order.id,
+    paymentMethod: order.payment_method ?? "online",
+    paymentStatus: order.payment_status ?? "unpaid",
+    deliveryPaymentStatus: order.delivery_payment_status ?? "unpaid",
+    ...extra,
+  });
 }
 
 async function complete(userId: string, body: Record<string, unknown>): Promise<Response> {
@@ -259,7 +324,7 @@ async function complete(userId: string, body: Record<string, unknown>): Promise<
 
   const { data: order, error: orderError } = await admin
     .from("orders")
-    .select("id, tran_id, payment_status")
+    .select("id, tran_id, payment_method, payment_status, delivery_payment_status")
     .eq("tran_id", tranId)
     .eq("retailer_id", userId)
     .maybeSingle();
@@ -269,10 +334,10 @@ async function complete(userId: string, body: Record<string, unknown>): Promise<
   if (!order) {
     return json({ error: "The order could not be found." }, 404);
   }
-  if (order.payment_status === "paid") {
-    return json({ orderId: order.id, paymentStatus: "paid" });
+  if (isAlreadyCaptured(order)) {
+    return settlementResponse(order);
   }
-  if (order.payment_status !== "unpaid") {
+  if (!isCheckoutOpen(order)) {
     return json(
       {
         error:
@@ -288,55 +353,36 @@ async function complete(userId: string, body: Record<string, unknown>): Promise<
     validation.amount === (await orderTotal(order.id));
 
   if (paid) {
-    const { data: updated, error: updateError } = await admin
-      .from("orders")
-      .update({
-        payment_status: "paid",
-        val_id: valId,
-        bank_tran_id: validation.bank_tran_id ?? null,
-        paid_at: new Date().toISOString(),
-      })
-      .eq("id", order.id)
-      .eq("payment_status", "unpaid")
-      .select("payment_status")
-      .maybeSingle();
-    if (updateError) {
+    const { data: captured, error: captureError } = await admin.rpc("capture_gateway_payment", {
+      p_order_id: order.id,
+      p_amount: validation.amount,
+      p_val_id: valId,
+      p_bank_tran_id: validation.bank_tran_id ?? null,
+    });
+    if (captureError) {
       return json(
         {
           error:
+            captureError.message ||
             "Payment was captured, but stock could not be reserved. Contact an administrator for fulfillment or refund support.",
         },
         409,
       );
     }
-    if (!updated) {
-      return json(
-        {
-          error:
-            "This checkout is no longer valid. If money was taken, contact support for a refund.",
-        },
-        409,
-      );
-    }
-    return json({ orderId: order.id, paymentStatus: updated.payment_status ?? "paid" });
+    return settlementFromRpc(order.id, captured);
   }
 
   const nextStatus = status === "CANCELLED" ? "cancelled" : "failed";
-  const { data: updated, error: updateError } = await admin
-    .from("orders")
-    .update({ payment_status: nextStatus, val_id: valId })
-    .eq("id", order.id)
-    .eq("payment_status", "unpaid")
-    .select("payment_status")
-    .maybeSingle();
-  if (updateError) {
-    throw updateError;
+  const { data: failed, error: failError } = await admin.rpc("fail_gateway_payment", {
+    p_order_id: order.id,
+    p_status: nextStatus,
+    p_val_id: valId,
+  });
+  if (failError) {
+    throw failError;
   }
 
-  return json({
-    orderId: order.id,
-    paymentStatus: updated?.payment_status ?? order.payment_status,
-  });
+  return settlementFromRpc(order.id, failed);
 }
 
 type ValidationResult = {
@@ -353,7 +399,7 @@ async function queryByTranId(userId: string, body: Record<string, unknown>): Pro
 
   const { data: order, error: orderError } = await admin
     .from("orders")
-    .select("id, payment_status")
+    .select("id, payment_method, payment_status, delivery_payment_status")
     .eq("tran_id", tranId)
     .eq("retailer_id", userId)
     .maybeSingle();
@@ -363,10 +409,10 @@ async function queryByTranId(userId: string, body: Record<string, unknown>): Pro
   if (!order) {
     return json({ error: "The order could not be found." }, 404);
   }
-  if (order.payment_status === "paid") {
-    return json({ orderId: order.id, paymentStatus: "paid" });
+  if (isAlreadyCaptured(order)) {
+    return settlementResponse(order);
   }
-  if (order.payment_status !== "unpaid") {
+  if (!isCheckoutOpen(order)) {
     return json(
       {
         error:
@@ -387,11 +433,11 @@ async function queryByTranId(userId: string, body: Record<string, unknown>): Pro
   );
   const data: unknown = await response.json();
   if (!isRecord(data) || data.APIConnect !== "DONE" || !Array.isArray(data.element)) {
-    return json({ orderId: order.id, paymentStatus: order.payment_status });
+    return settlementResponse(order);
   }
 
   const expected = await orderTotal(order.id);
-  let paidElement: { val_id: string; bank_tran_id: string | null } | undefined;
+  let paidElement: { val_id: string; bank_tran_id: string | null; amount: number } | undefined;
   let outcome: "unpaid" | "failed" | "cancelled" = "unpaid";
   for (const element of data.element) {
     if (!isRecord(element)) {
@@ -406,6 +452,7 @@ async function queryByTranId(userId: string, body: Record<string, unknown>): Pro
       paidElement = {
         val_id: typeof element.val_id === "string" ? element.val_id : "",
         bank_tran_id: typeof element.bank_tran_id === "string" ? element.bank_tran_id : null,
+        amount,
       };
       break;
     }
@@ -417,57 +464,51 @@ async function queryByTranId(userId: string, body: Record<string, unknown>): Pro
   }
 
   if (paidElement) {
-    const { data: updated, error: updateError } = await admin
-      .from("orders")
-      .update({
-        payment_status: "paid",
-        val_id: paidElement.val_id,
-        bank_tran_id: paidElement.bank_tran_id ?? null,
-        paid_at: new Date().toISOString(),
-      })
-      .eq("id", order.id)
-      .eq("payment_status", "unpaid")
-      .select("payment_status")
-      .maybeSingle();
-    if (updateError) {
+    const { data: captured, error: captureError } = await admin.rpc("capture_gateway_payment", {
+      p_order_id: order.id,
+      p_amount: paidElement.amount,
+      p_val_id: paidElement.val_id,
+      p_bank_tran_id: paidElement.bank_tran_id ?? null,
+    });
+    if (captureError) {
       return json(
         {
           error:
+            captureError.message ||
             "Payment was captured, but stock could not be reserved. Contact an administrator for fulfillment or refund support.",
         },
         409,
       );
     }
-    if (!updated) {
-      return json(
-        {
-          error:
-            "This checkout is no longer valid. If money was taken, contact support for a refund.",
-        },
-        409,
-      );
-    }
-    return json({ orderId: order.id, paymentStatus: updated.payment_status ?? "paid" });
+    return settlementFromRpc(order.id, captured);
   }
 
   if (outcome === "failed" || outcome === "cancelled") {
-    const { data: updated, error: updateError } = await admin
-      .from("orders")
-      .update({ payment_status: outcome })
-      .eq("id", order.id)
-      .eq("payment_status", "unpaid")
-      .select("payment_status")
-      .maybeSingle();
-    if (updateError) {
-      throw updateError;
-    }
-    return json({
-      orderId: order.id,
-      paymentStatus: updated?.payment_status ?? order.payment_status,
+    const { data: failed, error: failError } = await admin.rpc("fail_gateway_payment", {
+      p_order_id: order.id,
+      p_status: outcome,
+      p_val_id: null,
     });
+    if (failError) {
+      throw failError;
+    }
+    return settlementFromRpc(order.id, failed);
   }
 
-  return json({ orderId: order.id, paymentStatus: order.payment_status });
+  return settlementResponse(order);
+}
+
+function settlementFromRpc(orderId: string, value: unknown): Response {
+  if (!isRecord(value)) {
+    return json({ orderId, paymentStatus: "unpaid", deliveryPaymentStatus: "unpaid" });
+  }
+  return json({
+    orderId: typeof value.orderId === "string" ? value.orderId : orderId,
+    paymentStatus: typeof value.paymentStatus === "string" ? value.paymentStatus : "unpaid",
+    deliveryPaymentStatus:
+      typeof value.deliveryPaymentStatus === "string" ? value.deliveryPaymentStatus : "unpaid",
+    alreadyCaptured: value.alreadyCaptured === true,
+  });
 }
 
 async function validateTransaction(valId: string): Promise<ValidationResult> {
@@ -495,20 +536,17 @@ async function validateTransaction(valId: string): Promise<ValidationResult> {
 }
 
 async function orderTotal(orderId: string): Promise<number> {
-  const { data: items, error } = await admin
-    .from("order_items")
-    .select("quantity, unit_price")
-    .eq("order_id", orderId);
+  const { data, error } = await admin.rpc("order_gateway_amount", {
+    p_order_id: orderId,
+  });
   if (error) {
     throw error;
   }
-  return round2(
-    (items ?? []).reduce(
-      (sum: number, item: { quantity: number; unit_price: number }) =>
-        sum + Number(item.unit_price) * Number(item.quantity),
-      0,
-    ),
-  );
+  const amount = Number(data);
+  if (!Number.isFinite(amount)) {
+    throw new Error("The gateway amount could not be determined.");
+  }
+  return round2(amount);
 }
 
 async function authorize(request: Request): Promise<{ id: string } | Response> {

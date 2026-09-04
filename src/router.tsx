@@ -49,6 +49,8 @@ export const PAYMENT_SEARCH_KEYS = ["status", "tran_id", "val_id"] as const;
 export const routeContract = [
   { path: "/", target: "root" },
   { path: "/admin", target: "admin" },
+  { path: "/admin/inbox", target: "admin" },
+  // Legacy inbox URLs — AdminInbox redirects these to /admin/inbox.
   { path: "/admin/inbox/urgent", target: "admin" },
   { path: "/admin/inbox/queue", target: "admin" },
   { path: "/admin/users", target: "admin" },
@@ -168,7 +170,7 @@ function AdminRoute(): ReactElement {
   const pathname = useRouterState({ select: (routerState) => routerState.location.pathname });
   if (state.status !== "admin") return <AdminAuthRoute />;
   if (isReactOverviewRoute(pathname, "admin")) return <AdminOverview />;
-  if (pathname === "/admin/inbox/urgent" || pathname === "/admin/inbox/queue") {
+  if (pathname === "/admin/inbox" || pathname.startsWith("/admin/inbox/")) {
     return <AdminInbox />;
   }
   if (pathname === "/admin/users") return <AdminUsers />;

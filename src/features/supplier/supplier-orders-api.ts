@@ -46,6 +46,9 @@ export type SupplierOrder = {
   cancellation_reason: string | null;
   payment_status: string;
   payment_method: string;
+  delivery_charge: number;
+  delivery_payment_status: "unpaid" | "paid" | "failed" | "cancelled";
+  delivery_paid_at: string | null;
   delivery_verified_at: string | null;
   delivery_phone: string | null;
   delivery_address: string | null;
@@ -82,9 +85,19 @@ export type ShipOrderInput = {
 
 type SupplierOrderRow = Omit<
   SupplierOrder,
-  "supplier_total" | "items" | "cancel_requested" | "accepted_at" | "shipment"
+  | "supplier_total"
+  | "items"
+  | "cancel_requested"
+  | "accepted_at"
+  | "shipment"
+  | "delivery_charge"
+  | "delivery_payment_status"
+  | "delivery_paid_at"
 > & {
   supplier_total: number | string;
+  delivery_charge?: number | string | null;
+  delivery_payment_status?: string | null;
+  delivery_paid_at?: string | null;
   cancel_requested: boolean | null;
   accepted_at: string | null;
   shipment?:
@@ -114,11 +127,18 @@ function normalizeShipment(shipment: SupplierOrderRow["shipment"]): SupplierShip
 }
 
 function normalizeOrder(row: SupplierOrderRow): SupplierOrder {
+  const deliveryStatus = row.delivery_payment_status;
   return {
     ...row,
     status: row.status as SupplierOrderStatus,
     cancel_requested: row.cancel_requested === true,
     accepted_at: row.accepted_at ?? null,
+    delivery_charge: Number(row.delivery_charge ?? 0),
+    delivery_payment_status:
+      deliveryStatus === "paid" || deliveryStatus === "failed" || deliveryStatus === "cancelled"
+        ? deliveryStatus
+        : "unpaid",
+    delivery_paid_at: row.delivery_paid_at ?? null,
     delivery_phone: row.delivery_phone ?? null,
     delivery_address: row.delivery_address ?? null,
     delivery_city: row.delivery_city ?? null,
@@ -240,8 +260,9 @@ export async function requestSupplierCancellation(orderId: string, reason: strin
 }
 
 export function canFulfillPayment(
-  order: Pick<SupplierOrder, "payment_method" | "payment_status">,
+  order: Pick<SupplierOrder, "payment_method" | "payment_status" | "delivery_payment_status">,
 ): boolean {
+  if (order.delivery_payment_status !== "paid") return false;
   return order.payment_method === "cod" || order.payment_status === "paid";
 }
 

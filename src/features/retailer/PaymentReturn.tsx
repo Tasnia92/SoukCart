@@ -14,14 +14,21 @@ import {
   clearCart,
   completePayment,
   getSessionUserId,
+  isRecentOrderSettled,
   loadLatestRecentOrder,
   paymentOutcome,
+  paymentSuccessPath,
   PAYMENT_RETURN_KEY,
   queryPayment,
 } from "./payment-return-api.ts";
 
 type ResultState = "paid" | "failed" | "cancelled" | "pending" | "unknown";
-type Outcome = { state: ResultState; orderId: string; hasSession: boolean };
+type Outcome = {
+  state: ResultState;
+  orderId: string;
+  hasSession: boolean;
+  merchandisePaid: boolean;
+};
 
 const POLL_ATTEMPTS = 6;
 const POLL_INTERVAL_MS = 2500;
@@ -31,6 +38,7 @@ export function PaymentReturn() {
     state: "pending",
     orderId: "",
     hasSession: false,
+    merchandisePaid: false,
   });
 
   useEffect(() => {
@@ -52,86 +60,111 @@ export function PaymentReturn() {
     const valId = params.get("val_id") ?? "";
     const kind = paymentOutcome(status);
 
-    const gotoInvoice = async (orderId: string): Promise<boolean> => {
+    const finishPaid = async (orderId: string, merchandisePaid: boolean): Promise<boolean> => {
       const userId = await getSessionUserId();
       if (cancelled || !userId) return false;
       await clearCart(userId);
-      if (cancelled || !orderId) return false;
-      window.location.assign(`/retailer/orders/${orderId}/invoice`);
+      if (cancelled) return false;
+      window.location.assign(paymentSuccessPath({ orderId, merchandisePaid }));
       return true;
     };
 
     const settle = async () => {
-      const { paid, orderId } = await completePayment(tranId, valId, status);
+      const { paid, orderId, merchandisePaid } = await completePayment(tranId, valId, status);
       if (cancelled) return;
-      if (paid && (await gotoInvoice(orderId))) return;
+      if (paid && (await finishPaid(orderId, merchandisePaid))) return;
       const userId = await getSessionUserId();
       set({
         state: paid ? "paid" : kind === "cancelled" ? "cancelled" : "failed",
         orderId,
         hasSession: Boolean(userId),
+        merchandisePaid,
       });
     };
 
     const poll = async () => {
       const hasSession = Boolean(await getSessionUserId());
       for (let attempt = 0; attempt < POLL_ATTEMPTS; attempt += 1) {
-        const { paymentStatus, orderId } = await queryPayment(tranId);
+        const { paymentStatus, deliveryPaymentStatus, orderId, paid } = await queryPayment(tranId);
         if (cancelled) return;
-        if (paymentStatus === "paid") {
-          if (await gotoInvoice(orderId)) return;
-          set({ state: "paid", orderId, hasSession });
+        if (paid) {
+          const merchandisePaid = paymentStatus === "paid";
+          if (await finishPaid(orderId, merchandisePaid)) return;
+          set({ state: "paid", orderId, hasSession, merchandisePaid });
           return;
         }
-        if (paymentStatus === "failed" || paymentStatus === "cancelled") {
-          set({ state: kind === "cancelled" ? "cancelled" : "failed", orderId, hasSession });
-          return;
-        }
-        await sleep(POLL_INTERVAL_MS);
-        if (cancelled) return;
-      }
-      set({ state: "pending", orderId: "", hasSession });
-    };
-
-    const reconcileLatest = async () => {
-      const userId = await getSessionUserId();
-      if (cancelled) return;
-      if (!userId) {
-        set({ state: "unknown", orderId: "", hasSession: false });
-        return;
-      }
-      const order = await loadLatestRecentOrder(userId);
-      if (cancelled) return;
-      if (!order?.tran_id) {
-        set({ state: "pending", orderId: "", hasSession: true });
-        return;
-      }
-      if (order.payment_status === "paid") {
-        if (await gotoInvoice(order.id)) return;
-        set({ state: "paid", orderId: order.id, hasSession: true });
-        return;
-      }
-      for (let attempt = 0; attempt < POLL_ATTEMPTS; attempt += 1) {
-        const { paymentStatus, orderId } = await queryPayment(order.tran_id);
-        if (cancelled) return;
-        const resolvedOrderId = orderId || order.id;
-        if (paymentStatus === "paid") {
-          if (await gotoInvoice(resolvedOrderId)) return;
-          set({ state: "paid", orderId: resolvedOrderId, hasSession: true });
-          return;
-        }
-        if (paymentStatus === "failed" || paymentStatus === "cancelled") {
+        if (
+          paymentStatus === "failed" ||
+          paymentStatus === "cancelled" ||
+          deliveryPaymentStatus === "failed" ||
+          deliveryPaymentStatus === "cancelled"
+        ) {
           set({
-            state: paymentStatus === "cancelled" ? "cancelled" : "failed",
-            orderId: resolvedOrderId,
-            hasSession: true,
+            state: kind === "cancelled" ? "cancelled" : "failed",
+            orderId,
+            hasSession,
+            merchandisePaid: false,
           });
           return;
         }
         await sleep(POLL_INTERVAL_MS);
         if (cancelled) return;
       }
-      set({ state: "pending", orderId: order.id, hasSession: true });
+      set({ state: "pending", orderId: "", hasSession, merchandisePaid: false });
+    };
+
+    const reconcileLatest = async () => {
+      const userId = await getSessionUserId();
+      if (cancelled) return;
+      if (!userId) {
+        set({ state: "unknown", orderId: "", hasSession: false, merchandisePaid: false });
+        return;
+      }
+      const order = await loadLatestRecentOrder(userId);
+      if (cancelled) return;
+      if (!order?.tran_id) {
+        set({ state: "pending", orderId: "", hasSession: true, merchandisePaid: false });
+        return;
+      }
+      if (isRecentOrderSettled(order)) {
+        const merchandisePaid = order.payment_status === "paid";
+        if (await finishPaid(order.id, merchandisePaid)) return;
+        set({ state: "paid", orderId: order.id, hasSession: true, merchandisePaid });
+        return;
+      }
+      for (let attempt = 0; attempt < POLL_ATTEMPTS; attempt += 1) {
+        const { paymentStatus, deliveryPaymentStatus, orderId, paid } = await queryPayment(
+          order.tran_id,
+        );
+        if (cancelled) return;
+        const resolvedOrderId = orderId || order.id;
+        if (paid) {
+          const merchandisePaid = paymentStatus === "paid";
+          if (await finishPaid(resolvedOrderId, merchandisePaid)) return;
+          set({ state: "paid", orderId: resolvedOrderId, hasSession: true, merchandisePaid });
+          return;
+        }
+        if (
+          paymentStatus === "failed" ||
+          paymentStatus === "cancelled" ||
+          deliveryPaymentStatus === "failed" ||
+          deliveryPaymentStatus === "cancelled"
+        ) {
+          set({
+            state:
+              paymentStatus === "cancelled" || deliveryPaymentStatus === "cancelled"
+                ? "cancelled"
+                : "failed",
+            orderId: resolvedOrderId,
+            hasSession: true,
+            merchandisePaid: false,
+          });
+          return;
+        }
+        await sleep(POLL_INTERVAL_MS);
+        if (cancelled) return;
+      }
+      set({ state: "pending", orderId: order.id, hasSession: true, merchandisePaid: false });
     };
 
     const run = () => {
@@ -161,9 +194,12 @@ export function PaymentReturn() {
 }
 
 function resultAction(outcome: Outcome): { href: string; label: string } {
-  const { state, orderId, hasSession } = outcome;
-  if (state === "paid" && orderId && hasSession) {
-    return { href: `/retailer/orders/${orderId}/invoice`, label: "View invoice" };
+  const { state, orderId, hasSession, merchandisePaid } = outcome;
+  if (state === "paid" && hasSession) {
+    if (merchandisePaid && orderId) {
+      return { href: `/retailer/orders/${orderId}/invoice`, label: "View invoice" };
+    }
+    return { href: "/retailer/orders", label: "View orders" };
   }
   if (hasSession) return { href: "/retailer/orders", label: "View orders" };
   return { href: "/", label: "Sign in" };
@@ -191,7 +227,9 @@ function PaymentResultCard({ outcome }: { outcome: Outcome }) {
             : "Payment result";
   const copy =
     state === "paid"
-      ? "Your order is with the suppliers."
+      ? outcome.merchandisePaid
+        ? "Your order is with the suppliers."
+        : "Delivery is paid. Pay for products in cash when your order arrives."
       : state === "failed" || state === "cancelled"
         ? "No charge was made. You can try again from your cart."
         : state === "pending"

@@ -86,7 +86,17 @@ export type ProductSort = "newest" | "stock" | "price" | "name";
 
 /** Map PostgREST / Postgres errors into short seller-facing copy. */
 export function friendlyProductError(error: unknown): string {
-  const message = error instanceof Error ? error.message : String(error ?? "");
+  const message =
+    error instanceof Error
+      ? error.message
+      : typeof error === "string"
+        ? error
+        : error &&
+            typeof error === "object" &&
+            "message" in error &&
+            typeof error.message === "string"
+          ? error.message
+          : "";
   const lower = message.toLowerCase();
   if (lower.includes("stock changed elsewhere")) {
     return "Stock changed elsewhere. Refresh and try again.";
@@ -318,7 +328,7 @@ export async function bulkAdjustProductStock(
 function normalizeStockAdjustmentResult(value: unknown): StockAdjustmentResult {
   const row = (value ?? {}) as Record<string, unknown>;
   return {
-    id: String(row.id ?? ""),
+    id: typeof row.id === "string" ? row.id : "",
     stock: Number(row.stock) || 0,
     stockVersion: Number(row.stockVersion) || 0,
     reorderThreshold: Number(row.reorderThreshold) || 5,
@@ -346,8 +356,8 @@ export async function duplicateSupplierProduct(
   if (error) throw new Error(friendlyProductError(error));
   const row = (data ?? {}) as Record<string, unknown>;
   return {
-    id: String(row.id ?? ""),
-    name: String(row.name ?? "Copy"),
+    id: typeof row.id === "string" ? row.id : "",
+    name: typeof row.name === "string" ? row.name : "Copy",
   };
 }
 

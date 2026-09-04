@@ -43,7 +43,7 @@ Deno.serve(async (request) => {
 
     const { data: order, error: orderError } = await admin
       .from("orders")
-      .select("id, retailer_id, payment_status")
+      .select("id, retailer_id, payment_method, payment_status, delivery_payment_status")
       .eq("tran_id", tranId)
       .maybeSingle();
     if (orderError) {
@@ -53,16 +53,16 @@ Deno.serve(async (request) => {
       return respond(appBase, "unknown", "", `Unknown transaction ${tranId}.`);
     }
 
-    if (order.payment_status === "paid") {
+    if (isGatewayCaptured(order)) {
       await clearCart(order.retailer_id);
       return respond(appBase, "success", order.id);
     }
-    if (order.payment_status !== "unpaid") {
+    if (!isGatewayOpen(order)) {
       return respond(
         appBase,
         "failed",
         order.id,
-        `Capture refused for ${tranId}: payment_status=${order.payment_status}`,
+        `Capture refused for ${tranId}: payment_status=${order.payment_status}, delivery_payment_status=${order.delivery_payment_status}`,
       );
     }
 
@@ -76,13 +76,14 @@ Deno.serve(async (request) => {
     });
 
     if (result.paid) {
-      const { error: paymentError } = await admin
-        .from("orders")
-        .update({ payment_status: "paid", paid_at: new Date().toISOString() })
-        .eq("id", order.id)
-        .eq("payment_status", "unpaid");
+      const { error: paymentError } = await admin.rpc("capture_gateway_payment", {
+        p_order_id: order.id,
+        p_amount: result.amount,
+        p_val_id: result.valId ?? (valId || null),
+        p_bank_tran_id: result.bankTranId ?? null,
+      });
       if (paymentError) {
-        console.error("Paid order could not reserve stock", paymentError);
+        console.error("Paid order could not be captured", paymentError);
         return respond(
           appBase,
           "failed",
@@ -92,11 +93,11 @@ Deno.serve(async (request) => {
       }
       await clearCart(retailerSafe(result.retailerId, order.retailer_id));
     } else if (result.outcome !== "unpaid" && result.hardFail) {
-      const { error: paymentError } = await admin
-        .from("orders")
-        .update({ payment_status: result.outcome })
-        .eq("id", order.id)
-        .eq("payment_status", "unpaid");
+      const { error: paymentError } = await admin.rpc("fail_gateway_payment", {
+        p_order_id: order.id,
+        p_status: result.outcome,
+        p_val_id: valId || null,
+      });
       if (paymentError) {
         throw paymentError;
       }
@@ -121,8 +122,35 @@ type SettleResult = {
   paid: boolean;
   outcome: "unpaid" | "paid" | "failed" | "cancelled";
   hardFail: boolean;
+  amount: number;
+  valId?: string | null;
+  bankTranId?: string | null;
   retailerId?: string;
 };
+
+type GatewayOrder = {
+  payment_method: string | null;
+  payment_status: string | null;
+  delivery_payment_status: string | null;
+};
+
+function isGatewayCaptured(order: GatewayOrder): boolean {
+  if (order.payment_method === "cod") {
+    return order.delivery_payment_status === "paid";
+  }
+  return order.payment_status === "paid" && order.delivery_payment_status === "paid";
+}
+
+function isGatewayOpen(order: GatewayOrder): boolean {
+  if (order.payment_method === "cod") {
+    return (
+      order.delivery_payment_status === "unpaid" &&
+      order.payment_status !== "failed" &&
+      order.payment_status !== "cancelled"
+    );
+  }
+  return order.payment_status === "unpaid";
+}
 
 async function settle(input: {
   orderId: string;
@@ -132,7 +160,7 @@ async function settle(input: {
   status: string;
   hint: string;
 }): Promise<SettleResult> {
-  const expected = await orderTotal(input.orderId);
+  const expected = await orderGatewayAmount(input.orderId);
 
   // Success-style callbacks carry a val_id: validate it directly.
   const looksSuccessful =
@@ -143,31 +171,33 @@ async function settle(input: {
       (validation.status === "VALID" || validation.status === "VALIDATED") &&
       validation.amount === expected;
     if (paid) {
-      await admin
-        .from("orders")
-        .update({
-          val_id: input.valId,
-          bank_tran_id: validation.bank_tran_id,
-        })
-        .eq("id", input.orderId);
-      return { paid: true, outcome: "paid", hardFail: false, retailerId: input.retailerId };
+      return {
+        paid: true,
+        outcome: "paid",
+        hardFail: false,
+        amount: expected,
+        valId: input.valId,
+        bankTranId: validation.bank_tran_id,
+        retailerId: input.retailerId,
+      };
     }
     if (validation.status) {
-      return { paid: false, outcome: "failed", hardFail: true };
+      return { paid: false, outcome: "failed", hardFail: true, amount: expected };
     }
   }
 
   // No usable val_id: ask the gateway what happened to this transaction.
   const queried = await queryByTranId(input.tranId, expected);
   if (queried.paymentStatus === "paid") {
-    await admin
-      .from("orders")
-      .update({
-        val_id: queried.valId ?? input.valId,
-        bank_tran_id: queried.bankTranId,
-      })
-      .eq("id", input.orderId);
-    return { paid: true, outcome: "paid", hardFail: false, retailerId: input.retailerId };
+    return {
+      paid: true,
+      outcome: "paid",
+      hardFail: false,
+      amount: expected,
+      valId: queried.valId ?? input.valId,
+      bankTranId: queried.bankTranId,
+      retailerId: input.retailerId,
+    };
   }
 
   const known = queried.known || Boolean(input.status);
@@ -187,6 +217,7 @@ async function settle(input: {
     paid: false,
     outcome: status,
     hardFail: known,
+    amount: expected,
   };
 }
 
@@ -268,21 +299,14 @@ async function validateTransaction(valId: string): Promise<{
   };
 }
 
-async function orderTotal(orderId: string): Promise<number> {
-  const { data: items, error } = await admin
-    .from("order_items")
-    .select("quantity, unit_price")
-    .eq("order_id", orderId);
+async function orderGatewayAmount(orderId: string): Promise<number> {
+  const { data, error } = await admin.rpc("order_gateway_amount", {
+    p_order_id: orderId,
+  });
   if (error) {
     throw error;
   }
-  return round2(
-    (items ?? []).reduce(
-      (sum: number, item: { quantity: number; unit_price: number }) =>
-        sum + Number(item.unit_price) * Number(item.quantity),
-      0,
-    ),
-  );
+  return round2(Number(data ?? 0));
 }
 
 function retailerSafe(primary: string | undefined, fallback: string): string {

@@ -55,6 +55,7 @@ type ActivityOrder = {
   delivery_postcode: string | null;
   platform_charge: number;
   delivery_charge: number;
+  delivery_payment_status: string;
   refund_amount: number;
   manual_refund_status: string;
   refund_completed_at: string | null;
@@ -149,7 +150,7 @@ async function listActivity(): Promise<Response> {
   const { data, error } = await admin
     .from("orders")
     .select(
-      "id, status, cancel_requested, cancellation_initiator, cancellation_reason, payment_status, payment_method, created_at, delivered_at, delivery_verified_at, delivery_phone, delivery_address, delivery_city, delivery_postcode, platform_charge, delivery_charge, refund_amount, manual_refund_status, refund_completed_at, retailer_id, users!orders_retailer_id_fkey(name, email), order_items(id, product_id, quantity, unit_price, products(id, name, seller_id, users(name, email)))",
+      "id, status, cancel_requested, cancellation_initiator, cancellation_reason, payment_status, payment_method, created_at, delivered_at, delivery_verified_at, delivery_phone, delivery_address, delivery_city, delivery_postcode, platform_charge, delivery_charge, delivery_payment_status, refund_amount, manual_refund_status, refund_completed_at, retailer_id, users!orders_retailer_id_fkey(name, email), order_items(id, product_id, quantity, unit_price, products(id, name, seller_id, users(name, email)))",
     )
     .order("created_at", { ascending: false })
     .limit(1000);
@@ -193,6 +194,8 @@ async function listActivity(): Promise<Response> {
       delivery_postcode: row.delivery_postcode,
       platform_charge: Number(row.platform_charge ?? 0),
       delivery_charge: Number(row.delivery_charge ?? 0),
+      delivery_payment_status:
+        typeof row.delivery_payment_status === "string" ? row.delivery_payment_status : "unpaid",
       refund_amount: Number(row.refund_amount ?? 0),
       manual_refund_status: row.manual_refund_status ?? "not_required",
       refund_completed_at: row.refund_completed_at,
@@ -286,6 +289,7 @@ type OrderRow = {
   delivery_postcode: string | null;
   platform_charge: number | string | null;
   delivery_charge: number | string | null;
+  delivery_payment_status: string | null;
   refund_amount: number | string | null;
   manual_refund_status: string | null;
   refund_completed_at: string | null;

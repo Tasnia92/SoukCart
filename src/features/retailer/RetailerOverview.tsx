@@ -57,7 +57,11 @@ import {
 } from "./retailer-dashboard-api.ts";
 import { consumeRetailerNotice } from "./retailer-flash.ts";
 import type { RetailerOrder } from "./retailer-orders-api.ts";
-import { applyReconciliation, reconcileRetailerPayments } from "./retailer-overview-api.ts";
+import {
+  applyReconciliation,
+  reconcileRetailerPayments,
+  type ReconciliationResult,
+} from "./retailer-overview-api.ts";
 
 type LoadedInput = RetailerDashboardInput & { orders: RetailerOrder[] };
 
@@ -67,10 +71,7 @@ type RetailerOverviewProps = {
   reconcile?: (
     retailerId: string,
     orders: readonly RetailerOrder[],
-  ) => Promise<{
-    updates: { id: string; payment_status: RetailerOrder["payment_status"] }[];
-    cartCleared: boolean;
-  }>;
+  ) => Promise<ReconciliationResult>;
 };
 
 function seriesRange(series: readonly DashboardBucket[]): string {

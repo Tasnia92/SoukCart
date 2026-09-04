@@ -287,7 +287,7 @@ function OrderActions({
     return (
       <p className="text-sm text-muted-foreground">
         Cancelled
-        {order.manual_refund_status === "pending" ? " · full manual refund pending" : ""}
+        {order.manual_refund_status === "pending" ? " · manual refund pending" : ""}
       </p>
     );
   }
@@ -296,6 +296,13 @@ function OrderActions({
       <p className="text-sm text-muted-foreground">
         Cancellation requested by {order.cancellation_initiator ?? "a participant"} · waiting for
         admin
+      </p>
+    );
+  }
+  if (order.delivery_payment_status !== "paid") {
+    return (
+      <p className="text-sm text-muted-foreground">
+        Waiting for the retailer to pay the delivery charge before fulfillment
       </p>
     );
   }
@@ -718,7 +725,10 @@ export function SupplierOrders({ loadOrders = loadSupplierOrders }: SupplierOrde
     void requestSupplierCancellation(order.id, reason)
       .then(() => {
         setNotice({
-          message: `Cancellation of order #${shortId(order.id)} was requested. The retailer, admin, and other suppliers were notified.`,
+          message:
+            order.payment_method === "cod" && order.delivery_payment_status === "paid"
+              ? `Cancellation of order #${shortId(order.id)} was requested. The retailer can ask for a refund of the prepaid delivery charge.`
+              : `Cancellation of order #${shortId(order.id)} was requested. The retailer, admin, and other suppliers were notified.`,
           state: "info",
         });
         retry();

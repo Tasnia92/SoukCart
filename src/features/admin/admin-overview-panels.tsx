@@ -1,5 +1,6 @@
+import { useNavigate } from "@tanstack/react-router";
 import { useState, type FormEvent, type MouseEvent } from "react";
-import { ArrowRight, Mail, MapPin, Package, Phone, ShieldCheck, Store } from "lucide-react";
+import { ArrowRight, Mail, MapPin, Package, Phone, ShieldCheck } from "lucide-react";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import {
   AlertDialog,
@@ -29,7 +30,6 @@ import {
   ItemActions,
   ItemContent,
   ItemDescription,
-  ItemFooter,
   ItemGroup,
   ItemMedia,
   ItemTitle,
@@ -93,7 +93,6 @@ type AdminActionWorkspaceProps = {
   kindFilter: QueueKindFilter;
   slaFilter: QueueSlaFilter;
   onKindFilter: (value: QueueKindFilter) => void;
-  onSlaFilter: (value: QueueSlaFilter) => void;
   onMutated: () => void;
   onNotice: (notice: { message: string; state: NoticeState }) => void;
   search?: string;
@@ -125,13 +124,6 @@ export const KIND_FILTERS: { value: QueueKindFilter; label: string }[] = [
   { value: "verification", label: "Verifications" },
 ];
 
-export const SLA_FILTERS: { value: QueueSlaFilter; label: string }[] = [
-  { value: "all", label: "Any SLA" },
-  { value: "overdue", label: "Overdue" },
-  { value: "due_today", label: "Due today" },
-  { value: "due_soon", label: "Due soon" },
-];
-
 export const QUEUE_KIND_LABELS: Record<AdminQueueKind, string> = {
   refund: "Refund",
   cancellation: "Cancellation",
@@ -160,8 +152,9 @@ function needsCancellationCharges(order: ActivityOrder): boolean {
 
 function refundAmountFor(order: ActivityOrder, charges: CancellationCharges): number {
   if (order.payment_method !== "online" || order.payment_status !== "paid") return 0;
-  if (order.cancellation_initiator === "supplier") return order.total;
-  return Math.max(order.total - charges.platformCharge - charges.deliveryCharge, 0);
+  const paidTotal = order.total + order.delivery_charge;
+  if (order.cancellation_initiator === "supplier") return paidTotal;
+  return Math.max(paidTotal - charges.platformCharge, 0);
 }
 
 function slaVariant(sla: AdminSlaBucket): "destructive" | "default" | "outline" {
@@ -274,7 +267,6 @@ export function AdminActionWorkspace({
   kindFilter,
   slaFilter,
   onKindFilter,
-  onSlaFilter,
   onMutated,
   onNotice,
   search = "",
@@ -419,14 +411,14 @@ export function AdminActionWorkspace({
       setChargeDraft({
         order,
         platformCharge: initialCharge(order.platform_charge),
-        deliveryCharge: initialCharge(order.delivery_charge),
+        deliveryCharge: "0",
       });
       return;
     }
     setPending({
       type: "approve-cancel",
       order,
-      charges: { platformCharge: 0, deliveryCharge: 0 },
+      charges: { platformCharge: 0 },
     });
   };
 
@@ -434,19 +426,19 @@ export function AdminActionWorkspace({
     event.preventDefault();
     if (!chargeDraft) return;
     const platformCharge = parseCharge(chargeDraft.platformCharge);
-    const deliveryCharge = parseCharge(chargeDraft.deliveryCharge);
-    if (!Number.isFinite(platformCharge) || !Number.isFinite(deliveryCharge)) {
-      setChargeError("Enter valid non-negative cancellation charges.");
+    const paidTotal = chargeDraft.order.total + chargeDraft.order.delivery_charge;
+    if (!Number.isFinite(platformCharge)) {
+      setChargeError("Enter a valid non-negative platform charge.");
       return;
     }
-    if (platformCharge + deliveryCharge > chargeDraft.order.total) {
+    if (platformCharge > paidTotal) {
       setChargeError("Cancellation charges cannot exceed the paid order total.");
       return;
     }
     const { order } = chargeDraft;
     setChargeDraft(null);
     setChargeError(null);
-    setPending({ type: "approve-cancel", order, charges: { platformCharge, deliveryCharge } });
+    setPending({ type: "approve-cancel", order, charges: { platformCharge } });
   };
 
   const startBatch = () => {
@@ -530,7 +522,7 @@ export function AdminActionWorkspace({
                 value={kindFilter}
                 onValueChange={(value) => onKindFilter((value || "all") as QueueKindFilter)}
                 className="flex flex-wrap"
-                aria-label="Filter queue by type"
+                aria-label="Filter by type"
               >
                 {KIND_FILTERS.map((filter) => (
                   <ToggleGroupItem value={filter.value} key={filter.value}>
@@ -539,21 +531,6 @@ export function AdminActionWorkspace({
                 ))}
               </ToggleGroup>
             ) : null}
-            <ToggleGroup
-              type="single"
-              variant="outline"
-              size="sm"
-              value={slaFilter}
-              onValueChange={(value) => onSlaFilter((value || "all") as QueueSlaFilter)}
-              className="flex flex-wrap"
-              aria-label="Filter queue by SLA"
-            >
-              {SLA_FILTERS.map((filter) => (
-                <ToggleGroupItem value={filter.value} key={filter.value}>
-                  {filter.label}
-                </ToggleGroupItem>
-              ))}
-            </ToggleGroup>
           </div>
 
           {selectedItems.length ? (
@@ -615,18 +592,17 @@ export function AdminActionWorkspace({
                 ))}
               </div>
               <TableShell className="hidden md:block">
-                <Table className="db-queue min-w-[64rem]">
+                <Table className="db-queue min-w-[56rem]">
                   <TableHeader>
                     <TableRow>
                       <TableHead className="w-10">
                         <span className="sr-only">Select</span>
                       </TableHead>
                       <TableHead>Type</TableHead>
-                      <TableHead>Record</TableHead>
-                      <TableHead>Party</TableHead>
+                      <TableHead>What</TableHead>
+                      <TableHead>Who</TableHead>
                       <TableHead>Amount</TableHead>
-                      <TableHead>SLA</TableHead>
-                      <TableHead>Age</TableHead>
+                      <TableHead>Due</TableHead>
                       <TableHead className="text-right">Actions</TableHead>
                     </TableRow>
                   </TableHeader>
@@ -664,9 +640,13 @@ export function AdminActionWorkspace({
                           )}
                         </TableCell>
                         <TableCell>
-                          <Badge variant={slaVariant(item.sla)}>{ADMIN_SLA_LABELS[item.sla]}</Badge>
+                          <div className="flex flex-col gap-1">
+                            <Badge variant={slaVariant(item.sla)}>
+                              {ADMIN_SLA_LABELS[item.sla]}
+                            </Badge>
+                            <small className="text-xs text-muted-foreground">{item.marker}</small>
+                          </div>
                         </TableCell>
-                        <TableCell className="text-muted-foreground">{item.marker}</TableCell>
                         <TableCell className="text-right" onClick={stopRow}>
                           <div className="flex justify-end gap-2">
                             {item.kind === "confirmation" && item.order ? (
@@ -696,15 +676,29 @@ export function AdminActionWorkspace({
                                 Settle
                               </Button>
                             ) : null}
-                            <Button
-                              type="button"
-                              variant="ghost"
-                              size="sm"
-                              onClick={() => openQueueItem(item)}
-                            >
-                              Open
-                              <ArrowRight data-icon="inline-end" />
-                            </Button>
+                            {item.kind === "verification" ? (
+                              <Button type="button" size="sm" variant="default" asChild>
+                                <RouterLink
+                                  to={recordHref(item).to}
+                                  params={recordHref(item).params}
+                                  search={recordHref(item).search}
+                                  hash={recordHref(item).hash}
+                                >
+                                  Review
+                                  <ArrowRight data-icon="inline-end" />
+                                </RouterLink>
+                              </Button>
+                            ) : (
+                              <Button
+                                type="button"
+                                variant="ghost"
+                                size="sm"
+                                onClick={() => openQueueItem(item)}
+                              >
+                                Open
+                                <ArrowRight data-icon="inline-end" />
+                              </Button>
+                            )}
                           </div>
                         </TableCell>
                       </TableRow>
@@ -717,17 +711,17 @@ export function AdminActionWorkspace({
             <SectionEmpty
               icon={ShieldCheck}
               title="No items match these filters"
-              copy="Clear a filter or search to see the rest of the queue."
+              copy="Clear a filter or search to see everything waiting on you."
             />
           )}
         </div>
       ) : (
         <Alert>
           <ShieldCheck />
-          <AlertTitle>Nothing is blocked</AlertTitle>
+          <AlertTitle>Nothing needs you right now</AlertTitle>
           <AlertDescription>
-            No refunds, cancellation requests, confirmations, disputes or supplier verifications are
-            waiting on you.
+            No refunds, cancellations, confirmations, disputes, or supplier applications are
+            waiting.
           </AlertDescription>
         </Alert>
       )}
@@ -896,7 +890,19 @@ export function AdminActionWorkspace({
                 Mark resolved
               </Button>
             ) : null}
-            {sheetItem ? (
+            {sheetItem?.kind === "verification" ? (
+              <Button asChild>
+                <RouterLink
+                  to={recordHref(sheetItem).to}
+                  params={recordHref(sheetItem).params}
+                  search={recordHref(sheetItem).search}
+                  hash={recordHref(sheetItem).hash}
+                >
+                  Review application
+                  <ArrowRight data-icon="inline-end" />
+                </RouterLink>
+              </Button>
+            ) : sheetItem ? (
               <Button variant="outline" asChild>
                 <RouterLink
                   to={recordHref(sheetItem).to}
@@ -926,7 +932,8 @@ export function AdminActionWorkspace({
           <DialogHeader>
             <DialogTitle>Cancellation charges</DialogTitle>
             <DialogDescription>
-              Enter the charges to deduct before calculating the retailer&apos;s manual refund.
+              Enter any platform retention to deduct from the paid merchandise and delivery total.
+              Prepaid delivery is not edited here.
             </DialogDescription>
           </DialogHeader>
           <form onSubmit={onSubmitCharges} noValidate>
@@ -949,27 +956,14 @@ export function AdminActionWorkspace({
                     )
                   }
                 />
-              </Field>
-              <Field data-invalid={Boolean(chargeError) || undefined}>
-                <FieldLabel htmlFor="overview-delivery-charge">
-                  Delivery charge to deduct (BDT)
-                </FieldLabel>
-                <Input
-                  id="overview-delivery-charge"
-                  type="number"
-                  inputMode="decimal"
-                  min="0"
-                  step="0.01"
-                  value={chargeDraft?.deliveryCharge ?? ""}
-                  aria-invalid={Boolean(chargeError) || undefined}
-                  onChange={(event) =>
-                    setChargeDraft((current) =>
-                      current ? { ...current, deliveryCharge: event.target.value } : current,
-                    )
-                  }
-                />
                 {chargeError ? <FieldError>{chargeError}</FieldError> : null}
               </Field>
+              {chargeDraft ? (
+                <p className="text-sm text-muted-foreground">
+                  Prepaid delivery: {formatPrice(chargeDraft.order.delivery_charge)}. Paid total:{" "}
+                  {formatPrice(chargeDraft.order.total + chargeDraft.order.delivery_charge)}.
+                </p>
+              ) : null}
             </FieldGroup>
             <DialogFooter className="mt-6">
               <Button
@@ -1019,157 +1013,137 @@ export function AdminActionWorkspace({
   );
 }
 
-function slaBucketFromQueue(dashboard: AdminDashboard, userId: string): AdminSlaBucket {
-  return dashboard.queue.find((item) => item.recordId === userId)?.sla ?? "due_soon";
-}
+const NEEDS_YOU_LIMIT = 5;
 
-export function AdminRecentOrders({ dashboard }: { dashboard: AdminDashboard }) {
-  const [recent, setRecent] = useState<AdminRecentOrder | null>(null);
+/** Compact home list of the most urgent queue items. */
+export function AdminNeedsYouNow({ dashboard }: { dashboard: AdminDashboard }) {
+  const urgent = dashboard.queue
+    .filter((item) => item.sla === "overdue" || item.sla === "due_today")
+    .slice(0, NEEDS_YOU_LIMIT);
+  const items = urgent.length ? urgent : dashboard.queue.slice(0, NEEDS_YOU_LIMIT);
 
   return (
-    <>
-      <DashboardCard
-        eyebrow="Latest activity"
-        title="Recent orders"
-        meta={`Newest ${dashboard.recent.length} of the marketplace`}
-        action={<DashboardLink to="/admin/activity">View all</DashboardLink>}
-      >
-        {dashboard.recent.length ? (
-          <>
-            <div className="flex flex-col gap-3 md:hidden">
-              {dashboard.recent.map((order) => (
-                <Item key={order.id} variant="outline">
-                  <ItemContent>
-                    <ItemTitle>
-                      #{shortId(order.id)} · {formatPrice(order.total)}
-                    </ItemTitle>
-                    <ItemDescription>
-                      {order.retailerName} · {formatDate(order.createdAt)}
-                    </ItemDescription>
-                  </ItemContent>
-                  <ItemActions>
-                    <StatusBadge status={order.status} />
-                    <Button type="button" size="sm" onClick={() => setRecent(order)}>
-                      Open
-                    </Button>
-                  </ItemActions>
-                </Item>
-              ))}
-            </div>
-            <div className="hidden md:block">
-              <DashboardTable
-                label="Recent marketplace orders"
-                columns={recentColumns}
-                rows={dashboard.recent}
-                rowKey={(order) => order.id}
-                onRowClick={setRecent}
-              />
-            </div>
-          </>
-        ) : (
-          <SectionEmpty
-            icon={Package}
-            title="No orders yet"
-            copy="Orders will appear here as soon as retailers start checking out."
-          />
-        )}
-      </DashboardCard>
-
-      {dashboard.summary.accountsNeedingSetup > 0 && dashboard.pendingVerifications.length ? (
-        <DashboardCard
-          eyebrow="Onboarding"
-          title="Pending supplier verifications"
-          meta={`${dashboard.pendingVerifications.length} waiting for review`}
-          severity="attention"
-          action={<DashboardLink to="/admin/verifications">Open verifications</DashboardLink>}
-        >
-          <ItemGroup aria-label="Pending supplier verifications">
-            {dashboard.pendingVerifications.map((verification) => (
-              <Item key={verification.user_id} variant="outline">
-                <ItemMedia variant="icon">
-                  <Store />
-                </ItemMedia>
-                <ItemContent>
-                  <ItemTitle>{verification.shop_name}</ItemTitle>
-                  <ItemDescription>
-                    {verification.supplier_name} · {verification.location}
-                    {verification.contact_phone ? ` · ${verification.contact_phone}` : ""}
-                  </ItemDescription>
-                </ItemContent>
-                <ItemActions>
-                  <Badge variant="outline">
-                    {ADMIN_SLA_LABELS[slaBucketFromQueue(dashboard, verification.user_id)]}
-                  </Badge>
-                  <Button variant="ghost" size="sm" asChild>
+    <DashboardCard
+      eyebrow="Now"
+      title="Needs you now"
+      meta={
+        dashboard.queue.length
+          ? `${dashboard.queue.length} open · showing ${items.length}`
+          : "Nothing waiting"
+      }
+      severity={urgent.length ? "attention" : undefined}
+      action={<DashboardLink to="/admin/inbox">Open all</DashboardLink>}
+    >
+      {items.length ? (
+        <ItemGroup aria-label="Work that needs attention">
+          {items.map((item) => (
+            <Item key={item.id} variant="outline" size="sm">
+              <ItemContent>
+                <ItemTitle>{item.title}</ItemTitle>
+                <ItemDescription>
+                  {QUEUE_KIND_LABELS[item.kind]} · {partyName(item)}
+                  {item.amount !== null ? ` · ${formatPrice(item.amount)}` : ""}
+                </ItemDescription>
+              </ItemContent>
+              <ItemActions>
+                <Badge variant={slaVariant(item.sla)}>{ADMIN_SLA_LABELS[item.sla]}</Badge>
+                {item.kind === "verification" ? (
+                  <Button size="sm" variant="ghost" asChild>
                     <RouterLink
-                      to="/admin/verifications/$userId"
-                      params={{ userId: verification.user_id }}
+                      to={recordHref(item).to}
+                      params={recordHref(item).params}
+                      search={recordHref(item).search}
+                      hash={recordHref(item).hash}
                     >
                       Review
                       <ArrowRight data-icon="inline-end" />
                     </RouterLink>
                   </Button>
+                ) : (
+                  <Button size="sm" variant="ghost" asChild>
+                    <RouterLink to="/admin/inbox" search={{ kind: item.kind }}>
+                      Open
+                      <ArrowRight data-icon="inline-end" />
+                    </RouterLink>
+                  </Button>
+                )}
+              </ItemActions>
+            </Item>
+          ))}
+        </ItemGroup>
+      ) : (
+        <SectionEmpty
+          icon={ShieldCheck}
+          title="You’re caught up"
+          copy="When refunds, cancellations, confirmations, disputes, or applications need you, they’ll show up here."
+        />
+      )}
+    </DashboardCard>
+  );
+}
+
+/** Skim-friendly recent orders — deep-links into Orders, no detail sheet. */
+export function AdminRecentOrders({ dashboard }: { dashboard: AdminDashboard }) {
+  const navigate = useNavigate();
+
+  return (
+    <DashboardCard
+      eyebrow="Latest"
+      title="Recent orders"
+      meta={dashboard.recent.length ? `Newest ${dashboard.recent.length}` : "No orders yet"}
+      action={<DashboardLink to="/admin/activity">All orders</DashboardLink>}
+    >
+      {dashboard.recent.length ? (
+        <>
+          <div className="flex flex-col gap-3 md:hidden">
+            {dashboard.recent.map((order) => (
+              <Item key={order.id} variant="outline" size="sm">
+                <ItemContent>
+                  <ItemTitle>
+                    #{shortId(order.id)} · {formatPrice(order.total)}
+                  </ItemTitle>
+                  <ItemDescription>
+                    {order.retailerName} · {formatDate(order.createdAt)}
+                  </ItemDescription>
+                </ItemContent>
+                <ItemActions>
+                  <StatusBadge status={order.status} />
+                  <Button size="sm" variant="ghost" asChild>
+                    <RouterLink
+                      to="/admin/activity"
+                      search={{ order: order.id }}
+                      hash={`order-${order.id}`}
+                    >
+                      Open
+                    </RouterLink>
+                  </Button>
                 </ItemActions>
-                <ItemFooter className="w-full">
-                  <TradeLicenseCopyField
-                    compact
-                    id={`overview-trade-license-${verification.user_id}`}
-                    value={verification.trade_license_number}
-                  />
-                </ItemFooter>
               </Item>
             ))}
-          </ItemGroup>
-        </DashboardCard>
-      ) : null}
-
-      <Sheet
-        open={Boolean(recent)}
-        onOpenChange={(open) => {
-          if (!open) setRecent(null);
-        }}
-      >
-        <SheetContent className="w-full sm:max-w-lg" side="right">
-          <SheetHeader>
-            <SheetTitle>{recent ? `Order #${shortId(recent.id)}` : "Order"}</SheetTitle>
-            <SheetDescription>
-              {recent
-                ? `${recent.retailerName} · ${formatPrice(recent.total)}`
-                : "Review this marketplace order."}
-            </SheetDescription>
-          </SheetHeader>
-          {recent ? (
-            <div className="flex flex-col gap-2 px-6 text-sm">
-              <p className="flex items-center gap-2">
-                <StatusBadge status={recent.status} />
-                <PaymentBadge
-                  paymentStatus={recent.paymentStatus}
-                  paymentMethod={recent.paymentMethod}
-                  showFailed
-                />
-              </p>
-              <p>
-                <span className="text-muted-foreground">Retailer </span>
-                {recent.retailerName}
-              </p>
-            </div>
-          ) : null}
-          <SheetFooter>
-            {recent ? (
-              <Button asChild>
-                <RouterLink
-                  to="/admin/activity"
-                  search={{ order: recent.id }}
-                  hash={`order-${recent.id}`}
-                >
-                  Open order #{shortId(recent.id)}
-                  <ArrowRight data-icon="inline-end" />
-                </RouterLink>
-              </Button>
-            ) : null}
-          </SheetFooter>
-        </SheetContent>
-      </Sheet>
-    </>
+          </div>
+          <div className="hidden md:block">
+            <DashboardTable
+              label="Recent marketplace orders"
+              columns={recentColumns}
+              rows={dashboard.recent}
+              rowKey={(order) => order.id}
+              onRowClick={(order) => {
+                void navigate({
+                  to: "/admin/activity",
+                  search: { order: order.id },
+                  hash: `order-${order.id}`,
+                } as never);
+              }}
+            />
+          </div>
+        </>
+      ) : (
+        <SectionEmpty
+          icon={Package}
+          title="No orders yet"
+          copy="Orders will appear here as soon as retailers start checking out."
+        />
+      )}
+    </DashboardCard>
   );
 }

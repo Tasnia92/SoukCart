@@ -2,6 +2,7 @@ import { supabase } from "../../supabase.ts";
 
 export type RetailerOrderStatus = "pending" | "confirmed" | "shipped" | "delivered" | "cancelled";
 export type PaymentStatus = "unpaid" | "paid" | "failed" | "cancelled";
+export type DeliveryPaymentStatus = "unpaid" | "paid" | "failed" | "cancelled";
 export type PaymentMethod = "online" | "cod";
 export type CancellationInitiator = "retailer" | "supplier" | "admin" | "support" | null;
 export type ManualRefundStatus = "not_required" | "review_required" | "pending" | "completed";
@@ -29,6 +30,8 @@ export type RetailerOrder = {
   delivery_address: string | null;
   delivery_city: string | null;
   delivery_postcode: string | null;
+  delivery_payment_status: DeliveryPaymentStatus;
+  delivery_paid_at: string | null;
   manual_refund_status: ManualRefundStatus;
   refund_amount: number;
   platform_charge: number;
@@ -37,7 +40,7 @@ export type RetailerOrder = {
 };
 
 const ORDERS_SELECT =
-  "id, status, cancel_requested, cancellation_initiator, payment_status, payment_method, tran_id, notes, created_at, delivery_verified_at, delivery_phone, delivery_address, delivery_city, delivery_postcode, manual_refund_status, refund_amount, platform_charge, delivery_charge, order_items(id, product_id, quantity, unit_price, products(name))";
+  "id, status, cancel_requested, cancellation_initiator, payment_status, payment_method, tran_id, notes, created_at, delivery_verified_at, delivery_phone, delivery_address, delivery_city, delivery_postcode, delivery_payment_status, delivery_paid_at, manual_refund_status, refund_amount, platform_charge, delivery_charge, order_items(id, product_id, quantity, unit_price, products(name))";
 
 type OrderItemRow = {
   id: string;
@@ -62,6 +65,8 @@ type OrderRow = {
   delivery_address: string | null;
   delivery_city: string | null;
   delivery_postcode: string | null;
+  delivery_payment_status: string | null;
+  delivery_paid_at: string | null;
   manual_refund_status: string | null;
   refund_amount: number | string | null;
   platform_charge: number | string | null;
@@ -90,6 +95,8 @@ function normalizeOrder(row: OrderRow): RetailerOrder {
     delivery_address: row.delivery_address ?? null,
     delivery_city: row.delivery_city ?? null,
     delivery_postcode: row.delivery_postcode ?? null,
+    delivery_payment_status: (row.delivery_payment_status ?? "unpaid") as DeliveryPaymentStatus,
+    delivery_paid_at: row.delivery_paid_at ?? null,
     manual_refund_status: (row.manual_refund_status ?? "not_required") as ManualRefundStatus,
     refund_amount: Number(row.refund_amount ?? 0),
     platform_charge: Number(row.platform_charge ?? 0),
@@ -138,8 +145,13 @@ export async function queryPaymentStatus(tranId: string): Promise<PaymentQueryRe
   });
   if (error) return "pending";
   const payload = isRecord(data) ? data : null;
-  const status = typeof payload?.paymentStatus === "string" ? payload.paymentStatus : "";
-  return status === "paid" || status === "failed" || status === "cancelled" ? status : "pending";
+  const paymentStatus = typeof payload?.paymentStatus === "string" ? payload.paymentStatus : "";
+  const deliveryPaymentStatus =
+    typeof payload?.deliveryPaymentStatus === "string" ? payload.deliveryPaymentStatus : "";
+  if (paymentStatus === "paid" || deliveryPaymentStatus === "paid") return "paid";
+  if (paymentStatus === "cancelled" || deliveryPaymentStatus === "cancelled") return "cancelled";
+  if (paymentStatus === "failed" || deliveryPaymentStatus === "failed") return "failed";
+  return "pending";
 }
 
 export async function clearCart(userId: string): Promise<void> {
@@ -149,7 +161,7 @@ export async function clearCart(userId: string): Promise<void> {
 export type CancellationRequestResult = {
   status: "requested";
   initiator: "retailer";
-  refundPolicy: "manual_less_charges" | "not_required";
+  refundPolicy: "manual_less_charges" | "delivery_refund_requestable" | "not_required";
 };
 
 export async function requestOrderCancellation(
@@ -170,8 +182,35 @@ export async function confirmOrderDelivery(orderId: string): Promise<string> {
   return data;
 }
 
-export function orderTotal(order: RetailerOrder): number {
+export type CodDeliveryRefundResult = {
+  id: string;
+  manualRefundStatus: "pending";
+  refundAmount: number;
+};
+
+export async function requestCodDeliveryRefund(orderId: string): Promise<CodDeliveryRefundResult> {
+  const { data, error } = await supabase.rpc("request_cod_delivery_refund", {
+    p_order_id: orderId,
+  });
+  if (error)
+    throw new Error(error.message || "The delivery refund request could not be submitted.");
+  const refundAmount = isRecord(data) ? Number(data.refundAmount) : NaN;
+  if (!isRecord(data) || data.manualRefundStatus !== "pending" || !Number.isFinite(refundAmount)) {
+    throw new Error("The delivery refund request was not confirmed.");
+  }
+  return {
+    id: typeof data.id === "string" ? data.id : orderId,
+    manualRefundStatus: "pending",
+    refundAmount,
+  };
+}
+
+export function orderMerchandiseTotal(order: RetailerOrder): number {
   return order.items.reduce((sum, item) => sum + item.unit_price * item.quantity, 0);
+}
+
+export function orderTotal(order: RetailerOrder): number {
+  return orderMerchandiseTotal(order) + Number(order.delivery_charge ?? 0);
 }
 
 export function canCancelOrder(order: RetailerOrder): boolean {
@@ -180,4 +219,21 @@ export function canCancelOrder(order: RetailerOrder): boolean {
     !(order.status === "delivered" && order.delivery_verified_at) &&
     !order.cancel_requested
   );
+}
+
+export function canRequestCodDeliveryRefund(order: RetailerOrder): boolean {
+  return (
+    order.status === "cancelled" &&
+    order.payment_method === "cod" &&
+    order.delivery_payment_status === "paid" &&
+    order.cancellation_initiator === "supplier" &&
+    order.manual_refund_status === "not_required"
+  );
+}
+
+/** True when the prepaid gateway amount (full total or COD delivery) is still outstanding. */
+export function needsGatewayPaymentVerification(order: RetailerOrder): boolean {
+  if (!order.tran_id) return false;
+  if (order.payment_method === "cod") return order.delivery_payment_status === "unpaid";
+  return order.payment_status === "unpaid";
 }

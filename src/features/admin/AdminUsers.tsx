@@ -229,8 +229,8 @@ export function AdminUsers({ loadUsers = loadAdminUsers }: AdminUsersProps) {
   if (error) {
     return (
       <WorkspaceError
-        eyebrow="Admin workspace"
-        title="We could not load the admin workspace."
+        eyebrow="Admin"
+        title="We could not load users."
         message={error}
         onRetry={retry}
         onLogout={onLogout}
@@ -366,9 +366,9 @@ export function AdminUsers({ loadUsers = loadAdminUsers }: AdminUsersProps) {
       onLogout={onLogout}
     >
       <PageHeader
-        eyebrow="People & access"
-        title="User directory"
-        copy="Search by ID number and create, edit, or remove user accounts."
+        eyebrow="Users"
+        title="Accounts."
+        copy="Search, create, edit, or remove user accounts."
         actions={
           <Dialog open={createOpen} onOpenChange={onCreateOpenChange}>
             <DialogTrigger asChild>
@@ -600,7 +600,7 @@ export function AdminUsers({ loadUsers = loadAdminUsers }: AdminUsersProps) {
           </TableShell>
         </>
       ) : (
-        <LoadingState title="Loading the admin workspace…" />
+        <LoadingState title="Loading users…" />
       )}
 
       <AlertDialog

@@ -53,7 +53,10 @@ import { RouterLink, WorkspaceShell } from "../workspace/WorkspaceShell.tsx";
 import {
   assertCartWithinStock,
   assertSingleSupplierCart,
+  cartDeliveryCharge,
   cartItemCount,
+  cartOrderTotal,
+  cartPayableNow,
   cartSubtotal,
   clampCartQuantity,
   initiateCheckout,
@@ -65,15 +68,12 @@ import {
   type CheckoutOutcome,
   type PaymentMethod,
 } from "./retailer-cart-api.ts";
-import { RETAILER_NOTICE_KEY } from "./retailer-flash.ts";
-import { clearCart } from "./retailer-orders-api.ts";
 
 type RetailerCartProps = {
   loadLines?: (userId: string) => Promise<CartLine[]>;
   updateQuantity?: (userId: string, productId: string, quantity: number) => Promise<void>;
   removeLine?: (userId: string, productId: string) => Promise<void>;
   checkout?: (method: PaymentMethod, form: CheckoutForm) => Promise<CheckoutOutcome>;
-  clearRetailerCart?: (userId: string) => Promise<void>;
 };
 
 type Notice = { message: string; state: NoticeState } | null;
@@ -85,7 +85,6 @@ export function RetailerCart({
   updateQuantity = updateCartQuantity,
   removeLine = removeCartLine,
   checkout = initiateCheckout,
-  clearRetailerCart = clearCart,
 }: RetailerCartProps) {
   const { state } = useSessionSnapshot();
   const store = useSessionStore();
@@ -217,15 +216,6 @@ export function RetailerCart({
       assertCartWithinStock(lines);
       assertSingleSupplierCart(lines);
       const outcome = await checkout(paymentMethod, { phone, address, city, postcode, notes });
-      if ("method" in outcome) {
-        await clearRetailerCart(retailerId);
-        sessionStorage.setItem(
-          RETAILER_NOTICE_KEY,
-          "Order placed. Pay in cash when your order arrives.",
-        );
-        window.location.assign("/retailer/orders");
-        return;
-      }
       sessionStorage.setItem("soukcart:payment-return", "1");
       window.location.assign(outcome.url);
     } catch (checkoutError) {
@@ -242,6 +232,9 @@ export function RetailerCart({
 
   const cartCount = lines ? cartItemCount(lines) : 0;
   const subtotal = lines ? cartSubtotal(lines) : 0;
+  const delivery = cartDeliveryCharge();
+  const orderTotal = lines ? cartOrderTotal(lines) : delivery;
+  const payableNow = lines ? cartPayableNow(lines, paymentMethod) : 0;
   const cod = paymentMethod === "cod";
   const CheckoutIcon = cod ? Truck : LockKeyhole;
 
@@ -300,6 +293,12 @@ export function RetailerCart({
                     <dd className="text-right font-medium tabular-nums">{cartCount}</dd>
                     <dt className="text-muted-foreground">Subtotal</dt>
                     <dd className="text-right font-medium tabular-nums">{formatPrice(subtotal)}</dd>
+                    <dt className="text-muted-foreground">Delivery</dt>
+                    <dd className="text-right font-medium tabular-nums">{formatPrice(delivery)}</dd>
+                    <dt className="font-medium">Total</dt>
+                    <dd className="text-right font-medium tabular-nums">
+                      {formatPrice(orderTotal)}
+                    </dd>
                   </dl>
                   <Separator />
                   <FieldGroup>
@@ -401,7 +400,7 @@ export function RetailerCart({
                           <FieldContent>
                             <FieldTitle>Cash on delivery</FieldTitle>
                             <FieldDescription>
-                              Pay cash to the SoukCart delivery partner when your order arrives
+                              Pay delivery online now; pay for products in cash on arrival
                             </FieldDescription>
                           </FieldContent>
                         </Field>
@@ -413,12 +412,12 @@ export function RetailerCart({
                   <Button type="button" disabled={checkingOut} onClick={() => void onCheckout()}>
                     <CheckoutIcon data-icon="inline-start" />
                     {cod
-                      ? `Place order · ${formatPrice(subtotal)}`
-                      : `Pay ${formatPrice(subtotal)}`}
+                      ? `Pay delivery · ${formatPrice(payableNow)}`
+                      : `Pay ${formatPrice(payableNow)}`}
                   </Button>
                   <p className="text-sm text-muted-foreground">
                     {cod
-                      ? "Pay cash to the SoukCart delivery partner when your order arrives. SoukCart settles the seller after commission."
+                      ? `Pay ${formatPrice(delivery)} delivery online now. Pay ${formatPrice(subtotal)} for products in cash when your order arrives.`
                       : "You will be redirected to SSLCommerz to complete the payment securely."}
                   </p>
                 </CardFooter>
