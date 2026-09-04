@@ -66,6 +66,15 @@ type Freshness = "current" | "refreshing" | "stale";
 const REALTIME_COALESCE_MS = 400;
 const ORDER_LIVE_TABLES = ["orders", "seller_payouts"] as const;
 
+/**
+ * Stable module-level default. An inline default parameter recreates a new function
+ * every render; because the load effect depends on `loadDashboard`, that caused the
+ * seller dashboard to refresh in a loop after login.
+ */
+function defaultLoadDashboard(sellerId: string, windowDays: number): Promise<SupplierDashboard> {
+  return loadSupplierDashboard(sellerId, undefined, Date.now(), windowDays);
+}
+
 function seriesRange(series: readonly DashboardBucket[]): string {
   const first = series[0];
   const last = series[series.length - 1];
@@ -249,10 +258,7 @@ function focusItems(dashboard: SupplierDashboard): ActionQueueEntry[] {
   return items.slice(0, 5);
 }
 
-export function SupplierOverview({
-  loadDashboard = (sellerId, windowDays) =>
-    loadSupplierDashboard(sellerId, undefined, Date.now(), windowDays),
-}: SupplierOverviewProps) {
+export function SupplierOverview({ loadDashboard = defaultLoadDashboard }: SupplierOverviewProps) {
   const { state } = useSessionSnapshot();
   const store = useSessionStore();
   const navigate = useNavigate({ from: "/supplier" });
@@ -468,7 +474,7 @@ export function SupplierOverview({
               value={formatPrice(dashboard.earnings.available)}
               period="Net of commission"
               context={`${formatPrice(dashboard.earnings.paid)} paid to date · ${formatPrice(dashboard.earnings.commission)} commission withheld`}
-              hint="Payouts become available after an order is delivered and paid."
+              hint="SoukCart collects payment (including COD), takes commission, and pays you weekly."
               to="/supplier/earnings"
               linkLabel="Open earnings"
             />
@@ -570,7 +576,7 @@ export function SupplierOverview({
             <DashboardCard
               eyebrow="Fulfillment"
               title="Orders waiting for you"
-              meta="Confirm, ship, collect COD, or resolve cancellations"
+              meta="Confirm, ship, or resolve cancellations — COD is handled by SoukCart"
               severity={dashboard.queue.length ? "attention" : "neutral"}
               action={
                 <DashboardLink to="/supplier/orders" search={{ filter: "action" }}>

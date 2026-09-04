@@ -798,7 +798,7 @@ export function AdminActivity({ loadActivity = loadAdminActivity }: AdminActivit
             <AlertDialogTitle>Record cash collected</AlertDialogTitle>
             <AlertDialogDescription>
               {codConfirmation
-                ? `Record that cash on delivery was collected for order #${shortId(codConfirmation.id)}? The retailer can then download an invoice.`
+                ? `Confirm that the delivery partner collected cash for order #${shortId(codConfirmation.id)} and settled it with SoukCart? The retailer can then download an invoice.`
                 : null}
             </AlertDialogDescription>
           </AlertDialogHeader>

@@ -81,8 +81,8 @@ export const ADMIN_ORDER_VIEWS: readonly AdminOrderViewMeta[] = [
     id: "cod",
     label: "COD to collect",
     icon: Wallet,
-    title: "Cash on delivery to collect.",
-    copy: "COD orders that still need cash collection before the invoice is issued.",
+    title: "Cash on delivery to settle.",
+    copy: "SoukCart records COD after the delivery partner collects cash. Settle these before the invoice is issued.",
     search: { view: "cod" },
   },
 ];

@@ -231,7 +231,7 @@ export function AdminPayouts({
       <PageHeader
         eyebrow="Finance"
         title="Commission and payouts."
-        copy="Set the platform cut, then mark a supplier paid after you send them the money."
+        copy="Set the platform cut, then settle sellers weekly after SoukCart has collected payment (including COD) and withheld commission."
       />
       <InlineNotice message={notice?.message} state={notice?.state} />
       {overview ? (

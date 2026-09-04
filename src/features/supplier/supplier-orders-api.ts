@@ -223,14 +223,6 @@ export function trackingUrlValidationError(value: string): string | null {
   return null;
 }
 
-export async function collectCodPayment(orderId: string): Promise<void> {
-  const { data, error } = await supabase.rpc("collect_cod_payment", { p_order_id: orderId });
-  if (error) throw new Error(error.message || "Cash collection could not be recorded.");
-  if (typeof data !== "object" || data === null || !("paymentStatus" in data)) {
-    throw new Error("Cash collection was not recorded.");
-  }
-}
-
 export async function requestSupplierCancellation(orderId: string, reason: string): Promise<void> {
   const { data, error } = await supabase.rpc("seller_request_order_cancellation", {
     p_order_id: orderId,
@@ -263,15 +255,6 @@ export function canShipOrder(order: SupplierOrder): boolean {
 
 export function canMarkDelivered(order: SupplierOrder): boolean {
   return order.status === "shipped" && !order.cancel_requested && canFulfillPayment(order);
-}
-
-export function canCollectCod(order: SupplierOrder): boolean {
-  return (
-    order.payment_method === "cod" &&
-    order.payment_status === "unpaid" &&
-    order.status !== "cancelled" &&
-    order.status !== "pending"
-  );
 }
 
 export function canSupplierCancel(order: SupplierOrder): boolean {

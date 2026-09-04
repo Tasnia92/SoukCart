@@ -78,13 +78,11 @@ import { searchParam } from "../workspace/search.ts";
 import { RouterLink } from "../workspace/WorkspaceShell.tsx";
 import { SupplierWorkspaceShell } from "./supplier-shared.tsx";
 import {
-  canCollectCod,
   canConfirmOrder,
   canMarkDelivered,
   canShipOrder,
   canSupplierCancel,
   carrierValidationError,
-  collectCodPayment,
   filterSupplierOrders,
   loadSupplierOrders,
   requestSupplierCancellation,
@@ -115,7 +113,7 @@ type OrderFilter =
   | "cancelled"
   | "all";
 type OrderSort = "oldest" | "newest" | "value" | "city";
-type FulfillAction = "confirmed" | "shipped" | "delivered" | "collect";
+type FulfillAction = "confirmed" | "shipped" | "delivered";
 
 const ORDER_FILTERS = new Set<OrderFilter>([
   "action",
@@ -141,7 +139,6 @@ function needsAction(order: SupplierOrder): boolean {
     canConfirmOrder(order) ||
     canShipOrder(order) ||
     canMarkDelivered(order) ||
-    canCollectCod(order) ||
     order.cancel_requested
   );
 }
@@ -229,7 +226,11 @@ function exportOrdersCsv(orders: readonly SupplierOrder[]): void {
   URL.revokeObjectURL(url);
 }
 
-function fulfillCopy(action: FulfillAction): { title: string; body: string; confirm: string } {
+function fulfillCopy(action: Exclude<FulfillAction, "shipped">): {
+  title: string;
+  body: string;
+  confirm: string;
+} {
   if (action === "confirmed") {
     return {
       title: "Confirm order",
@@ -237,17 +238,10 @@ function fulfillCopy(action: FulfillAction): { title: string; body: string; conf
       confirm: "Confirm order",
     };
   }
-  if (action === "delivered") {
-    return {
-      title: "Mark delivered",
-      body: "Mark this order as delivered. The retailer can then verify receipt.",
-      confirm: "Mark delivered",
-    };
-  }
   return {
-    title: "Record cash collected",
-    body: "Record that cash on delivery was collected. The retailer can then download an invoice.",
-    confirm: "Record cash collected",
+    title: "Mark delivered",
+    body: "Mark this order as delivered. The retailer can then verify receipt.",
+    confirm: "Mark delivered",
   };
 }
 
@@ -371,17 +365,6 @@ function OrderActions({
           onClick={() => onReturn(order)}
         >
           Open return
-        </Button>
-      ) : null}
-      {canCollectCod(order) ? (
-        <Button
-          variant="outline"
-          size="sm"
-          type="button"
-          disabled={disabled}
-          onClick={() => onFulfill(order, "collect")}
-        >
-          Record cash collected
         </Button>
       ) : null}
       {order.status === "pending" && !canConfirmOrder(order) ? (
@@ -636,23 +619,14 @@ export function SupplierOrders({ loadOrders = loadSupplierOrders }: SupplierOrde
     const { order, action } = target;
     setFulfillTarget(null);
     setBusyId(order.id);
-    const work =
-      action === "collect"
-        ? collectCodPayment(order.id).then(() => {
-            setNotice({
-              message: `Cash collected for order #${shortId(order.id)}. The retailer can download an invoice.`,
-              state: "success",
-            });
-            retry();
-          })
-        : setSupplierOrderStatus(order.id, action).then((status) => {
-            setNotice({
-              message: `Order #${shortId(order.id)} is now ${status}.`,
-              state: "success",
-            });
-            retry();
-          });
-    void work
+    void setSupplierOrderStatus(order.id, action)
+      .then((status) => {
+        setNotice({
+          message: `Order #${shortId(order.id)} is now ${status}.`,
+          state: "success",
+        });
+        retry();
+      })
       .catch((fulfillError: unknown) => {
         setNotice({
           message:
@@ -801,7 +775,7 @@ export function SupplierOrders({ loadOrders = loadSupplierOrders }: SupplierOrde
       <PageHeader
         eyebrow="Fulfillment"
         title="Order work queue"
-        copy="Start with orders that need action, then track shipments, delivery, and COD collection."
+        copy="Confirm and hand orders to the SoukCart delivery partner. Cash on delivery is collected by SoukCart, not by you."
         actions={
           <>
             {updatedAt ? (
@@ -837,7 +811,7 @@ export function SupplierOrders({ loadOrders = loadSupplierOrders }: SupplierOrde
           <StatCard
             label="Needs action"
             value={counts.action}
-            detail="Confirm, ship, deliver, collect, or review"
+            detail="Confirm, ship, deliver, or review"
           />
           <StatCard
             label="To confirm"
@@ -1121,7 +1095,8 @@ export function SupplierOrders({ loadOrders = loadSupplierOrders }: SupplierOrde
           <DialogHeader>
             <DialogTitle>Ship order{shipTarget ? ` #${shortId(shipTarget.id)}` : ""}</DialogTitle>
             <DialogDescription>
-              Add the carrier and tracking number so the retailer can follow the shipment.
+              Hand the parcel to the SoukCart delivery partner assigned to collect it. For cash on
+              delivery, the partner collects payment and settles with SoukCart—not with you.
             </DialogDescription>
           </DialogHeader>
           <FieldGroup>

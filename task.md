@@ -28,8 +28,11 @@ receives and verifies → platform takes its commission and pays the seller.
       affects Phase 2.)
 - [ ] **Return window length** after delivery before payout is released
       (e.g. 3 or 7 days).
-- [ ] **COD payout timing**: seller earnings on COD are only "real" once cash is
-      collected — confirm how COD settles vs online.
+- [x] **COD ownership & payout timing**: COD is handled by SoukCart, not the
+      seller. The seller hands the parcel to the SoukCart delivery partner; the
+      partner delivers, collects cash, and settles with SoukCart. SoukCart takes
+      commission and pays the seller weekly. Seller UI no longer records COD;
+      `collect_cod_payment` is admin-only.
 
 ---
 

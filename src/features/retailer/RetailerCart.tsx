@@ -400,7 +400,9 @@ export function RetailerCart({
                           <Truck className="size-5 text-muted-foreground" aria-hidden="true" />
                           <FieldContent>
                             <FieldTitle>Cash on delivery</FieldTitle>
-                            <FieldDescription>Pay in cash when your order arrives</FieldDescription>
+                            <FieldDescription>
+                              Pay cash to the SoukCart delivery partner when your order arrives
+                            </FieldDescription>
                           </FieldContent>
                         </Field>
                       </FieldLabel>
@@ -416,7 +418,7 @@ export function RetailerCart({
                   </Button>
                   <p className="text-sm text-muted-foreground">
                     {cod
-                      ? "Pay in cash when your order arrives."
+                      ? "Pay cash to the SoukCart delivery partner when your order arrives. SoukCart settles the seller after commission."
                       : "You will be redirected to SSLCommerz to complete the payment securely."}
                   </p>
                 </CardFooter>

@@ -9,7 +9,7 @@
 
 ## Problem statement
 
-SoukCart already has a working seller workspace: verification, analytics, products, stock, and order fulfillment (confirm → ship → deliver → COD → cancellation requests). The weakness is cohesion: screens behave like separate management pages rather than one live operations surface.
+SoukCart already has a working seller workspace: verification, analytics, products, stock, and order fulfillment (confirm → ship → deliver → cancellation requests). COD cash collection is owned by SoukCart (delivery partner → platform), not the seller. The weakness is cohesion: screens behave like separate management pages rather than one live operations surface.
 
 ---
 
@@ -21,7 +21,7 @@ SoukCart already has a working seller workspace: verification, analytics, produc
 | Dashboard analytics and action queue     | Implemented        | Local edits already push action-first layout                              |
 | Product CRUD, images, search, visibility | Implemented        | Edit still loads full catalog then `.find()`                              |
 | Stock editing                            | Implemented, basic | Filters exist; no bulk / relative / save-all                              |
-| Order fulfillment and COD                | Implemented        | Orders default to Needs action (local)                                    |
+| Order fulfillment                        | Implemented        | Confirm → ship → deliver; COD owned by SoukCart admin                     |
 | Earnings                                 | Implemented (P1)   | `/supplier/earnings` ledger + CSV; totals + rows from `seller_earnings()` |
 | Notifications                            | Implemented (P2)   | Bell + `/supplier/notifications` center; unread nav badge                 |
 | Customers                                | Implemented (P3)   | `/supplier/customers` order-centric insights (not a CRM)                  |
@@ -84,20 +84,12 @@ Correctness and authorization first. Do not expand the panel on a soft auth boun
 - Set bucket MIME + size limits (align with client: images, ≤5 MB).
 - Clean up replaced or partially uploaded NID objects.
 
-### 4. Align COD rules between client and database
+### 4. COD is SoukCart-owned (resolved)
 
-**Finding**
-
-| Layer                      | Rule                                                    |
-| -------------------------- | ------------------------------------------------------- |
-| UI `canCollectCod`         | Blocks `pending` and `cancelled`                        |
-| Live `collect_cod_payment` | Allows any non-cancelled unpaid COD—including `pending` |
-| Multi-supplier guard       | On `seller_set_order_status`; missing on COD collection |
-
-**Work**
-
-- Enforce the same status restriction in `collect_cod_payment` as the UI.
-- Add the same historical multi-supplier guard used by fulfillment.
+**Decision:** Cash on delivery is collected by the SoukCart delivery partner and
+settled with the platform. Sellers only hand over the parcel; they do not record
+COD. `collect_cod_payment` is admin-only. SoukCart withholds commission and pays
+sellers weekly.
 
 ### 5. Preserve immutable order-line history
 

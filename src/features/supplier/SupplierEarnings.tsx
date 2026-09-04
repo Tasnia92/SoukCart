@@ -236,7 +236,7 @@ export function SupplierEarnings({ loadEarnings = loadSellerEarnings }: Supplier
       <PageHeader
         eyebrow="Finance"
         title="Earnings and payouts."
-        copy="Track available balance, paid lifetime totals, and the commission withheld on each delivered order."
+        copy="SoukCart collects customer payments (including COD), withholds commission, and pays you weekly. Track available balance and paid totals here."
         actions={
           <div className="flex flex-wrap items-center gap-2">
             {updatedAt ? (
@@ -262,7 +262,7 @@ export function SupplierEarnings({ loadEarnings = loadSellerEarnings }: Supplier
             <StatCard
               label="Available balance"
               value={formatPrice(earnings.available)}
-              detail="Ready for payout after delivery and payment"
+              detail="Ready for the next weekly SoukCart payout"
             />
             <StatCard
               label="Paid lifetime"
