@@ -86,11 +86,14 @@ export async function loadAdminActivity(): Promise<ActivityResponse> {
   return invokeAdmin<ActivityResponse>({ action: "list" }, ADMIN_ACTIVITY_FUNCTION);
 }
 
+/**
+ * Admin status changes are cancellation-only: approve a request (cancel) or
+ * reject it (same status). Suppliers own confirm, out for delivery, delivered.
+ */
 export async function updateOrderStatus(
   orderId: string,
   status: string,
   charges: CancellationCharges = { platformCharge: 0 },
-  supplierId?: string,
 ): Promise<void> {
   await invokeAdmin<unknown>(
     {
@@ -99,7 +102,6 @@ export async function updateOrderStatus(
       status,
       platformCharge: charges.platformCharge,
       deliveryCharge: 0,
-      supplierId,
     },
     ADMIN_ACTIVITY_FUNCTION,
   );
@@ -109,34 +111,14 @@ export async function completeManualRefund(orderId: string): Promise<void> {
   await invokeAdmin<unknown>({ action: "complete-refund", orderId }, ADMIN_ACTIVITY_FUNCTION);
 }
 
-export function canShipPackage(
-  order: Pick<
-    ActivityOrder,
-    "payment_method" | "payment_status" | "delivery_payment_status" | "cancel_requested"
-  >,
-  pkg: Pick<ActivityPackage, "status">,
-): boolean {
-  return canFulfillOrder(order) && !order.cancel_requested && pkg.status === "confirmed";
-}
-
-export function canDeliverPackage(
-  order: Pick<
-    ActivityOrder,
-    "payment_method" | "payment_status" | "delivery_payment_status" | "cancel_requested"
-  >,
-  pkg: Pick<ActivityPackage, "status">,
-): boolean {
-  return canFulfillOrder(order) && !order.cancel_requested && pkg.status === "shipped";
-}
-
 export function packageStatusLabel(status: string): string {
   switch (status) {
     case "pending":
       return "Waiting on supplier";
     case "confirmed":
-      return "Ready to ship";
+      return "Ready to go out";
     case "shipped":
-      return "Shipped";
+      return "Out for delivery";
     case "delivered":
       return "Delivered";
     case "declined":
@@ -151,33 +133,6 @@ export function canFulfillOrder(
 ): boolean {
   if (order.delivery_payment_status !== "paid") return false;
   return order.payment_method === "cod" || order.payment_status === "paid";
-}
-
-export type PrimaryOrderAction = {
-  pkg: ActivityPackage;
-  action: "shipped" | "delivered";
-};
-
-/**
- * The single next fulfillment action for an order, when it is unambiguous.
- * Returns null when nothing can move forward or when several packages need
- * separate decisions (the expanded order detail handles those).
- */
-export function primaryOrderAction(
-  order: Pick<
-    ActivityOrder,
-    "payment_method" | "payment_status" | "delivery_payment_status" | "cancel_requested"
-  >,
-  packages: readonly ActivityPackage[],
-): PrimaryOrderAction | null {
-  if (!canFulfillOrder(order) || order.cancel_requested) return null;
-  const deliverable = packages.filter((pkg) => canDeliverPackage(order, pkg));
-  if (deliverable.length === 1) return { pkg: deliverable[0], action: "delivered" };
-  const shippable = packages.filter((pkg) => canShipPackage(order, pkg));
-  if (deliverable.length === 0 && shippable.length === 1) {
-    return { pkg: shippable[0], action: "shipped" };
-  }
-  return null;
 }
 
 export function needsCodCollection(

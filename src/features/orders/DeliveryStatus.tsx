@@ -18,7 +18,7 @@ import { StatusBadge, statusLabel, type OrderStatus } from "./order-presentation
 export const DELIVERY_STEPS = [
   { id: "pending", label: "Placed", hint: "Order received" },
   { id: "confirmed", label: "Confirmed", hint: "Ready to send" },
-  { id: "shipped", label: "Shipped", hint: "On the way" },
+  { id: "shipped", label: "Out for delivery", hint: "On the way" },
   { id: "delivered", label: "Delivered", hint: "Arrived" },
 ] as const;
 
@@ -59,7 +59,7 @@ export function nextDeliveryActionLabel(status: string): string | null {
     case "pending":
       return "Confirm order";
     case "confirmed":
-      return "Mark shipped";
+      return "Mark out for delivery";
     case "shipped":
       return "Mark delivered";
     default:
@@ -84,9 +84,9 @@ export function deliveryStatusCopy(status: string, audience: DeliveryAudience): 
       case "pending":
         return "Your order is placed. Each supplier confirms their own items next.";
       case "confirmed":
-        return "Confirmed. Your parcels are being prepared and will ship soon.";
+        return "Confirmed. Your parcels are being prepared and will be out for delivery soon.";
       case "shipped":
-        return "Your order is on the way.";
+        return "Your order is out for delivery.";
       case "delivered":
         return "Delivered. Please confirm you received it.";
       default:
@@ -97,13 +97,13 @@ export function deliveryStatusCopy(status: string, audience: DeliveryAudience): 
   if (audience === "supplier") {
     switch (status) {
       case "pending":
-        return "Confirm this order so admin can start delivery.";
+        return "Confirm this order, then keep delivery status up to date.";
       case "confirmed":
-        return "Waiting for admin to mark this order shipped.";
+        return "Mark the parcel out for delivery when it leaves your shop.";
       case "shipped":
-        return "Admin marked this order shipped. Waiting for delivery.";
+        return "Out for delivery. Mark it delivered once the retailer receives it.";
       case "delivered":
-        return "Admin marked this order delivered.";
+        return "You marked this order delivered.";
       default:
         return `Current status: ${statusLabel(status)}.`;
     }
@@ -111,11 +111,11 @@ export function deliveryStatusCopy(status: string, audience: DeliveryAudience): 
 
   switch (status) {
     case "pending":
-      return "Waiting for the supplier to confirm. You can ship a package after that.";
+      return "Waiting for the supplier to confirm. Suppliers keep delivery status up to date.";
     case "confirmed":
-      return "Ship each confirmed supplier package. Unconfirmed items stay here until the supplier acts.";
+      return "The supplier marks this out for delivery and delivered. Monitor progress here.";
     case "shipped":
-      return "Mark delivered when the retailer has received it.";
+      return "Out for delivery. The supplier marks it delivered once it arrives.";
     case "delivered":
       return "Delivery is complete.";
     default:

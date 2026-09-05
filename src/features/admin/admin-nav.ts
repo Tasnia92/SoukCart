@@ -33,15 +33,15 @@ export const ADMIN_ORDER_VIEWS: readonly AdminOrderViewMeta[] = [
     label: "New orders",
     icon: Clock3,
     title: "New orders",
-    copy: "Fresh orders waiting to be dispatched to the courier.",
+    copy: "Fresh orders waiting for supplier confirmation and delivery.",
     search: { view: "new" },
   },
   {
     id: "dispatched",
-    label: "Dispatched",
+    label: "Out for delivery",
     icon: Truck,
-    title: "Dispatched",
-    copy: "Orders on the way. Mark them delivered once they arrive.",
+    title: "Out for delivery",
+    copy: "Orders on the way. Suppliers mark them delivered once they arrive.",
     search: { view: "dispatched" },
   },
   {
@@ -73,7 +73,7 @@ export const ADMIN_ORDER_VIEWS: readonly AdminOrderViewMeta[] = [
     label: "All orders",
     icon: ClipboardList,
     title: "All orders",
-    copy: "Browse every order. Update delivery status, cancel, refund, or collect COD from here.",
+    copy: "Monitor every order. Suppliers update delivery status; cancellations, refunds, and COD are handled here.",
     search: {},
   },
 ];

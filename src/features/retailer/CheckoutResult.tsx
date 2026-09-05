@@ -1,4 +1,4 @@
-import { useRouterState } from "@tanstack/react-router";
+import { useNavigate, useRouterState } from "@tanstack/react-router";
 import { Check, Clock, Minus, type LucideIcon } from "lucide-react";
 import { useEffect, useState, type ReactNode } from "react";
 import { Button } from "@/components/ui/button";
@@ -38,6 +38,7 @@ export function CheckoutResult() {
   const kind = kindFromPath(pathname);
   const { state } = useSessionSnapshot();
   const store = useSessionStore();
+  const navigate = useNavigate();
   const [card, setCard] = useState<Card>(null);
 
   useEffect(() => {
@@ -107,7 +108,11 @@ export function CheckoutResult() {
         section="orders"
         userName={state.profile.name || state.profile.email}
         userEmail={state.profile.email}
-        onLogout={() => void store.signOut()}
+        onLogout={() => {
+          void store.signOut().then(() => {
+            void navigate({ to: "/" });
+          });
+        }}
       >
         {body}
       </RetailerWorkspaceShell>

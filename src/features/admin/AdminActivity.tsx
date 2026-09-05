@@ -59,9 +59,7 @@ import {
 import { formatDate, formatPrice, initials } from "../workspace/format.ts";
 import { recordIdFromHash, searchParam } from "../workspace/search.ts";
 import {
-  canDeliverPackage,
   canFulfillOrder,
-  canShipPackage,
   collectCodPayment,
   completeManualRefund,
   filterActivityOrders,
@@ -69,10 +67,8 @@ import {
   needsCodCollection,
   packageStatusLabel,
   parseAdminOrderView,
-  primaryOrderAction,
   updateOrderStatus,
   type ActivityOrder,
-  type ActivityPackage,
   type ActivityResponse,
 } from "./admin-activity-api.ts";
 
@@ -287,41 +283,9 @@ export function AdminActivity({ loadActivity = loadAdminActivity }: AdminActivit
       .finally(() => setBusyId(null));
   };
 
-  const applyPackageStatus = (order: ActivityOrder, pkg: ActivityPackage, status: string) => {
-    if (!canFulfillOrder(order)) {
-      setNotice({
-        message: "Delivery must be paid before this order can move forward.",
-        state: "error",
-      });
-      return;
-    }
-    setBusyId(`${order.id}:${pkg.supplier_id}`);
-    void updateOrderStatus(order.id, status, { platformCharge: 0 }, pkg.supplier_id)
-      .then(() => {
-        setNotice({
-          message: `${pkg.supplier_name ?? "Supplier"} items on #${shortId(order.id)} are now ${statusLabel(status)}.`,
-          state: "success",
-        });
-        setLoadVersion((version) => version + 1);
-      })
-      .catch((statusError: unknown) => {
-        setNotice({
-          message:
-            statusError instanceof Error
-              ? statusError.message
-              : "The order status could not be updated.",
-          state: "error",
-        });
-      })
-      .finally(() => setBusyId(null));
-  };
-
   const orders = data?.orders ?? null;
   const summary = data?.summary ?? null;
   const filtered = orders ? filterActivityOrders(orders, searchTerm, shortId, orderView) : [];
-  const rowActions = new Map(
-    filtered.map((order) => [order.id, primaryOrderAction(order, order.packages ?? [])] as const),
-  );
 
   return (
     <AdminWorkspaceShell
@@ -372,7 +336,6 @@ export function AdminActivity({ loadActivity = loadAdminActivity }: AdminActivit
                     <TableHead>Total</TableHead>
                     <TableHead>Payment</TableHead>
                     <TableHead>Status</TableHead>
-                    <TableHead>Actions</TableHead>
                     <TableHead>
                       <span className="sr-only">Order lines</span>
                     </TableHead>
@@ -381,11 +344,10 @@ export function AdminActivity({ loadActivity = loadAdminActivity }: AdminActivit
                 <TableBody>
                   {filtered.length ? (
                     filtered.map((order) => {
-                      const rowAction = rowActions.get(order.id) ?? null;
                       return (
                         <OrderRow
                           key={order.id}
-                          colSpan={9}
+                          colSpan={8}
                           rowId={`order-${order.id}`}
                           defaultOpen={order.id === focusedOrderId}
                           highlight={order.id === focusedOrderId}
@@ -445,25 +407,6 @@ export function AdminActivity({ loadActivity = loadAdminActivity }: AdminActivit
                                     <OrderFlag>Refund completed</OrderFlag>
                                   ) : null}
                                 </div>
-                              </TableCell>
-                              <TableCell>
-                                {rowAction ? (
-                                  <Button
-                                    size="sm"
-                                    type="button"
-                                    disabled={busyId === `${order.id}:${rowAction.pkg.supplier_id}`}
-                                    onClick={() =>
-                                      applyPackageStatus(order, rowAction.pkg, rowAction.action)
-                                    }
-                                  >
-                                    {busyId === `${order.id}:${rowAction.pkg.supplier_id}` ? (
-                                      <Spinner data-icon="inline-start" />
-                                    ) : null}
-                                    {rowAction.action === "shipped"
-                                      ? "Mark shipped"
-                                      : "Mark delivered"}
-                                  </Button>
-                                ) : null}
                               </TableCell>
                             </>
                           }
@@ -545,34 +488,7 @@ export function AdminActivity({ loadActivity = loadAdminActivity }: AdminActivit
                                           {pkg.decline_reason ? ` · ${pkg.decline_reason}` : ""}
                                         </p>
                                       </div>
-                                      {canShipPackage(order, pkg) ? (
-                                        <Button
-                                          size="sm"
-                                          type="button"
-                                          disabled={busyId === `${order.id}:${pkg.supplier_id}`}
-                                          onClick={() => applyPackageStatus(order, pkg, "shipped")}
-                                        >
-                                          {busyId === `${order.id}:${pkg.supplier_id}` ? (
-                                            <Spinner data-icon="inline-start" />
-                                          ) : null}
-                                          Mark shipped
-                                        </Button>
-                                      ) : null}
-                                      {canDeliverPackage(order, pkg) ? (
-                                        <Button
-                                          size="sm"
-                                          type="button"
-                                          disabled={busyId === `${order.id}:${pkg.supplier_id}`}
-                                          onClick={() =>
-                                            applyPackageStatus(order, pkg, "delivered")
-                                          }
-                                        >
-                                          {busyId === `${order.id}:${pkg.supplier_id}` ? (
-                                            <Spinner data-icon="inline-start" />
-                                          ) : null}
-                                          Mark delivered
-                                        </Button>
-                                      ) : null}
+                                      <Badge variant="outline">Supplier updates status</Badge>
                                     </li>
                                   ))}
                                 </ul>
@@ -581,7 +497,8 @@ export function AdminActivity({ loadActivity = loadAdminActivity }: AdminActivit
                                 <Alert>
                                   <AlertTitle>Waiting on supplier</AlertTitle>
                                   <AlertDescription>
-                                    You can ship a package after that supplier confirms their items.
+                                    The supplier confirms their items, then marks the parcel out for
+                                    delivery and delivered. Monitor the progress here.
                                   </AlertDescription>
                                 </Alert>
                               ) : null}

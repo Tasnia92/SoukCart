@@ -210,7 +210,7 @@ export function packageStatusLabel(status: string): string {
     case "confirmed":
       return "Confirmed";
     case "shipped":
-      return "Shipped";
+      return "Out for delivery";
     case "delivered":
       return "Delivered";
     case "declined":
@@ -224,7 +224,7 @@ export function packageStatusLabel(status: string): string {
 export function shipmentStatusLabel(status: string): string {
   switch (status) {
     case "shipped":
-      return "Shipped";
+      return "Out for delivery";
     case "in_transit":
       return "In transit";
     case "out_for_delivery":

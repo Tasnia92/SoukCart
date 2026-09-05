@@ -110,13 +110,19 @@ export async function loadSupplierOrders(): Promise<SupplierOrder[]> {
   return ((Array.isArray(data) ? data : []) as SupplierOrderRow[]).map(normalizeOrder);
 }
 
-export async function setSupplierOrderStatus(orderId: string): Promise<"confirmed"> {
+/** The delivery steps the supplier owns: confirm, out for delivery, delivered. */
+export type SupplierDeliveryAction = "confirmed" | "shipped" | "delivered";
+
+export async function setSupplierOrderStatus(
+  orderId: string,
+  status: SupplierDeliveryAction,
+): Promise<SupplierDeliveryAction> {
   const { data, error } = await supabase.rpc("seller_set_order_status", {
     p_order_id: orderId,
-    p_status: "confirmed",
+    p_status: status,
   });
   if (error) throw new Error(error.message || "The order status could not be updated.");
-  if (data !== "confirmed") {
+  if (data !== status) {
     throw new Error("The order status was not updated.");
   }
   return data;
@@ -147,6 +153,24 @@ export function canFulfillPayment(
 
 export function canConfirmOrder(order: SupplierOrder): boolean {
   return order.package_status === "pending" && !order.cancel_requested && canFulfillPayment(order);
+}
+
+/** Supplier owns this step: confirmed parcel leaves the shop. */
+export function canShipOrder(order: SupplierOrder): boolean {
+  return (
+    order.package_status === "confirmed" &&
+    order.status !== "cancelled" &&
+    order.status !== "delivered" &&
+    !order.cancel_requested &&
+    canFulfillPayment(order)
+  );
+}
+
+/** Supplier owns this step: parcel arrived at the retailer. */
+export function canDeliverOrder(order: SupplierOrder): boolean {
+  return (
+    order.package_status === "shipped" && order.status !== "cancelled" && !order.cancel_requested
+  );
 }
 
 export function canDeclineOrderItems(order: SupplierOrder): boolean {

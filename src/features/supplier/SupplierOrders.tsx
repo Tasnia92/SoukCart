@@ -1,6 +1,6 @@
 import { useNavigate, useRouterState } from "@tanstack/react-router";
 import { useCallback, useEffect, useMemo, useState } from "react";
-import { Check, Download, Package, RefreshCw, Search } from "lucide-react";
+import { Check, CheckCheck, Download, Package, RefreshCw, Search, Truck } from "lucide-react";
 import {
   AlertDialog,
   AlertDialogAction,
@@ -55,7 +55,7 @@ import {
 } from "../../components/ui/Workspace.tsx";
 import { useSessionSnapshot, useSessionStore } from "../../session.tsx";
 import { useTableChanges } from "../../workspace-realtime.ts";
-import { DeliveryStatusCard } from "../orders/DeliveryStatus.tsx";
+import { DeliveryStatusCard, nextDeliveryActionLabel } from "../orders/DeliveryStatus.tsx";
 import {
   DeliveryDetails,
   OrderRow,
@@ -69,12 +69,15 @@ import { SupplierWorkspaceShell } from "./supplier-shared.tsx";
 import {
   canConfirmOrder,
   canDeclineOrderItems,
+  canDeliverOrder,
+  canShipOrder,
   canSupplierCancel,
   declineSupplierItems,
   filterSupplierOrders,
   loadSupplierOrders,
   requestSupplierCancellation,
   setSupplierOrderStatus,
+  type SupplierDeliveryAction,
   type SupplierOrder,
 } from "./supplier-orders-api.ts";
 import { requestSellerReturn } from "./supplier-returns-api.ts";
@@ -92,7 +95,7 @@ type OrderFilter =
   | "cancelled"
   | "all";
 type OrderSort = "oldest" | "newest" | "value" | "city";
-type FulfillAction = "confirmed";
+type FulfillAction = SupplierDeliveryAction;
 
 const ORDER_FILTERS = new Set<OrderFilter>([
   "action",
@@ -120,7 +123,13 @@ function parseOrderFilter(value: string | null): OrderFilter {
 }
 
 function needsAction(order: SupplierOrder): boolean {
-  return canConfirmOrder(order) || canDeclineOrderItems(order) || order.cancel_requested;
+  return (
+    canConfirmOrder(order) ||
+    canDeclineOrderItems(order) ||
+    canShipOrder(order) ||
+    canDeliverOrder(order) ||
+    order.cancel_requested
+  );
 }
 
 function isAwaitingPayment(order: SupplierOrder): boolean {
@@ -133,7 +142,7 @@ function canOpenReturn(order: SupplierOrder): boolean {
   return order.status === "delivered" && !order.cancel_requested;
 }
 
-/** Confirmed and waiting for admin to ship, or already on the way. */
+/** Confirmed and waiting to go out, or already out for delivery. */
 function isInProgress(order: SupplierOrder): boolean {
   if (order.cancel_requested) return false;
   if (order.status === "cancelled" || order.status === "delivered") return false;
@@ -279,6 +288,28 @@ function OrderActions({
           Confirm order
         </Button>
       ) : null}
+      {!hidePrimary && canShipOrder(order) ? (
+        <Button
+          size="sm"
+          type="button"
+          disabled={disabled}
+          onClick={() => onFulfill(order, "shipped")}
+        >
+          <Truck data-icon="inline-start" />
+          Mark out for delivery
+        </Button>
+      ) : null}
+      {!hidePrimary && canDeliverOrder(order) ? (
+        <Button
+          size="sm"
+          type="button"
+          disabled={disabled}
+          onClick={() => onFulfill(order, "delivered")}
+        >
+          <CheckCheck data-icon="inline-start" />
+          Mark delivered
+        </Button>
+      ) : null}
       {canOpenReturn(order) ? (
         <Button
           variant="outline"
@@ -339,7 +370,14 @@ function OrderRowActions({
   onFulfill: (order: SupplierOrder, action: FulfillAction) => void;
   onDecline: (order: SupplierOrder) => void;
 }) {
-  if (!canConfirmOrder(order) && !canDeclineOrderItems(order)) return null;
+  if (
+    !canConfirmOrder(order) &&
+    !canDeclineOrderItems(order) &&
+    !canShipOrder(order) &&
+    !canDeliverOrder(order)
+  ) {
+    return null;
+  }
   return (
     <div className="flex flex-wrap items-center gap-2">
       {canConfirmOrder(order) ? (
@@ -351,6 +389,28 @@ function OrderRowActions({
         >
           <Check data-icon="inline-start" />
           Confirm order
+        </Button>
+      ) : null}
+      {canShipOrder(order) ? (
+        <Button
+          size="sm"
+          type="button"
+          disabled={disabled}
+          onClick={() => onFulfill(order, "shipped")}
+        >
+          <Truck data-icon="inline-start" />
+          Mark out for delivery
+        </Button>
+      ) : null}
+      {canDeliverOrder(order) ? (
+        <Button
+          size="sm"
+          type="button"
+          disabled={disabled}
+          onClick={() => onFulfill(order, "delivered")}
+        >
+          <CheckCheck data-icon="inline-start" />
+          Mark delivered
         </Button>
       ) : null}
       {canDeclineOrderItems(order) ? (
@@ -566,13 +626,18 @@ export function SupplierOrders({ loadOrders = loadSupplierOrders }: SupplierOrde
   const confirmFulfill = () => {
     const target = fulfillTarget;
     if (!target) return;
-    const { order } = target;
+    const { order, action } = target;
     setFulfillTarget(null);
     setBusyId(order.id);
-    void setSupplierOrderStatus(order.id)
+    void setSupplierOrderStatus(order.id, action)
       .then((status) => {
         setNotice({
-          message: `Order #${shortId(order.id)} is now ${status}. Admin will update delivery next.`,
+          message:
+            status === "confirmed"
+              ? `Order #${shortId(order.id)} is confirmed. Mark it out for delivery when the parcel leaves.`
+              : status === "shipped"
+                ? `Order #${shortId(order.id)} is out for delivery. Mark it delivered once the retailer receives it.`
+                : `Order #${shortId(order.id)} is marked delivered. The retailer can verify the delivery.`,
           state: "success",
         });
         retry();
@@ -582,7 +647,7 @@ export function SupplierOrders({ loadOrders = loadSupplierOrders }: SupplierOrde
           message:
             fulfillError instanceof Error
               ? fulfillError.message
-              : "The order could not be updated.",
+              : "The order status could not be updated.",
           state: "error",
         });
       })
@@ -696,7 +761,7 @@ export function SupplierOrders({ loadOrders = loadSupplierOrders }: SupplierOrde
       <PageHeader
         eyebrow="Fulfillment"
         title="Order work queue"
-        copy="Confirm orders you can fulfill. Admin updates delivery status for the retailer."
+        copy="Confirm orders you can fulfill, then keep delivery status up to date: mark parcels out for delivery and delivered."
         actions={
           <>
             {updatedAt ? (
@@ -965,16 +1030,30 @@ export function SupplierOrders({ loadOrders = loadSupplierOrders }: SupplierOrde
         <AlertDialogContent>
           <AlertDialogHeader>
             <AlertDialogTitle>
-              {fulfillTarget ? `Confirm order #${shortId(fulfillTarget.order.id)}?` : ""}
+              {fulfillTarget
+                ? fulfillTarget.action === "confirmed"
+                  ? `Confirm order #${shortId(fulfillTarget.order.id)}?`
+                  : fulfillTarget.action === "shipped"
+                    ? `Mark order #${shortId(fulfillTarget.order.id)} out for delivery?`
+                    : `Mark order #${shortId(fulfillTarget.order.id)} delivered?`
+                : ""}
             </AlertDialogTitle>
             <AlertDialogDescription>
-              Confirm that you can fulfill this order. Admin will update delivery status after that.
+              {fulfillTarget?.action === "confirmed"
+                ? "Confirm that you can fulfill this order. Then keep delivery status up to date."
+                : fulfillTarget?.action === "shipped"
+                  ? "Tell the retailer the parcel is on the way. You will mark it delivered once it arrives."
+                  : fulfillTarget?.action === "delivered"
+                    ? "Only mark delivered after the retailer has received the parcel. They can then verify the delivery."
+                    : ""}
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
             <AlertDialogCancel type="button">Cancel</AlertDialogCancel>
             <AlertDialogAction type="button" onClick={confirmFulfill}>
-              Confirm order
+              {fulfillTarget
+                ? (nextDeliveryActionLabel(fulfillTarget.action) ?? "Confirm")
+                : "Confirm"}
             </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>
