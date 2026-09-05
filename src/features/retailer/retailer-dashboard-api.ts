@@ -127,7 +127,7 @@ export function pickNextAction(orders: readonly RetailerOrder[]): RetailerNextAc
       kind: "confirm-delivery",
       eyebrow: "Next step",
       title: "Confirm a delivery you received",
-      copy: "Verifying delivery closes the order and releases it from the cancellation window.",
+      copy: "Verifying delivery confirms you received the parcel. Delivered orders can no longer be cancelled or refunded.",
       icon: Check,
       severity: "attention",
       to: "/retailer/orders",

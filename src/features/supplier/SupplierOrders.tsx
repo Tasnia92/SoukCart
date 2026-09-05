@@ -1,6 +1,6 @@
 import { useNavigate, useRouterState } from "@tanstack/react-router";
 import { useCallback, useEffect, useMemo, useState } from "react";
-import { Check, CheckCheck, Download, Package, RefreshCw, Search, Truck } from "lucide-react";
+import { Ban, Check, CheckCheck, Download, Package, RefreshCw, Search, Truck } from "lucide-react";
 import {
   AlertDialog,
   AlertDialogAction,
@@ -55,7 +55,7 @@ import {
 } from "../../components/ui/Workspace.tsx";
 import { useSessionSnapshot, useSessionStore } from "../../session.tsx";
 import { useTableChanges } from "../../workspace-realtime.ts";
-import { DeliveryStatusCard, nextDeliveryActionLabel } from "../orders/DeliveryStatus.tsx";
+import { DeliveryStatusCard, deliveryActionLabel } from "../orders/DeliveryStatus.tsx";
 import {
   DeliveryDetails,
   OrderRow,
@@ -67,15 +67,20 @@ import { formatDate, formatPrice, formatUpdatedAt, initials } from "../workspace
 import { searchParam } from "../workspace/search.ts";
 import { SupplierWorkspaceShell } from "./supplier-shared.tsx";
 import {
+  approveSupplierCancellation,
   canConfirmOrder,
   canDeclineOrderItems,
   canDeliverOrder,
-  canShipOrder,
+  canDispatchOrder,
+  canMarkOutForDelivery,
   canSupplierCancel,
+  cancelSupplierOrder,
   declineSupplierItems,
   filterSupplierOrders,
+  hasRetailerCancellationRequest,
+  isDeliveryInitiated,
   loadSupplierOrders,
-  requestSupplierCancellation,
+  rejectSupplierCancellation,
   setSupplierOrderStatus,
   type SupplierDeliveryAction,
   type SupplierOrder,
@@ -96,6 +101,7 @@ type OrderFilter =
   | "all";
 type OrderSort = "oldest" | "newest" | "value" | "city";
 type FulfillAction = SupplierDeliveryAction;
+type CancelDecision = { order: SupplierOrder; approve: boolean };
 
 const ORDER_FILTERS = new Set<OrderFilter>([
   "action",
@@ -126,9 +132,10 @@ function needsAction(order: SupplierOrder): boolean {
   return (
     canConfirmOrder(order) ||
     canDeclineOrderItems(order) ||
-    canShipOrder(order) ||
+    canDispatchOrder(order) ||
+    canMarkOutForDelivery(order) ||
     canDeliverOrder(order) ||
-    order.cancel_requested
+    hasRetailerCancellationRequest(order)
   );
 }
 
@@ -142,7 +149,7 @@ function canOpenReturn(order: SupplierOrder): boolean {
   return order.status === "delivered" && !order.cancel_requested;
 }
 
-/** Confirmed and waiting to go out, or already out for delivery. */
+/** Confirmed (waiting on the admin gate) or already moving toward the retailer. */
 function isInProgress(order: SupplierOrder): boolean {
   if (order.cancel_requested) return false;
   if (order.status === "cancelled" || order.status === "delivered") return false;
@@ -221,6 +228,13 @@ function exportOrdersCsv(orders: readonly SupplierOrder[]): void {
   URL.revokeObjectURL(url);
 }
 
+function deliveryProgress(order: SupplierOrder) {
+  return {
+    deliveryInitiated: isDeliveryInitiated(order),
+    parcelStatus: order.shipment_status,
+  };
+}
+
 function OrderActions({
   order,
   disabled,
@@ -229,6 +243,7 @@ function OrderActions({
   onCancel,
   onDecline,
   onReturn,
+  onDecideCancellation,
 }: {
   order: SupplierOrder;
   disabled: boolean;
@@ -238,6 +253,7 @@ function OrderActions({
   onCancel: (order: SupplierOrder) => void;
   onDecline: (order: SupplierOrder) => void;
   onReturn: (order: SupplierOrder) => void;
+  onDecideCancellation: (order: SupplierOrder, approve: boolean) => void;
 }) {
   if (order.status === "cancelled") {
     return (
@@ -247,12 +263,57 @@ function OrderActions({
       </p>
     );
   }
+  if (hasRetailerCancellationRequest(order)) {
+    return (
+      <div className="flex flex-col gap-2">
+        <p className="text-sm text-muted-foreground">
+          {order.shipment_status === "out_for_delivery"
+            ? "The retailer asked to cancel this order. The parcel is out for delivery: approving cancels it and refunds the merchandise, but the delivery charge is kept."
+            : "The retailer asked to cancel this order. Approving cancels it and refunds everything the retailer paid in advance, including the delivery charge."}
+        </p>
+        <div className="flex flex-wrap items-center gap-2">
+          <Button
+            variant="destructive"
+            size="sm"
+            type="button"
+            disabled={disabled}
+            onClick={() => onDecideCancellation(order, true)}
+          >
+            {disabled ? <Spinner data-icon="inline-start" /> : null}
+            Approve &amp; cancel
+          </Button>
+          <Button
+            variant="outline"
+            size="sm"
+            type="button"
+            disabled={disabled}
+            onClick={() => onDecideCancellation(order, false)}
+          >
+            Reject request
+          </Button>
+        </div>
+      </div>
+    );
+  }
   if (order.cancel_requested) {
     return (
-      <p className="text-sm text-muted-foreground">
-        Cancellation requested by {order.cancellation_initiator ?? "a participant"} · waiting for
-        admin
-      </p>
+      <div className="flex flex-col gap-2">
+        <p className="text-sm text-muted-foreground">
+          You requested cancellation of this order. Confirm below to cancel it now.
+        </p>
+        <div className="flex flex-wrap items-center gap-2">
+          <Button
+            variant="outline"
+            size="sm"
+            type="button"
+            disabled={disabled}
+            onClick={() => onCancel(order)}
+          >
+            <Ban data-icon="inline-start" />
+            Cancel order
+          </Button>
+        </div>
+      </div>
     );
   }
   if (order.delivery_payment_status !== "paid") {
@@ -263,97 +324,110 @@ function OrderActions({
     );
   }
   if (order.status === "delivered" && order.delivery_verified_at && !canOpenReturn(order)) {
-    return (
-      <p className="text-sm text-muted-foreground">
-        Delivery verified · supplier cancellation is closed
-      </p>
-    );
+    return <p className="text-sm text-muted-foreground">Delivery verified · the order is closed</p>;
   }
 
   return (
-    <div className="flex flex-wrap items-center gap-2">
-      {order.status === "delivered" && order.delivery_verified_at ? (
-        <p className="text-sm text-muted-foreground">
-          Delivery verified · supplier cancellation is closed
-        </p>
-      ) : null}
-      {!hidePrimary && canConfirmOrder(order) ? (
-        <Button
-          size="sm"
-          type="button"
-          disabled={disabled}
-          onClick={() => onFulfill(order, "confirmed")}
-        >
-          <Check data-icon="inline-start" />
-          Confirm order
-        </Button>
-      ) : null}
-      {!hidePrimary && canShipOrder(order) ? (
-        <Button
-          size="sm"
-          type="button"
-          disabled={disabled}
-          onClick={() => onFulfill(order, "shipped")}
-        >
-          <Truck data-icon="inline-start" />
-          Mark out for delivery
-        </Button>
-      ) : null}
-      {!hidePrimary && canDeliverOrder(order) ? (
-        <Button
-          size="sm"
-          type="button"
-          disabled={disabled}
-          onClick={() => onFulfill(order, "delivered")}
-        >
-          <CheckCheck data-icon="inline-start" />
-          Mark delivered
-        </Button>
-      ) : null}
-      {canOpenReturn(order) ? (
-        <Button
-          variant="outline"
-          size="sm"
-          type="button"
-          disabled={disabled}
-          onClick={() => onReturn(order)}
-        >
-          Open return
-        </Button>
-      ) : null}
-      {order.status === "pending" && !canConfirmOrder(order) ? (
-        <p className="text-sm text-muted-foreground">
-          Waiting for online payment before fulfillment
-        </p>
-      ) : null}
-      {!hidePrimary && canDeclineOrderItems(order) ? (
-        <Button
-          variant="outline"
-          size="sm"
-          type="button"
-          disabled={disabled}
-          onClick={() => onDecline(order)}
-        >
-          Decline these items
-        </Button>
-      ) : null}
-      {order.package_status === "declined" ? (
-        <p className="text-sm text-muted-foreground">
-          You declined these items
-          {order.decline_reason ? ` · ${order.decline_reason}` : ""}
-        </p>
-      ) : null}
-      {canSupplierCancel(order) ? (
-        <Button
-          variant="outline"
-          size="sm"
-          type="button"
-          disabled={disabled}
-          onClick={() => onCancel(order)}
-        >
-          Request cancellation
-        </Button>
-      ) : null}
+    <div className="flex flex-col gap-2">
+      <div className="flex flex-wrap items-center gap-2">
+        {order.status === "delivered" && order.delivery_verified_at ? (
+          <p className="text-sm text-muted-foreground">Delivery verified · the order is closed</p>
+        ) : null}
+        {!hidePrimary && canConfirmOrder(order) ? (
+          <Button
+            size="sm"
+            type="button"
+            disabled={disabled}
+            onClick={() => onFulfill(order, "confirmed")}
+          >
+            <Check data-icon="inline-start" />
+            Confirm order
+          </Button>
+        ) : null}
+        {!hidePrimary && canDispatchOrder(order) ? (
+          <Button
+            size="sm"
+            type="button"
+            disabled={disabled}
+            onClick={() => onFulfill(order, "dispatched")}
+          >
+            <Truck data-icon="inline-start" />
+            Mark dispatched
+          </Button>
+        ) : null}
+        {!hidePrimary && canMarkOutForDelivery(order) ? (
+          <Button
+            size="sm"
+            type="button"
+            disabled={disabled}
+            onClick={() => onFulfill(order, "out_for_delivery")}
+          >
+            <Truck data-icon="inline-start" />
+            Mark out for delivery
+          </Button>
+        ) : null}
+        {!hidePrimary && canDeliverOrder(order) ? (
+          <Button
+            size="sm"
+            type="button"
+            disabled={disabled}
+            onClick={() => onFulfill(order, "delivered")}
+          >
+            <CheckCheck data-icon="inline-start" />
+            Mark delivered
+          </Button>
+        ) : null}
+        {canOpenReturn(order) ? (
+          <Button
+            variant="outline"
+            size="sm"
+            type="button"
+            disabled={disabled}
+            onClick={() => onReturn(order)}
+          >
+            Open return
+          </Button>
+        ) : null}
+        {order.status === "pending" && !canConfirmOrder(order) ? (
+          <p className="text-sm text-muted-foreground">
+            Waiting for online payment before fulfillment
+          </p>
+        ) : null}
+        {order.package_status === "confirmed" && !isDeliveryInitiated(order) ? (
+          <p className="text-sm text-muted-foreground">
+            Waiting for admin to initiate delivery. Have the parcel ready to hand over.
+          </p>
+        ) : null}
+        {!hidePrimary && canDeclineOrderItems(order) ? (
+          <Button
+            variant="outline"
+            size="sm"
+            type="button"
+            disabled={disabled}
+            onClick={() => onDecline(order)}
+          >
+            Decline these items
+          </Button>
+        ) : null}
+        {order.package_status === "declined" ? (
+          <p className="text-sm text-muted-foreground">
+            You declined these items
+            {order.decline_reason ? ` · ${order.decline_reason}` : ""}
+          </p>
+        ) : null}
+        {canSupplierCancel(order) ? (
+          <Button
+            variant="outline"
+            size="sm"
+            type="button"
+            disabled={disabled}
+            onClick={() => onCancel(order)}
+          >
+            <Ban data-icon="inline-start" />
+            Cancel order
+          </Button>
+        ) : null}
+      </div>
     </div>
   );
 }
@@ -373,7 +447,8 @@ function OrderRowActions({
   if (
     !canConfirmOrder(order) &&
     !canDeclineOrderItems(order) &&
-    !canShipOrder(order) &&
+    !canDispatchOrder(order) &&
+    !canMarkOutForDelivery(order) &&
     !canDeliverOrder(order)
   ) {
     return null;
@@ -391,12 +466,23 @@ function OrderRowActions({
           Confirm order
         </Button>
       ) : null}
-      {canShipOrder(order) ? (
+      {canDispatchOrder(order) ? (
         <Button
           size="sm"
           type="button"
           disabled={disabled}
-          onClick={() => onFulfill(order, "shipped")}
+          onClick={() => onFulfill(order, "dispatched")}
+        >
+          <Truck data-icon="inline-start" />
+          Mark dispatched
+        </Button>
+      ) : null}
+      {canMarkOutForDelivery(order) ? (
+        <Button
+          size="sm"
+          type="button"
+          disabled={disabled}
+          onClick={() => onFulfill(order, "out_for_delivery")}
         >
           <Truck data-icon="inline-start" />
           Mark out for delivery
@@ -436,6 +522,7 @@ function OrderMobileCard({
   onCancel,
   onDecline,
   onReturn,
+  onDecideCancellation,
 }: {
   order: SupplierOrder;
   waitingLabel: string;
@@ -444,6 +531,7 @@ function OrderMobileCard({
   onCancel: (order: SupplierOrder) => void;
   onDecline: (order: SupplierOrder) => void;
   onReturn: (order: SupplierOrder) => void;
+  onDecideCancellation: (order: SupplierOrder, approve: boolean) => void;
 }) {
   return (
     <div className="flex flex-col gap-3 rounded-xl border border-border/70 bg-card p-3">
@@ -466,7 +554,11 @@ function OrderMobileCard({
       {order.cancel_requested ? (
         <Badge variant="destructive">Cancel requested by {order.cancellation_initiator}</Badge>
       ) : null}
-      <DeliveryStatusCard status={order.status} audience="supplier" />
+      <DeliveryStatusCard
+        status={order.status}
+        audience="supplier"
+        progress={deliveryProgress(order)}
+      />
       <OrderActions
         order={order}
         disabled={busy}
@@ -474,6 +566,7 @@ function OrderMobileCard({
         onCancel={onCancel}
         onDecline={onDecline}
         onReturn={onReturn}
+        onDecideCancellation={onDecideCancellation}
       />
     </div>
   );
@@ -503,6 +596,7 @@ export function SupplierOrders({ loadOrders = loadSupplierOrders }: SupplierOrde
   const [cancelTarget, setCancelTarget] = useState<SupplierOrder | null>(null);
   const [cancelReason, setCancelReason] = useState("");
   const [cancelInvalid, setCancelInvalid] = useState(false);
+  const [cancelDecision, setCancelDecision] = useState<CancelDecision | null>(null);
   const [declineTarget, setDeclineTarget] = useState<SupplierOrder | null>(null);
   const [declineReason, setDeclineReason] = useState("");
   const [declineInvalid, setDeclineInvalid] = useState(false);
@@ -600,6 +694,9 @@ export function SupplierOrders({ loadOrders = loadSupplierOrders }: SupplierOrde
     setCancelInvalid(false);
     setCancelTarget(order);
   };
+  const openCancelDecision = (order: SupplierOrder, approve: boolean) => {
+    setCancelDecision({ order, approve });
+  };
   const openDecline = (order: SupplierOrder) => {
     setDeclineReason("");
     setDeclineInvalid(false);
@@ -634,10 +731,12 @@ export function SupplierOrders({ loadOrders = loadSupplierOrders }: SupplierOrde
         setNotice({
           message:
             status === "confirmed"
-              ? `Order #${shortId(order.id)} is confirmed. Mark it out for delivery when the parcel leaves.`
-              : status === "shipped"
-                ? `Order #${shortId(order.id)} is out for delivery. Mark it delivered once the retailer receives it.`
-                : `Order #${shortId(order.id)} is marked delivered. The retailer can verify the delivery.`,
+              ? `Order #${shortId(order.id)} is confirmed. Delivery starts once admin initiates it.`
+              : status === "dispatched"
+                ? `Order #${shortId(order.id)} is dispatched. Mark it out for delivery when the courier takes it.`
+                : status === "out_for_delivery"
+                  ? `Order #${shortId(order.id)} is out for delivery. Mark it delivered once the retailer receives it.`
+                  : `Order #${shortId(order.id)} is marked delivered. The retailer can verify the delivery.`,
           state: "success",
         });
         retry();
@@ -648,6 +747,88 @@ export function SupplierOrders({ loadOrders = loadSupplierOrders }: SupplierOrde
             fulfillError instanceof Error
               ? fulfillError.message
               : "The order status could not be updated.",
+          state: "error",
+        });
+      })
+      .finally(() => setBusyId(null));
+  };
+
+  const confirmCancelDecision = () => {
+    const decision = cancelDecision;
+    if (!decision) return;
+    const { order, approve } = decision;
+    setCancelDecision(null);
+    setBusyId(order.id);
+    if (approve) {
+      void approveSupplierCancellation(order.id)
+        .then((result) => {
+          setNotice({
+            message:
+              result.manualRefundStatus === "pending" && result.refundAmount > 0
+                ? `Order #${shortId(order.id)} was cancelled. A manual refund of ${formatPrice(result.refundAmount)} for merchandise is pending.`
+                : `Order #${shortId(order.id)} was cancelled. The retailer was notified.`,
+            state: "success",
+          });
+          retry();
+        })
+        .catch((decisionError: unknown) => {
+          setNotice({
+            message:
+              decisionError instanceof Error
+                ? decisionError.message
+                : "The cancellation could not be approved.",
+            state: "error",
+          });
+        })
+        .finally(() => setBusyId(null));
+      return;
+    }
+    void rejectSupplierCancellation(order.id)
+      .then(() => {
+        setNotice({
+          message: `Cancellation request for order #${shortId(order.id)} was rejected. The order continues as normal.`,
+          state: "info",
+        });
+        retry();
+      })
+      .catch((decisionError: unknown) => {
+        setNotice({
+          message:
+            decisionError instanceof Error
+              ? decisionError.message
+              : "The cancellation request could not be rejected.",
+          state: "error",
+        });
+      })
+      .finally(() => setBusyId(null));
+  };
+
+  const confirmCancel = () => {
+    const order = cancelTarget;
+    if (!order) return;
+    if (!cancelReason.trim()) {
+      setCancelInvalid(true);
+      return;
+    }
+    const reason = cancelReason.trim();
+    setCancelTarget(null);
+    setCancelReason("");
+    setCancelInvalid(false);
+    setBusyId(order.id);
+    void cancelSupplierOrder(order.id, reason)
+      .then(() => {
+        setNotice({
+          message: `Order #${shortId(order.id)} was cancelled. The retailer was notified and any advance-payment refund is queued for settlement.`,
+          state: "info",
+        });
+        retry();
+      })
+      .catch((cancelError: unknown) => {
+        setNotice({
+          message:
+            cancelError instanceof Error
+              ? cancelError.message
+              : "The order could not be cancelled.",
           state: "error",
         });
       })
@@ -680,41 +861,6 @@ export function SupplierOrders({ loadOrders = loadSupplierOrders }: SupplierOrde
             declineError instanceof Error
               ? declineError.message
               : "These items could not be declined.",
-          state: "error",
-        });
-      })
-      .finally(() => setBusyId(null));
-  };
-
-  const confirmCancel = () => {
-    const order = cancelTarget;
-    if (!order) return;
-    if (!cancelReason.trim()) {
-      setCancelInvalid(true);
-      return;
-    }
-    const reason = cancelReason.trim();
-    setCancelTarget(null);
-    setCancelReason("");
-    setCancelInvalid(false);
-    setBusyId(order.id);
-    void requestSupplierCancellation(order.id, reason)
-      .then(() => {
-        setNotice({
-          message:
-            order.payment_method === "cod" && order.delivery_payment_status === "paid"
-              ? `Cancellation of order #${shortId(order.id)} was requested. The retailer can ask for a refund of the prepaid delivery charge.`
-              : `Cancellation of order #${shortId(order.id)} was requested. The retailer, admin, and other suppliers were notified.`,
-          state: "info",
-        });
-        retry();
-      })
-      .catch((cancelError: unknown) => {
-        setNotice({
-          message:
-            cancelError instanceof Error
-              ? cancelError.message
-              : "The cancellation request could not be submitted.",
           state: "error",
         });
       })
@@ -761,7 +907,7 @@ export function SupplierOrders({ loadOrders = loadSupplierOrders }: SupplierOrde
       <PageHeader
         eyebrow="Fulfillment"
         title="Order work queue"
-        copy="Confirm orders you can fulfill, then keep delivery status up to date: mark parcels out for delivery and delivered."
+        copy="Confirm orders you can fulfill, then keep delivery status up to date: mark parcels dispatched, out for delivery, and delivered."
         actions={
           <>
             {updatedAt ? (
@@ -849,6 +995,7 @@ export function SupplierOrders({ loadOrders = loadSupplierOrders }: SupplierOrde
                         onCancel={openCancel}
                         onDecline={openDecline}
                         onReturn={openReturn}
+                        onDecideCancellation={openCancelDecision}
                       />
                     ))}
                   </div>
@@ -979,7 +1126,11 @@ export function SupplierOrders({ loadOrders = loadSupplierOrders }: SupplierOrde
                                     {order.cancellation_reason}
                                   </p>
                                 ) : null}
-                                <DeliveryStatusCard status={order.status} audience="supplier" />
+                                <DeliveryStatusCard
+                                  status={order.status}
+                                  audience="supplier"
+                                  progress={deliveryProgress(order)}
+                                />
                                 <OrderActions
                                   order={order}
                                   disabled={busyId === order.id}
@@ -988,6 +1139,7 @@ export function SupplierOrders({ loadOrders = loadSupplierOrders }: SupplierOrde
                                   onCancel={openCancel}
                                   onDecline={openDecline}
                                   onReturn={openReturn}
+                                  onDecideCancellation={openCancelDecision}
                                 />
                               </div>
                             }
@@ -1033,27 +1185,67 @@ export function SupplierOrders({ loadOrders = loadSupplierOrders }: SupplierOrde
               {fulfillTarget
                 ? fulfillTarget.action === "confirmed"
                   ? `Confirm order #${shortId(fulfillTarget.order.id)}?`
-                  : fulfillTarget.action === "shipped"
-                    ? `Mark order #${shortId(fulfillTarget.order.id)} out for delivery?`
-                    : `Mark order #${shortId(fulfillTarget.order.id)} delivered?`
+                  : fulfillTarget.action === "dispatched"
+                    ? `Mark order #${shortId(fulfillTarget.order.id)} dispatched?`
+                    : fulfillTarget.action === "out_for_delivery"
+                      ? `Mark order #${shortId(fulfillTarget.order.id)} out for delivery?`
+                      : `Mark order #${shortId(fulfillTarget.order.id)} delivered?`
                 : ""}
             </AlertDialogTitle>
             <AlertDialogDescription>
               {fulfillTarget?.action === "confirmed"
-                ? "Confirm that you can fulfill this order. Then keep delivery status up to date."
-                : fulfillTarget?.action === "shipped"
-                  ? "Tell the retailer the parcel is on the way. You will mark it delivered once it arrives."
-                  : fulfillTarget?.action === "delivered"
-                    ? "Only mark delivered after the retailer has received the parcel. They can then verify the delivery."
-                    : ""}
+                ? "Confirm that you can fulfill this order. Delivery starts once admin initiates it."
+                : fulfillTarget?.action === "dispatched"
+                  ? "Tell the retailer the parcel has left your shop. Then keep the delivery status up to date."
+                  : fulfillTarget?.action === "out_for_delivery"
+                    ? "Tell the retailer the parcel is on its way. You will mark it delivered once it arrives."
+                    : fulfillTarget?.action === "delivered"
+                      ? "Only mark delivered after the retailer has received the parcel. They can then verify the delivery."
+                      : ""}
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
             <AlertDialogCancel type="button">Cancel</AlertDialogCancel>
             <AlertDialogAction type="button" onClick={confirmFulfill}>
-              {fulfillTarget
-                ? (nextDeliveryActionLabel(fulfillTarget.action) ?? "Confirm")
-                : "Confirm"}
+              {fulfillTarget ? (deliveryActionLabel(fulfillTarget.action) ?? "Confirm") : "Confirm"}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+
+      <AlertDialog
+        open={cancelDecision !== null}
+        onOpenChange={(open) => {
+          if (!open) setCancelDecision(null);
+        }}
+      >
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>
+              {cancelDecision?.approve
+                ? `Approve cancellation of order #${
+                    cancelDecision ? shortId(cancelDecision.order.id) : ""
+                  }?`
+                : `Reject the cancellation request for order #${
+                    cancelDecision ? shortId(cancelDecision.order.id) : ""
+                  }?`}
+            </AlertDialogTitle>
+            <AlertDialogDescription>
+              {cancelDecision?.approve
+                ? cancelDecision.order.shipment_status === "out_for_delivery"
+                  ? "The whole order is cancelled. The parcel is out for delivery: merchandise is refunded, but the prepaid delivery charge is kept."
+                  : "The whole order is cancelled and everything the retailer paid in advance goes back, including the prepaid delivery charge."
+                : "The order continues as normal and the retailer is notified."}
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel type="button">Back</AlertDialogCancel>
+            <AlertDialogAction
+              type="button"
+              variant={cancelDecision?.approve ? "destructive" : "default"}
+              onClick={confirmCancelDecision}
+            >
+              {cancelDecision?.approve ? "Approve & cancel" : "Reject request"}
             </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>
@@ -1125,11 +1317,12 @@ export function SupplierOrders({ loadOrders = loadSupplierOrders }: SupplierOrde
         <DialogContent>
           <DialogHeader>
             <DialogTitle>
-              Request cancellation{cancelTarget ? ` of #${shortId(cancelTarget.id)}` : ""}
+              Cancel order{cancelTarget ? ` #${shortId(cancelTarget.id)}` : ""}
             </DialogTitle>
             <DialogDescription>
-              A paid online order will require a full manual refund. Add a reason so admin and the
-              retailer can review the request.
+              {cancelTarget?.shipment_status === "out_for_delivery"
+                ? "This cancels the order immediately. The parcel is out for delivery: merchandise is refunded, but the prepaid delivery charge is kept. Use this when you cannot fulfill the order."
+                : "This cancels the order immediately. The retailer is refunded everything paid in advance — merchandise plus prepaid delivery for online orders, the prepaid delivery charge for COD. Use this when you cannot fulfill the order."}
             </DialogDescription>
           </DialogHeader>
           <FieldGroup>
@@ -1143,7 +1336,7 @@ export function SupplierOrders({ loadOrders = loadSupplierOrders }: SupplierOrde
                   setCancelReason(event.target.value);
                   if (event.target.value.trim()) setCancelInvalid(false);
                 }}
-                placeholder="Why should this order be cancelled?"
+                placeholder="Why is this order being cancelled?"
               />
             </Field>
           </FieldGroup>
@@ -1157,10 +1350,10 @@ export function SupplierOrders({ loadOrders = loadSupplierOrders }: SupplierOrde
                 setCancelInvalid(false);
               }}
             >
-              Cancel
+              Keep order
             </Button>
-            <Button type="button" onClick={confirmCancel}>
-              Submit request
+            <Button variant="destructive" type="button" onClick={confirmCancel}>
+              Cancel order
             </Button>
           </DialogFooter>
         </DialogContent>

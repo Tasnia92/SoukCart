@@ -41,7 +41,7 @@ import {
 import type { RetailerShipmentCard } from "./retailer-dashboard-api.ts";
 import { formatDate } from "../workspace/format.ts";
 
-/** Maps a supplier-package status onto the 4-step delivery ladder. */
+/** Maps a supplier-package status onto the 6-step delivery ladder. */
 function packageStep(status: string): string {
   switch (status) {
     case "confirmed":
@@ -58,12 +58,20 @@ function packageStep(status: string): string {
 }
 
 /**
- * Compact fulfillment ladder: four dots, filled up to the current step, so a
+ * Compact fulfillment ladder: six dots, filled up to the current step, so a
  * row answers "where is it?" without expanding anything.
  */
-export function MiniTimeline({ status }: { status: string }) {
+export function MiniTimeline({
+  status,
+  deliveryInitiated = false,
+  parcelStatus = null,
+}: {
+  status: string;
+  deliveryInitiated?: boolean;
+  parcelStatus?: string | null;
+}) {
   const cancelled = status === "cancelled";
-  const currentIndex = deliveryStepIndex(status);
+  const currentIndex = deliveryStepIndex(status, { deliveryInitiated, parcelStatus });
   return (
     <ol
       className="flex items-center gap-1.5"
@@ -155,6 +163,7 @@ export function TrackingLine({
 
 function eventIcon(eventType: string): LucideIcon {
   switch (eventType) {
+    case "dispatched":
     case "in_transit":
     case "out_for_delivery":
       return Truck;
@@ -187,7 +196,7 @@ export function ShipmentStripCard({ card }: { card: RetailerShipmentCard }) {
         </CardAction>
       </CardHeader>
       <CardContent className="flex flex-col gap-3">
-        <MiniTimeline status={card.status} />
+        <MiniTimeline status={card.status} parcelStatus={card.shipment?.status ?? null} />
         {card.shipment ? (
           <>
             <TrackingLine
@@ -311,7 +320,14 @@ export function ShipmentTracker({ order }: { order: RetailerOrder }) {
           </CardContent>
         </Card>
       ) : (
-        <DeliveryStatusCard status={order.status} audience="retailer" />
+        <DeliveryStatusCard
+          status={order.status}
+          audience="retailer"
+          progress={{
+            deliveryInitiated: Boolean(order.delivery_initiated_at),
+            parcelStatus: null,
+          }}
+        />
       )}
     </div>
   );

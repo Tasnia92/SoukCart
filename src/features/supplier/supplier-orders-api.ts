@@ -24,6 +24,8 @@ export type SupplierOrder = {
   delivery_payment_status: "unpaid" | "paid" | "failed" | "cancelled";
   delivery_paid_at: string | null;
   delivery_verified_at: string | null;
+  delivery_initiated_at: string | null;
+  shipment_status: string | null;
   delivery_phone: string | null;
   delivery_address: string | null;
   delivery_city: string | null;
@@ -53,11 +55,15 @@ type SupplierOrderRow = Omit<
   | "delivery_charge"
   | "delivery_payment_status"
   | "delivery_paid_at"
+  | "delivery_initiated_at"
+  | "shipment_status"
 > & {
   supplier_total: number | string;
   delivery_charge?: number | string | null;
   delivery_payment_status?: string | null;
   delivery_paid_at?: string | null;
+  delivery_initiated_at?: string | null;
+  shipment_status?: string | null;
   cancel_requested: boolean | null;
   accepted_at: string | null;
   package_status?: string | null;
@@ -91,6 +97,8 @@ function normalizeOrder(row: SupplierOrderRow): SupplierOrder {
         ? deliveryStatus
         : "unpaid",
     delivery_paid_at: row.delivery_paid_at ?? null,
+    delivery_initiated_at: row.delivery_initiated_at ?? null,
+    shipment_status: row.shipment_status ?? null,
     delivery_phone: row.delivery_phone ?? null,
     delivery_address: row.delivery_address ?? null,
     delivery_city: row.delivery_city ?? null,
@@ -110,8 +118,11 @@ export async function loadSupplierOrders(): Promise<SupplierOrder[]> {
   return ((Array.isArray(data) ? data : []) as SupplierOrderRow[]).map(normalizeOrder);
 }
 
-/** The delivery steps the supplier owns: confirm, out for delivery, delivered. */
-export type SupplierDeliveryAction = "confirmed" | "shipped" | "delivered";
+/**
+ * The delivery steps the supplier owns: confirm, dispatched, out for delivery,
+ * delivered. Dispatching only unlocks after admin initiates delivery.
+ */
+export type SupplierDeliveryAction = "confirmed" | "dispatched" | "out_for_delivery" | "delivered";
 
 export async function setSupplierOrderStatus(
   orderId: string,
@@ -128,20 +139,75 @@ export async function setSupplierOrderStatus(
   return data;
 }
 
-export async function requestSupplierCancellation(orderId: string, reason: string): Promise<void> {
-  const { data, error } = await supabase.rpc("seller_request_order_cancellation", {
+/** The admin gate: suppliers stay blocked until admin initiates delivery. */
+export function isDeliveryInitiated(order: Pick<SupplierOrder, "delivery_initiated_at">): boolean {
+  return Boolean(order.delivery_initiated_at);
+}
+
+/** The supplier approved the retailer's cancellation request. */
+export async function approveSupplierCancellation(
+  orderId: string,
+  reason = "",
+): Promise<{ refundAmount: number; manualRefundStatus: string }> {
+  const { data, error } = await supabase.rpc("seller_respond_order_cancellation", {
     p_order_id: orderId,
+    p_approve: true,
     p_reason: reason,
   });
-  if (error) throw new Error(error.message || "The cancellation request could not be submitted.");
+  if (error) throw new Error(error.message || "The cancellation could not be approved.");
   if (
     typeof data !== "object" ||
     data === null ||
     !("status" in data) ||
-    data.status !== "requested"
+    data.status !== "cancelled"
   ) {
-    throw new Error("The cancellation request was not confirmed.");
+    throw new Error("The cancellation was not approved.");
   }
+  const record = data as Record<string, unknown>;
+  return {
+    refundAmount: Number(record.refundAmount ?? 0),
+    manualRefundStatus:
+      typeof record.manualRefundStatus === "string" ? record.manualRefundStatus : "",
+  };
+}
+
+/** The supplier rejected the retailer's cancellation request. */
+export async function rejectSupplierCancellation(orderId: string): Promise<void> {
+  const { data, error } = await supabase.rpc("seller_respond_order_cancellation", {
+    p_order_id: orderId,
+    p_approve: false,
+  });
+  if (error) throw new Error(error.message || "The cancellation request could not be rejected.");
+  if (
+    typeof data !== "object" ||
+    data === null ||
+    !("decision" in data) ||
+    data.decision !== "rejected"
+  ) {
+    throw new Error("The cancellation request was not rejected.");
+  }
+}
+
+/** Supplier cancels a single-supplier order directly (e.g. out of stock). */
+export async function cancelSupplierOrder(orderId: string, reason: string): Promise<void> {
+  const { data, error } = await supabase.rpc("seller_cancel_order", {
+    p_order_id: orderId,
+    p_reason: reason,
+  });
+  if (error) throw new Error(error.message || "The order could not be cancelled.");
+  if (
+    typeof data !== "object" ||
+    data === null ||
+    !("status" in data) ||
+    data.status !== "cancelled"
+  ) {
+    throw new Error("The order was not cancelled.");
+  }
+}
+
+/** A retailer cancellation request this supplier can approve or reject. */
+export function hasRetailerCancellationRequest(order: SupplierOrder): boolean {
+  return order.cancel_requested && order.cancellation_initiator === "retailer";
 }
 
 export function canFulfillPayment(
@@ -155,10 +221,11 @@ export function canConfirmOrder(order: SupplierOrder): boolean {
   return order.package_status === "pending" && !order.cancel_requested && canFulfillPayment(order);
 }
 
-/** Supplier owns this step: confirmed parcel leaves the shop. */
-export function canShipOrder(order: SupplierOrder): boolean {
+/** Step 1 of delivery: parcel leaves the shop once admin initiated delivery. */
+export function canDispatchOrder(order: SupplierOrder): boolean {
   return (
     order.package_status === "confirmed" &&
+    isDeliveryInitiated(order) &&
     order.status !== "cancelled" &&
     order.status !== "delivered" &&
     !order.cancel_requested &&
@@ -166,10 +233,27 @@ export function canShipOrder(order: SupplierOrder): boolean {
   );
 }
 
-/** Supplier owns this step: parcel arrived at the retailer. */
+/** Step 2 of delivery: the courier takes the parcel out for delivery. */
+export function canMarkOutForDelivery(order: SupplierOrder): boolean {
+  return (
+    order.package_status === "shipped" &&
+    isDeliveryInitiated(order) &&
+    order.shipment_status !== "out_for_delivery" &&
+    order.shipment_status !== "delivered" &&
+    order.status !== "cancelled" &&
+    order.status !== "delivered" &&
+    !order.cancel_requested
+  );
+}
+
+/** Step 3 of delivery: parcel arrived at the retailer. */
 export function canDeliverOrder(order: SupplierOrder): boolean {
   return (
-    order.package_status === "shipped" && order.status !== "cancelled" && !order.cancel_requested
+    order.package_status === "shipped" &&
+    isDeliveryInitiated(order) &&
+    order.shipment_status === "out_for_delivery" &&
+    order.status !== "cancelled" &&
+    !order.cancel_requested
   );
 }
 
@@ -202,7 +286,7 @@ export function canSupplierCancel(order: SupplierOrder): boolean {
   return (
     order.supplier_can_cancel &&
     order.status !== "cancelled" &&
-    !(order.status === "delivered" && order.delivery_verified_at) &&
+    order.status !== "delivered" &&
     !order.cancel_requested
   );
 }

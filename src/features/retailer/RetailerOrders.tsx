@@ -74,6 +74,7 @@ import {
   needsGatewayPaymentVerification,
   ORDER_SORTS,
   orderMerchandiseTotal,
+  orderIsOutOfDelivery,
   orderTotal,
   packageStatusLabel,
   parseOrderSort,
@@ -147,9 +148,15 @@ function cancelHint(order: RetailerOrder): string {
   const prepaidDelivery =
     order.payment_method === "cod" && order.delivery_payment_status === "paid";
   if (paidOnline) {
-    return "Paid merchandise is manually refunded; prepaid delivery is kept and there is no platform charge.";
+    return orderIsOutOfDelivery(order)
+      ? "The parcel is out for delivery: merchandise is refunded, but the prepaid delivery charge is kept."
+      : "If the suppliers approve, the paid merchandise and the delivery charge are refunded in full.";
   }
-  if (prepaidDelivery) return "Prepaid delivery is not refunded when you cancel.";
+  if (prepaidDelivery) {
+    return orderIsOutOfDelivery(order)
+      ? "The parcel is out for delivery: the prepaid delivery charge is kept."
+      : "If the suppliers approve, the prepaid delivery charge is refunded in full.";
+  }
   return "";
 }
 
@@ -226,36 +233,38 @@ function CancelAction({
   if (order.cancel_requested) {
     return (
       <p className="text-sm text-muted-foreground">
-        Cancellation requested · waiting for admin approval
+        Cancellation requested · waiting for the suppliers to approve
       </p>
     );
   }
 
-  if (order.status === "delivered" && order.delivery_verified_at) {
+  if (order.status === "delivered") {
     return (
-      <Button asChild variant="outline" size="sm">
-        <RouterLink to="/retailer/complaints" search={{ order: order.id }}>
-          <MessageSquare data-icon="inline-start" />
-          Contact support for cancellation or refund
-        </RouterLink>
-      </Button>
+      <>
+        {order.delivery_verified_at ? null : (
+          <Button
+            type="button"
+            variant="outline"
+            size="sm"
+            disabled={disabled}
+            onClick={() => onVerifyDelivery(order)}
+          >
+            <Check data-icon="inline-start" />
+            Verify delivery
+          </Button>
+        )}
+        <Button asChild variant="outline" size="sm">
+          <RouterLink to="/retailer/complaints" search={{ order: order.id }}>
+            <MessageSquare data-icon="inline-start" />
+            Contact support about this order
+          </RouterLink>
+        </Button>
+      </>
     );
   }
 
   return (
     <>
-      {order.status === "delivered" ? (
-        <Button
-          type="button"
-          variant="outline"
-          size="sm"
-          disabled={disabled}
-          onClick={() => onVerifyDelivery(order)}
-        >
-          <Check data-icon="inline-start" />
-          Verify delivery
-        </Button>
-      ) : null}
       {canCancelOrder(order) ? (
         <Button
           type="button"
@@ -452,7 +461,7 @@ export function RetailerOrders({
       .then((verifiedAt) => {
         updateOrder(order.id, { delivery_verified_at: verifiedAt });
         setNotice({
-          message: `Delivery of order #${shortId(order.id)} was verified. Future cancellation requests must go through support.`,
+          message: `Delivery of order #${shortId(order.id)} was verified. Delivered orders can no longer be cancelled or refunded.`,
           state: "success",
         });
       })
@@ -480,7 +489,7 @@ export function RetailerOrders({
           cancellation_initiator: "retailer",
         });
         setNotice({
-          message: `Cancellation of order #${shortId(order.id)} was requested. The admin and suppliers were notified.`,
+          message: `Cancellation of order #${shortId(order.id)} was requested. The suppliers were notified and will approve or reject it.`,
           state: "info",
         });
       })
@@ -639,8 +648,8 @@ export function RetailerOrders({
                     Request cancellation of order #{shortId(confirmAction.order.id)}?
                   </AlertDialogTitle>
                   <AlertDialogDescription>
-                    {cancelHint(confirmAction.order)} The admin team reviews every cancellation
-                    before anything is cancelled.
+                    {cancelHint(confirmAction.order)} The suppliers on the order review every
+                    cancellation before anything is cancelled.
                   </AlertDialogDescription>
                 </AlertDialogHeader>
                 <AlertDialogFooter>
@@ -760,7 +769,11 @@ export function RetailerOrders({
                               <TableCell>
                                 <div className="flex min-w-40 flex-col gap-1.5">
                                   <div className="flex items-center gap-2">
-                                    <MiniTimeline status={order.status} />
+                                    <MiniTimeline
+                                      status={order.status}
+                                      deliveryInitiated={Boolean(order.delivery_initiated_at)}
+                                      parcelStatus={shipment?.status ?? null}
+                                    />
                                     <StatusBadge status={order.status} />
                                   </div>
                                   <div className="flex flex-wrap items-center gap-1.5">

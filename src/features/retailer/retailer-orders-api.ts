@@ -53,6 +53,7 @@ export type RetailerOrder = {
   notes: string | null;
   created_at: string;
   delivery_verified_at: string | null;
+  delivery_initiated_at: string | null;
   delivery_phone: string | null;
   delivery_address: string | null;
   delivery_city: string | null;
@@ -69,7 +70,7 @@ export type RetailerOrder = {
 };
 
 const ORDERS_SELECT =
-  "id, status, cancel_requested, cancellation_initiator, payment_status, payment_method, tran_id, notes, created_at, delivery_verified_at, delivery_phone, delivery_address, delivery_city, delivery_postcode, delivery_payment_status, delivery_paid_at, manual_refund_status, refund_amount, platform_charge, delivery_charge, order_items(id, product_id, quantity, unit_price, seller_id, products(name)), order_supplier_acceptances(supplier_id, status, decline_reason), order_shipments(id, seller_id, carrier, tracking_number, tracking_url, status, notes, shipped_at, shipment_events(id, event_type, message, occurred_at))";
+  "id, status, cancel_requested, cancellation_initiator, payment_status, payment_method, tran_id, notes, created_at, delivery_verified_at, delivery_initiated_at, delivery_phone, delivery_address, delivery_city, delivery_postcode, delivery_payment_status, delivery_paid_at, manual_refund_status, refund_amount, platform_charge, delivery_charge, order_items(id, product_id, quantity, unit_price, seller_id, products(name)), order_supplier_acceptances(supplier_id, status, decline_reason), order_shipments(id, seller_id, carrier, tracking_number, tracking_url, status, notes, shipped_at, shipment_events(id, event_type, message, occurred_at))";
 
 type OrderItemRow = {
   id: string;
@@ -116,6 +117,7 @@ type OrderRow = {
   notes: string | null;
   created_at: string;
   delivery_verified_at: string | null;
+  delivery_initiated_at: string | null;
   delivery_phone: string | null;
   delivery_address: string | null;
   delivery_city: string | null;
@@ -170,6 +172,7 @@ function normalizeOrder(row: OrderRow): RetailerOrder {
     notes: row.notes,
     created_at: row.created_at,
     delivery_verified_at: row.delivery_verified_at ?? null,
+    delivery_initiated_at: row.delivery_initiated_at ?? null,
     delivery_phone: row.delivery_phone ?? null,
     delivery_address: row.delivery_address ?? null,
     delivery_city: row.delivery_city ?? null,
@@ -210,7 +213,7 @@ export function packageStatusLabel(status: string): string {
     case "confirmed":
       return "Confirmed";
     case "shipped":
-      return "Out for delivery";
+      return "Dispatched";
     case "delivered":
       return "Delivered";
     case "declined":
@@ -223,8 +226,9 @@ export function packageStatusLabel(status: string): string {
 /** Display label for the granular carrier shipment status on `order_shipments`. */
 export function shipmentStatusLabel(status: string): string {
   switch (status) {
+    case "dispatched":
     case "shipped":
-      return "Out for delivery";
+      return "Dispatched";
     case "in_transit":
       return "In transit";
     case "out_for_delivery":
@@ -242,6 +246,7 @@ const SHIPMENT_STATUS_RANK: Record<string, number> = {
   exception: 0,
   out_for_delivery: 1,
   in_transit: 2,
+  dispatched: 3,
   shipped: 3,
   delivered: 4,
 };
@@ -314,12 +319,7 @@ export async function clearCart(userId: string): Promise<void> {
 export type CancellationRequestResult = {
   status: "requested";
   initiator: "retailer";
-  refundPolicy:
-    | "manual_keep_delivery"
-    | "manual_less_charges"
-    | "delivery_not_refunded"
-    | "delivery_refund_requestable"
-    | "not_required";
+  refundPolicy: "manual_full" | "delivery_full" | "not_required";
 };
 
 export async function requestOrderCancellation(
@@ -371,11 +371,22 @@ export function orderTotal(order: RetailerOrder): number {
   return orderMerchandiseTotal(order) + Number(order.delivery_charge ?? 0);
 }
 
+/**
+ * The retailer may ask to cancel (and get a refund) only while the order is
+ * still on its way — never after it was marked delivered.
+ */
 export function canCancelOrder(order: RetailerOrder): boolean {
-  return (
-    order.status !== "cancelled" &&
-    !(order.status === "delivered" && order.delivery_verified_at) &&
-    !order.cancel_requested
+  return order.status !== "cancelled" && order.status !== "delivered" && !order.cancel_requested;
+}
+
+/**
+ * True once any parcel on the order was marked out for delivery (or already
+ * delivered). The prepaid delivery charge stops being refundable at that
+ * point — only merchandise comes back after that.
+ */
+export function orderIsOutOfDelivery(order: RetailerOrder): boolean {
+  return order.shipments.some(
+    (shipment) => shipment.status === "out_for_delivery" || shipment.status === "delivered",
   );
 }
 

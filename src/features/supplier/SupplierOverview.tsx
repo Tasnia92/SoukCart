@@ -197,7 +197,8 @@ function focusItems(dashboard: SupplierDashboard): ActionQueueEntry[] {
       id: "to-ship",
       icon: Truck,
       title: `${summary.toShip} order${summary.toShip === 1 ? "" : "s"} waiting on delivery`,
-      detail: "Confirmed. Mark these out for delivery and delivered.",
+      detail:
+        "Confirmed. Keep the delivery status up to date: dispatched, out for delivery, delivered.",
       severity: "attention",
       marker: "Waiting",
       to: "/supplier/orders",

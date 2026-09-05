@@ -57,11 +57,7 @@ import { PaymentBadge, shortId, StatusBadge } from "../orders/order-presentation
 import { formatDate, formatPrice } from "../workspace/format.ts";
 import { RouterLink } from "../workspace/WorkspaceShell.tsx";
 import { TradeLicenseCopyField } from "./trade-license-copy-field.tsx";
-import {
-  completeManualRefund,
-  updateOrderStatus,
-  type ActivityOrder,
-} from "./admin-activity-api.ts";
+import { completeManualRefund, type ActivityOrder } from "./admin-activity-api.ts";
 import { resolveComplaint } from "./admin-complaints-api.ts";
 import {
   ADMIN_DISPUTES_SECTION,
@@ -89,8 +85,6 @@ type AdminActionWorkspaceProps = {
 };
 
 type PendingMutation =
-  | { type: "reject-cancel"; order: ActivityOrder }
-  | { type: "approve-cancel"; order: ActivityOrder }
   | { type: "settle"; order: ActivityOrder }
   | { type: "resolve"; item: AdminQueueItem }
   | { type: "batch-settle"; orders: ActivityOrder[] }
@@ -110,14 +104,6 @@ export const QUEUE_KIND_LABELS: Record<AdminQueueKind, string> = {
   dispute: "Dispute",
   verification: "Verification",
 };
-
-function cancelRefundAmount(order: ActivityOrder): number {
-  if (order.payment_method !== "online" || order.payment_status !== "paid") return 0;
-  if (order.cancellation_initiator === "supplier") {
-    return Math.max(order.total + order.delivery_charge, 0);
-  }
-  return Math.max(order.total, 0);
-}
 
 function slaVariant(sla: AdminSlaBucket): "destructive" | "default" | "outline" {
   if (sla === "overdue") return "destructive";
@@ -289,27 +275,6 @@ export function AdminActionWorkspace({
 
   const confirmPending = () => {
     if (!pending) return;
-    if (pending.type === "reject-cancel") {
-      const order = pending.order;
-      run(
-        () => updateOrderStatus(order.id, order.status),
-        `Cancellation request for #${shortId(order.id)} was rejected.`,
-      );
-      return;
-    }
-    if (pending.type === "approve-cancel") {
-      const { order } = pending;
-      const refund = cancelRefundAmount(order);
-      run(
-        () => updateOrderStatus(order.id, "cancelled"),
-        refund
-          ? order.cancellation_initiator === "supplier"
-            ? `Order #${shortId(order.id)} was cancelled. Manual refund ${formatPrice(refund)} (merchandise + delivery) is pending.`
-            : `Order #${shortId(order.id)} was cancelled. Manual refund ${formatPrice(refund)} for merchandise is pending. Prepaid delivery is retained.`
-          : `Order #${shortId(order.id)} was cancelled. No advance refund is required.`,
-      );
-      return;
-    }
     if (pending.type === "settle") {
       const order = pending.order;
       run(
@@ -345,10 +310,6 @@ export function AdminActionWorkspace({
     );
   };
 
-  const requestApproveCancel = (order: ActivityOrder) => {
-    setPending({ type: "approve-cancel", order });
-  };
-
   const startBatch = () => {
     if (!canBatch || !selectedKind) return;
     if (selectedKind === "refund") {
@@ -365,18 +326,6 @@ export function AdminActionWorkspace({
 
   const pendingMessage = (() => {
     if (!pending) return "";
-    if (pending.type === "reject-cancel") {
-      return `Reject the cancellation request for order #${shortId(pending.order.id)}?`;
-    }
-    if (pending.type === "approve-cancel") {
-      const refund = cancelRefundAmount(pending.order);
-      const refundNote = refund
-        ? pending.order.cancellation_initiator === "supplier"
-          ? ` Record a pending manual refund of ${formatPrice(refund)} (merchandise + delivery).`
-          : ` Record a pending manual refund of ${formatPrice(refund)} for merchandise. Prepaid delivery is retained; no platform charge.`
-        : "";
-      return `Cancel order #${shortId(pending.order.id)} for ${pending.order.retailer_name}?${refundNote}`;
-    }
     if (pending.type === "settle") {
       return `Confirm that the manual refund of ${formatPrice(pending.order.refund_amount)} for order #${shortId(pending.order.id)} has been paid?`;
     }
@@ -714,30 +663,10 @@ export function AdminActionWorkspace({
           </div>
           <SheetFooter>
             {sheetItem?.kind === "cancellation" && sheetItem.order ? (
-              <>
-                <Button
-                  type="button"
-                  variant="destructive"
-                  disabled={busy}
-                  onClick={() => {
-                    const order = sheetItem.order;
-                    if (order) requestApproveCancel(order);
-                  }}
-                >
-                  Approve &amp; cancel
-                </Button>
-                <Button
-                  type="button"
-                  variant="outline"
-                  disabled={busy}
-                  onClick={() => {
-                    const order = sheetItem.order;
-                    if (order) setPending({ type: "reject-cancel", order });
-                  }}
-                >
-                  Reject request
-                </Button>
-              </>
+              <p className="text-sm text-muted-foreground">
+                The suppliers on the order review cancellation requests. Admin has read-only
+                oversight.
+              </p>
             ) : null}
             {sheetItem?.kind === "refund" && sheetItem.order?.manual_refund_status === "pending" ? (
               <Button
@@ -802,15 +731,7 @@ export function AdminActionWorkspace({
           </AlertDialogHeader>
           <AlertDialogFooter>
             <AlertDialogCancel type="button">Cancel</AlertDialogCancel>
-            <AlertDialogAction
-              type="button"
-              variant={
-                pending?.type === "approve-cancel" || pending?.type === "reject-cancel"
-                  ? "destructive"
-                  : "default"
-              }
-              onClick={confirmPending}
-            >
+            <AlertDialogAction type="button" variant="default" onClick={confirmPending}>
               Confirm
             </AlertDialogAction>
           </AlertDialogFooter>

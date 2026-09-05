@@ -64,7 +64,7 @@ function ComplaintCard({ complaint }: { complaint: RetailerComplaint }) {
           <CardTitle>{complaint.subject}</CardTitle>
           <CardDescription>
             {complaint.order_id
-              ? `Order #${shortId(complaint.order_id)} · cancellation/refund support`
+              ? `Order #${shortId(complaint.order_id)} · order support`
               : `Filed ${formatDateTime(complaint.created_at)}`}
           </CardDescription>
           <CardAction>
@@ -196,7 +196,7 @@ export function RetailerComplaints({
       setComplaints((prev) => [created, ...(prev ?? [])]);
       setNotice({
         message: linkedOrderId
-          ? "Support request filed. The admin team will review the cancellation and manual refund."
+          ? "Support request filed. The admin team will review it and follow up."
           : "Complaint filed. The admin team will review it.",
         state: "success",
       });
@@ -226,7 +226,7 @@ export function RetailerComplaints({
         title={linkedOrderId ? `Order #${shortId(linkedOrderId)} support.` : "Help Center."}
         copy={
           linkedOrderId
-            ? "Request admin help with cancellation and a manual refund after verified delivery."
+            ? "Delivered orders can't be returned or refunded, but you can ask the admin team for help with any issue."
             : "Tell us what went wrong."
         }
       />
@@ -269,7 +269,7 @@ export function RetailerComplaints({
               </CardTitle>
               <CardDescription>
                 {linkedOrderId
-                  ? `This request is linked to order #${shortId(linkedOrderId)}. Only the admin can cancel a verified delivery and record its manual refund.`
+                  ? `This request is linked to order #${shortId(linkedOrderId)}. Delivered orders can't be cancelled or refunded — the admin team will review your complaint and help resolve it.`
                   : "Share the details our support team needs to investigate."}
               </CardDescription>
             </CardHeader>
@@ -282,7 +282,7 @@ export function RetailerComplaints({
                     name="subject"
                     type="text"
                     maxLength={120}
-                    defaultValue={linkedOrderId ? "Cancellation and refund request" : ""}
+                    defaultValue={linkedOrderId ? "Delivered order support" : ""}
                     placeholder="What is this about?"
                     required
                   />

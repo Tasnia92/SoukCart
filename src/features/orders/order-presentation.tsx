@@ -13,7 +13,7 @@ export function statusLabel(status: string): string {
     case "confirmed":
       return "Confirmed";
     case "shipped":
-      return "Out for delivery";
+      return "Dispatched";
     case "delivered":
       return "Delivered";
     case "cancelled":

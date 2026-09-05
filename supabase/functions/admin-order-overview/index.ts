@@ -15,13 +15,7 @@ const corsHeaders = {
 type RequestBody = {
   action?: unknown;
   orderId?: unknown;
-  status?: unknown;
-  platformCharge?: unknown;
-  deliveryCharge?: unknown;
-  supplierId?: unknown;
 };
-
-const ORDER_STATUSES = ["pending", "confirmed", "shipped", "delivered", "cancelled"] as const;
 
 type Caller = {
   id: string;
@@ -50,6 +44,7 @@ type ActivityOrder = {
   created_at: string;
   delivered_at: string | null;
   delivery_verified_at: string | null;
+  delivery_initiated_at: string | null;
   delivery_phone: string | null;
   delivery_address: string | null;
   delivery_city: string | null;
@@ -112,8 +107,8 @@ Deno.serve(async (request) => {
     if (body.action === "list") {
       return await listActivity();
     }
-    if (body.action === "update-status") {
-      return await updateStatus(caller, body);
+    if (body.action === "initiate-delivery") {
+      return await initiateDelivery(caller, body);
     }
     if (body.action === "complete-refund") {
       return await completeRefund(caller, body);
@@ -160,7 +155,7 @@ async function listActivity(): Promise<Response> {
   const { data, error } = await admin
     .from("orders")
     .select(
-      "id, status, cancel_requested, cancellation_initiator, cancellation_reason, payment_status, payment_method, created_at, delivered_at, delivery_verified_at, delivery_phone, delivery_address, delivery_city, delivery_postcode, platform_charge, delivery_charge, delivery_payment_status, refund_amount, manual_refund_status, refund_completed_at, retailer_id, users!orders_retailer_id_fkey(name, email), order_items(id, product_id, quantity, unit_price, products(id, name, seller_id, users!products_seller_id_fkey(name, email))), order_supplier_acceptances(supplier_id, status, declined_at, decline_reason)",
+      "id, status, cancel_requested, cancellation_initiator, cancellation_reason, payment_status, payment_method, created_at, delivered_at, delivery_verified_at, delivery_initiated_at, delivery_phone, delivery_address, delivery_city, delivery_postcode, platform_charge, delivery_charge, delivery_payment_status, refund_amount, manual_refund_status, refund_completed_at, retailer_id, users!orders_retailer_id_fkey(name, email), order_items(id, product_id, quantity, unit_price, products(id, name, seller_id, users!products_seller_id_fkey(name, email))), order_supplier_acceptances(supplier_id, status, declined_at, decline_reason)",
     )
     .order("created_at", { ascending: false })
     .limit(1000);
@@ -198,6 +193,7 @@ async function listActivity(): Promise<Response> {
       created_at: row.created_at,
       delivered_at: row.delivered_at,
       delivery_verified_at: row.delivery_verified_at,
+      delivery_initiated_at: row.delivery_initiated_at ?? null,
       delivery_phone: row.delivery_phone,
       delivery_address: row.delivery_address,
       delivery_city: row.delivery_city,
@@ -238,30 +234,15 @@ async function listActivity(): Promise<Response> {
   return json({ summary, orders });
 }
 
-async function updateStatus(caller: Caller, body: RequestBody): Promise<Response> {
+async function initiateDelivery(caller: Caller, body: RequestBody): Promise<Response> {
   const orderId = readUuid(body.orderId);
-  const status = typeof body.status === "string" ? body.status : "";
   if (!orderId) {
     return json({ error: "A valid order is required." }, 400);
   }
-  if (!(ORDER_STATUSES as readonly string[]).includes(status)) {
-    return json({ error: "Choose a valid order status." }, 400);
-  }
 
-  const platformCharge = readMoney(body.platformCharge);
-  const deliveryCharge = readMoney(body.deliveryCharge);
-  if (platformCharge === null || deliveryCharge === null) {
-    return json({ error: "Cancellation charges must be valid non-negative amounts." }, 400);
-  }
-
-  const supplierId = readUuid(body.supplierId);
-  const { data, error } = await admin.rpc("admin_update_order_status", {
+  const { data, error } = await admin.rpc("admin_initiate_delivery", {
     p_order_id: orderId,
-    p_status: status,
     p_admin_id: caller.id,
-    p_platform_charge: platformCharge,
-    p_delivery_charge: deliveryCharge,
-    p_supplier_id: supplierId,
   });
   if (error) {
     return json({ error: error.message }, 400);
@@ -296,6 +277,7 @@ type OrderRow = {
   created_at: string;
   delivered_at: string | null;
   delivery_verified_at: string | null;
+  delivery_initiated_at: string | null;
   delivery_phone: string | null;
   delivery_address: string | null;
   delivery_city: string | null;
@@ -367,12 +349,6 @@ function packagesFrom(row: OrderRow, lines: ActivityLine[]): ActivityPackage[] {
 
 function roundMoney(value: number): number {
   return Math.round(value * 100) / 100;
-}
-
-function readMoney(value: unknown): number | null {
-  if (value === undefined || value === null || value === "") return 0;
-  const amount = typeof value === "number" || typeof value === "string" ? Number(value) : NaN;
-  return Number.isFinite(amount) && amount >= 0 ? roundMoney(amount) : null;
 }
 
 async function readBody(request: Request): Promise<RequestBody> {

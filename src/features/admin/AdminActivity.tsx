@@ -54,20 +54,21 @@ import {
   PaymentBadge,
   shortId,
   StatusBadge,
-  statusLabel,
 } from "../orders/order-presentation.tsx";
 import { formatDate, formatPrice, initials } from "../workspace/format.ts";
 import { recordIdFromHash, searchParam } from "../workspace/search.ts";
 import {
   canFulfillOrder,
+  canInitiateDelivery,
   collectCodPayment,
   completeManualRefund,
   filterActivityOrders,
+  initiateDelivery,
+  isDeliveryInitiated,
   loadAdminActivity,
   needsCodCollection,
   packageStatusLabel,
   parseAdminOrderView,
-  updateOrderStatus,
   type ActivityOrder,
   type ActivityResponse,
 } from "./admin-activity-api.ts";
@@ -77,28 +78,6 @@ type AdminActivityProps = {
 };
 
 type Notice = { message: string; state: NoticeState } | null;
-
-type PendingStatusChange = {
-  order: ActivityOrder;
-  status: string;
-  approved: boolean;
-  rejecting: boolean;
-  refundAmount: number;
-  message: string;
-};
-
-function canCancelOrder(order: ActivityOrder): boolean {
-  return order.status !== "cancelled";
-}
-
-function cancelRefundAmount(order: ActivityOrder): number {
-  if (order.payment_method !== "online" || order.payment_status !== "paid") return 0;
-  if (order.cancellation_initiator === "supplier") {
-    return Math.max(order.total + order.delivery_charge, 0);
-  }
-  // Retailer/admin/support cancel: merchandise only; prepaid delivery retained.
-  return Math.max(order.total, 0);
-}
 
 function OrderFlag({ children }: { children: string }) {
   return <Badge variant="outline">{children}</Badge>;
@@ -119,7 +98,7 @@ export function AdminActivity({ loadActivity = loadAdminActivity }: AdminActivit
   const [searchTerm, setSearchTerm] = useState("");
   const [notice, setNotice] = useState<Notice>(null);
   const [busyId, setBusyId] = useState<string | null>(null);
-  const [pendingStatusChange, setPendingStatusChange] = useState<PendingStatusChange | null>(null);
+  const [initiateTarget, setInitiateTarget] = useState<ActivityOrder | null>(null);
   const [refundConfirmation, setRefundConfirmation] = useState<ActivityOrder | null>(null);
   const [codConfirmation, setCodConfirmation] = useState<ActivityOrder | null>(null);
 
@@ -171,64 +150,25 @@ export function AdminActivity({ loadActivity = loadAdminActivity }: AdminActivit
     );
   }
 
-  const requestStatusChange = (order: ActivityOrder, status: string) => {
-    const approved = status === "cancelled" && order.status !== "cancelled";
-    const rejecting = order.cancel_requested && status === order.status;
-    const refundAmount = approved ? cancelRefundAmount(order) : 0;
-    const refundNote = refundAmount
-      ? order.cancellation_initiator === "supplier"
-        ? ` Record a pending manual refund of ${formatPrice(refundAmount)} (merchandise + delivery).`
-        : ` Record a pending manual refund of ${formatPrice(refundAmount)} for merchandise. Prepaid delivery is retained; no platform charge.`
-      : "";
-    const message = rejecting
-      ? `Reject the cancellation request for order #${shortId(order.id)}?`
-      : approved
-        ? `Cancel order #${shortId(order.id)} for ${order.retailer_name}?${refundNote}`
-        : `Set order #${shortId(order.id)} to ${statusLabel(status)}?`;
-
-    setPendingStatusChange({
-      order,
-      status,
-      approved,
-      rejecting,
-      refundAmount,
-      message,
-    });
-  };
-
-  const confirmStatusChange = () => {
-    if (!pendingStatusChange) return;
-    const { order, status, approved, rejecting, refundAmount } = pendingStatusChange;
-    setPendingStatusChange(null);
+  const confirmInitiateDelivery = () => {
+    if (!initiateTarget) return;
+    const order = initiateTarget;
+    setInitiateTarget(null);
     setBusyId(order.id);
-    void updateOrderStatus(order.id, status)
+    void initiateDelivery(order.id)
       .then(() => {
-        setNotice(
-          rejecting
-            ? {
-                message: `Cancellation request for #${shortId(order.id)} was rejected.`,
-                state: "info",
-              }
-            : approved
-              ? {
-                  message: refundAmount
-                    ? `Order #${shortId(order.id)} was cancelled. Manual refund ${formatPrice(refundAmount)} is pending.`
-                    : `Order #${shortId(order.id)} was cancelled. No advance refund is required.`,
-                  state: "success",
-                }
-              : {
-                  message: `Order #${shortId(order.id)} is now ${statusLabel(status)}.`,
-                  state: "success",
-                },
-        );
+        setNotice({
+          message: `Delivery was initiated for order #${shortId(order.id)}. The suppliers will dispatch the parcels and keep the status up to date.`,
+          state: "success",
+        });
         setLoadVersion((version) => version + 1);
       })
-      .catch((statusError: unknown) => {
+      .catch((initiateError: unknown) => {
         setNotice({
           message:
-            statusError instanceof Error
-              ? statusError.message
-              : "The order status could not be updated.",
+            initiateError instanceof Error
+              ? initiateError.message
+              : "Delivery could not be initiated.",
           state: "error",
         });
       })
@@ -394,6 +334,9 @@ export function AdminActivity({ loadActivity = loadAdminActivity }: AdminActivit
                                       {`Cancel requested by ${order.cancellation_initiator}`}
                                     </OrderFlag>
                                   ) : null}
+                                  {isDeliveryInitiated(order) ? (
+                                    <OrderFlag>Delivery initiated</OrderFlag>
+                                  ) : null}
                                   {order.delivery_verified_at ? (
                                     <OrderFlag>Delivery verified</OrderFlag>
                                   ) : null}
@@ -470,7 +413,11 @@ export function AdminActivity({ loadActivity = loadAdminActivity }: AdminActivit
                                   </AlertDescription>
                                 </Alert>
                               ) : null}
-                              <DeliveryStatusCard status={order.status} audience="admin" />
+                              <DeliveryStatusCard
+                                status={order.status}
+                                audience="admin"
+                                progress={{ deliveryInitiated: isDeliveryInitiated(order) }}
+                              />
                               {(order.packages ?? []).length ? (
                                 <ul className="flex flex-col gap-2">
                                   {(order.packages ?? []).map((pkg) => (
@@ -497,8 +444,31 @@ export function AdminActivity({ loadActivity = loadAdminActivity }: AdminActivit
                                 <Alert>
                                   <AlertTitle>Waiting on supplier</AlertTitle>
                                   <AlertDescription>
-                                    The supplier confirms their items, then marks the parcel out for
-                                    delivery and delivered. Monitor the progress here.
+                                    Every supplier confirms their own items first. Once they all
+                                    confirm, initiate delivery here.
+                                  </AlertDescription>
+                                </Alert>
+                              ) : null}
+                              {order.status === "confirmed" && !isDeliveryInitiated(order) ? (
+                                <Alert>
+                                  <AlertTitle>
+                                    {canInitiateDelivery(order)
+                                      ? "Ready for delivery"
+                                      : "Waiting on supplier"}
+                                  </AlertTitle>
+                                  <AlertDescription>
+                                    {canInitiateDelivery(order)
+                                      ? "Every supplier confirmed. Initiate delivery to start the delivery process — the suppliers then mark the parcels dispatched, out for delivery, and delivered."
+                                      : "Some items are still waiting for supplier confirmation. Delivery can be initiated once every supplier confirms."}
+                                  </AlertDescription>
+                                </Alert>
+                              ) : null}
+                              {isDeliveryInitiated(order) && order.status !== "delivered" ? (
+                                <Alert>
+                                  <AlertTitle>Delivery initiated</AlertTitle>
+                                  <AlertDescription>
+                                    The suppliers keep the delivery status up to date: dispatched,
+                                    out for delivery, delivered. Admin cannot change it.
                                   </AlertDescription>
                                 </Alert>
                               ) : null}
@@ -512,41 +482,21 @@ export function AdminActivity({ loadActivity = loadAdminActivity }: AdminActivit
                               ) : null}
                               <div className="flex flex-wrap items-center gap-2">
                                 {order.cancel_requested ? (
-                                  <>
-                                    <OrderFlag>
-                                      {`Cancellation requested by ${order.cancellation_initiator}`}
-                                    </OrderFlag>
-                                    <Button
-                                      variant="destructive"
-                                      size="sm"
-                                      type="button"
-                                      disabled={busyId === order.id}
-                                      onClick={() => requestStatusChange(order, "cancelled")}
-                                    >
-                                      {busyId === order.id ? (
-                                        <Spinner data-icon="inline-start" />
-                                      ) : null}
-                                      Approve &amp; cancel
-                                    </Button>
-                                    <Button
-                                      variant="ghost"
-                                      size="sm"
-                                      type="button"
-                                      disabled={busyId === order.id}
-                                      onClick={() => requestStatusChange(order, order.status)}
-                                    >
-                                      Reject request
-                                    </Button>
-                                  </>
-                                ) : canCancelOrder(order) ? (
+                                  <OrderFlag>
+                                    {`Cancellation requested by ${order.cancellation_initiator} · suppliers review it`}
+                                  </OrderFlag>
+                                ) : null}
+                                {canInitiateDelivery(order) ? (
                                   <Button
-                                    variant="destructive"
-                                    size="sm"
                                     type="button"
+                                    size="sm"
                                     disabled={busyId === order.id}
-                                    onClick={() => requestStatusChange(order, "cancelled")}
+                                    onClick={() => setInitiateTarget(order)}
                                   >
-                                    Cancel order
+                                    {busyId === order.id ? (
+                                      <Spinner data-icon="inline-start" />
+                                    ) : null}
+                                    Initiate delivery
                                   </Button>
                                 ) : null}
                                 {needsCodCollection(order) ? (
@@ -603,24 +553,25 @@ export function AdminActivity({ loadActivity = loadAdminActivity }: AdminActivit
       )}
 
       <AlertDialog
-        open={Boolean(pendingStatusChange)}
+        open={Boolean(initiateTarget)}
         onOpenChange={(open) => {
-          if (!open) setPendingStatusChange(null);
+          if (!open) setInitiateTarget(null);
         }}
       >
         <AlertDialogContent>
           <AlertDialogHeader>
-            <AlertDialogTitle>Confirm order status change</AlertDialogTitle>
-            <AlertDialogDescription>{pendingStatusChange?.message}</AlertDialogDescription>
+            <AlertDialogTitle>
+              Initiate delivery for order #{initiateTarget ? shortId(initiateTarget.id) : ""}?
+            </AlertDialogTitle>
+            <AlertDialogDescription>
+              This starts the delivery process. The suppliers are asked to dispatch their parcels
+              and keep the delivery status up to date — dispatched, out for delivery, delivered.
+            </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
-            <AlertDialogCancel type="button">Cancel</AlertDialogCancel>
-            <AlertDialogAction
-              type="button"
-              variant={pendingStatusChange?.approved ? "destructive" : "default"}
-              onClick={confirmStatusChange}
-            >
-              Confirm
+            <AlertDialogCancel type="button">Not yet</AlertDialogCancel>
+            <AlertDialogAction type="button" onClick={confirmInitiateDelivery}>
+              Initiate delivery
             </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>

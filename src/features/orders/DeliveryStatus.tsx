@@ -15,67 +15,102 @@ import { Spinner } from "@/components/ui/spinner";
 import { cn } from "@/lib/utils";
 import { StatusBadge, statusLabel, type OrderStatus } from "./order-presentation.tsx";
 
+/**
+ * The full order progression, visible to every role:
+ * placed → supplier confirmed → admin initiated delivery →
+ * supplier dispatched → out for delivery → delivered.
+ * `delivery_initiated` and `out_for_delivery` are not order statuses — they are
+ * derived from the admin gate and the parcel state.
+ */
 export const DELIVERY_STEPS = [
   { id: "pending", label: "Placed", hint: "Order received" },
-  { id: "confirmed", label: "Confirmed", hint: "Ready to send" },
-  { id: "shipped", label: "Out for delivery", hint: "On the way" },
+  { id: "confirmed", label: "Confirmed", hint: "Suppliers confirmed" },
+  { id: "delivery_initiated", label: "Delivery initiated", hint: "Admin started it" },
+  { id: "shipped", label: "Dispatched", hint: "Left the shop" },
+  { id: "out_for_delivery", label: "Out for delivery", hint: "Arriving soon" },
   { id: "delivered", label: "Delivered", hint: "Arrived" },
 ] as const;
 
 export type DeliveryStepId = (typeof DELIVERY_STEPS)[number]["id"];
 export type DeliveryAudience = "admin" | "retailer" | "supplier";
 
+/** Extra context that refines the whole-order status onto the step ladder. */
+export type DeliveryProgress = {
+  /** Admin pressed "Initiate delivery". */
+  deliveryInitiated?: boolean;
+  /** Status of the parcel the retailer should look at first. */
+  parcelStatus?: string | null;
+};
+
 const STEP_INDEX: Record<DeliveryStepId, number> = {
   pending: 0,
   confirmed: 1,
-  shipped: 2,
-  delivered: 3,
+  delivery_initiated: 2,
+  shipped: 3,
+  out_for_delivery: 4,
+  delivered: 5,
 };
 
 export function isDeliveryStep(status: string): status is DeliveryStepId {
   return status in STEP_INDEX;
 }
 
-/** Position on the 4-step delivery ladder; -1 for cancelled/unknown statuses. */
-export function deliveryStepIndex(status: string): number {
-  return isDeliveryStep(status) ? STEP_INDEX[status] : -1;
-}
-
-export function nextDeliveryStatus(status: string): "confirmed" | "shipped" | "delivered" | null {
+/**
+ * Position on the 6-step delivery ladder; -1 for cancelled/unknown statuses.
+ * Confirmed orders sit on "Confirmed" until admin initiates delivery, and
+ * dispatched orders move to "Out for delivery" once a parcel says so.
+ */
+export function deliveryStepIndex(status: string, progress: DeliveryProgress = {}): number {
+  if (!isDeliveryStep(status)) return -1;
   switch (status) {
     case "pending":
-      return "confirmed";
+      return STEP_INDEX.pending;
     case "confirmed":
-      return "shipped";
+      return progress.deliveryInitiated ? STEP_INDEX.delivery_initiated : STEP_INDEX.confirmed;
     case "shipped":
-      return "delivered";
+      return progress.parcelStatus === "out_for_delivery"
+        ? STEP_INDEX.out_for_delivery
+        : STEP_INDEX.shipped;
+    case "delivered":
+      return STEP_INDEX.delivered;
     default:
-      return null;
+      return -1;
   }
 }
 
-export function nextDeliveryActionLabel(status: string): string | null {
-  switch (status) {
-    case "pending":
-      return "Confirm order";
+/** Supplier action labels, keyed by the delivery action the supplier takes. */
+export function deliveryActionLabel(action: string): string | null {
+  switch (action) {
     case "confirmed":
+      return "Confirm order";
+    case "dispatched":
+      return "Mark dispatched";
+    case "out_for_delivery":
       return "Mark out for delivery";
-    case "shipped":
+    case "delivered":
       return "Mark delivered";
     default:
       return null;
   }
 }
 
-export function deliveryProgressValue(status: string): number {
-  if (!isDeliveryStep(status)) return 0;
-  return (STEP_INDEX[status] / (DELIVERY_STEPS.length - 1)) * 100;
+export function deliveryProgressValue(status: string, progress: DeliveryProgress = {}): number {
+  const index = deliveryStepIndex(status, progress);
+  if (index < 0) return 0;
+  return (index / (DELIVERY_STEPS.length - 1)) * 100;
 }
 
-export function deliveryStatusCopy(status: string, audience: DeliveryAudience): string {
+export function deliveryStatusCopy(
+  status: string,
+  audience: DeliveryAudience,
+  progress: DeliveryProgress = {},
+): string {
+  const initiated = progress.deliveryInitiated === true;
+
   if (status === "cancelled") {
     if (audience === "retailer") return "This order was cancelled.";
-    if (audience === "supplier") return "This order was cancelled. Admin is handling any refund.";
+    if (audience === "supplier")
+      return "This order was cancelled. Any refund is handled for the retailer.";
     return "This order is cancelled.";
   }
 
@@ -84,9 +119,13 @@ export function deliveryStatusCopy(status: string, audience: DeliveryAudience): 
       case "pending":
         return "Your order is placed. Each supplier confirms their own items next.";
       case "confirmed":
-        return "Confirmed. Your parcels are being prepared and will be out for delivery soon.";
+        return initiated
+          ? "Delivery initiated. Your parcels will be dispatched soon."
+          : "Confirmed. Delivery starts once admin initiates it.";
       case "shipped":
-        return "Your order is out for delivery.";
+        return progress.parcelStatus === "out_for_delivery"
+          ? "Your order is out for delivery."
+          : "Your order has been dispatched.";
       case "delivered":
         return "Delivered. Please confirm you received it.";
       default:
@@ -99,9 +138,13 @@ export function deliveryStatusCopy(status: string, audience: DeliveryAudience): 
       case "pending":
         return "Confirm this order, then keep delivery status up to date.";
       case "confirmed":
-        return "Mark the parcel out for delivery when it leaves your shop.";
+        return initiated
+          ? "Delivery initiated. Mark the parcel dispatched when it leaves your shop."
+          : "Waiting for admin to initiate delivery. Have the parcel ready to go.";
       case "shipped":
-        return "Out for delivery. Mark it delivered once the retailer receives it.";
+        return progress.parcelStatus === "out_for_delivery"
+          ? "Out for delivery. Mark it delivered once the retailer receives it."
+          : "Dispatched. Mark it out for delivery when the courier takes it.";
       case "delivered":
         return "You marked this order delivered.";
       default:
@@ -111,11 +154,15 @@ export function deliveryStatusCopy(status: string, audience: DeliveryAudience): 
 
   switch (status) {
     case "pending":
-      return "Waiting for the supplier to confirm. Suppliers keep delivery status up to date.";
+      return "Waiting for the suppliers to confirm. Suppliers keep delivery status up to date.";
     case "confirmed":
-      return "The supplier marks this out for delivery and delivered. Monitor progress here.";
+      return initiated
+        ? "Delivery initiated. The suppliers mark the parcels dispatched, out for delivery, and delivered."
+        : "Confirmed. Initiate delivery once every supplier has confirmed.";
     case "shipped":
-      return "Out for delivery. The supplier marks it delivered once it arrives.";
+      return progress.parcelStatus === "out_for_delivery"
+        ? "Out for delivery. The supplier marks it delivered once it arrives."
+        : "Dispatched. The suppliers keep the delivery status up to date.";
     case "delivered":
       return "Delivery is complete.";
     default:
@@ -126,6 +173,7 @@ export function deliveryStatusCopy(status: string, audience: DeliveryAudience): 
 export function DeliveryStatusCard({
   status,
   audience,
+  progress = {},
   nextLabel,
   onNext,
   nextDisabled = false,
@@ -133,15 +181,16 @@ export function DeliveryStatusCard({
 }: {
   status: OrderStatus | string;
   audience: DeliveryAudience;
+  progress?: DeliveryProgress;
   nextLabel?: string | null;
   onNext?: () => void;
   nextDisabled?: boolean;
   busy?: boolean;
 }) {
   const cancelled = status === "cancelled";
-  const currentIndex = isDeliveryStep(status) ? STEP_INDEX[status] : -1;
-  const copy = deliveryStatusCopy(status, audience);
-  const actionLabel = nextLabel ?? nextDeliveryActionLabel(status);
+  const currentIndex = deliveryStepIndex(status, progress);
+  const copy = deliveryStatusCopy(status, audience, progress);
+  const actionLabel = nextLabel ?? null;
   const showAction = Boolean(onNext && actionLabel && !cancelled);
 
   return (
@@ -158,11 +207,12 @@ export function DeliveryStatusCard({
           <Badge variant="destructive">Cancelled</Badge>
         ) : (
           <>
-            <ol className="grid grid-cols-4 gap-2">
+            <ol className="grid grid-cols-3 gap-2 sm:grid-cols-6">
               {DELIVERY_STEPS.map((step, index) => {
                 const complete = currentIndex > index;
                 const current = currentIndex === index;
-                const Icon = step.id === "shipped" ? Truck : Package;
+                const Icon =
+                  step.id === "shipped" || step.id === "out_for_delivery" ? Truck : Package;
                 return (
                   <li
                     key={step.id}
@@ -201,7 +251,7 @@ export function DeliveryStatusCard({
               })}
             </ol>
             <Progress
-              value={deliveryProgressValue(status)}
+              value={deliveryProgressValue(status, progress)}
               aria-label={`Delivery progress: ${statusLabel(status)}`}
             />
           </>

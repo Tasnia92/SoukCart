@@ -72,6 +72,44 @@ security advisors show no new findings. _(Phase 1 complete.)_
 Move order status control from the admin to the seller. Admin keeps
 cancellation/dispute powers only.
 
+### Delivered flow (implemented 2026-09-05)
+
+The full order progression, visible to every role:
+
+    retailer places order → supplier(s) confirm → admin initiates delivery →
+    supplier: dispatched → out for delivery → delivered → retailer verifies
+
+- **Admin cannot confirm, change, or cancel orders.** Admin's only order
+  action is **"Initiate delivery"** (once every supplier package is confirmed
+  and the order is paid). Admin notifications on confirm/dispatch/deliver are
+  informational; refund settlement and COD collection stay with admin.
+- **Suppliers own the delivery ladder** via `seller_set_order_status`:
+  `confirmed → dispatched → out_for_delivery → delivered`. Dispatch and later
+  steps are blocked until `admin_initiate_delivery` sets
+  `orders.delivery_initiated_at`. The order-level status stays
+  `pending/confirmed/shipped/delivered/cancelled`; `shipped` displays as
+  "Dispatched" and `out_for_delivery` is parcel-level (`order_shipments`).
+- **Cancellations moved to the suppliers.** A retailer can request
+  cancellation only before delivery; any supplier on the order approves or
+  rejects it (`seller_respond_order_cancellation`). Suppliers cancel
+  single-supplier orders directly (`seller_cancel_order`, e.g. out of stock).
+  Delivered orders can never be cancelled or refunded by anyone — the refund
+  window closes when the parcel is marked delivered.
+- **Refund policy follows the delivery stage** (2026-09-05). Delivered orders
+  are closed: the retailer cannot ask for a return or refund, only open a
+  complaint (the retailer-facing `request_order_return` RPC was dropped).
+  A supplier-confirmed cancellation — the supplier cancels directly or approves
+  the retailer's request — refunds everything the retailer paid in advance:
+  merchandise + delivery for online orders, the prepaid delivery charge for COD
+  (queued automatically, no request step). Once any parcel is out for delivery
+  the prepaid delivery charge is kept no matter who cancels; only merchandise
+  is refunded.
+- **Retailer visibility**: a 6-step tracker (Placed, Confirmed, Delivery
+  initiated, Dispatched, Out for delivery, Delivered) on orders/tracking, plus
+  realtime parcel events.
+
+---
+
 - [ ] **Decide multi-supplier model** (see open decisions). Assuming per-supplier
       fulfillment:
 - [ ] Evolve `order_supplier_acceptances` into a per-supplier fulfillment record

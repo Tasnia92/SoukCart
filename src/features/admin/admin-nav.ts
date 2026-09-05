@@ -33,7 +33,7 @@ export const ADMIN_ORDER_VIEWS: readonly AdminOrderViewMeta[] = [
     label: "New orders",
     icon: Clock3,
     title: "New orders",
-    copy: "Fresh orders waiting for supplier confirmation and delivery.",
+    copy: "Fresh orders waiting for supplier confirmation. Initiate delivery once they confirm.",
     search: { view: "new" },
   },
   {
@@ -41,7 +41,7 @@ export const ADMIN_ORDER_VIEWS: readonly AdminOrderViewMeta[] = [
     label: "Out for delivery",
     icon: Truck,
     title: "Out for delivery",
-    copy: "Orders on the way. Suppliers mark them delivered once they arrive.",
+    copy: "Orders handed over for delivery — dispatched or out for delivery. Suppliers keep the status current.",
     search: { view: "dispatched" },
   },
   {
@@ -57,7 +57,7 @@ export const ADMIN_ORDER_VIEWS: readonly AdminOrderViewMeta[] = [
     label: "Cancellations",
     icon: AlertTriangle,
     title: "Cancellations",
-    copy: "Cancel requests and cancelled orders.",
+    copy: "Cancellation requests and cancelled orders. Suppliers approve or reject the requests; admin has read-only oversight.",
     search: { view: "cancellations" },
   },
   {
@@ -73,7 +73,7 @@ export const ADMIN_ORDER_VIEWS: readonly AdminOrderViewMeta[] = [
     label: "All orders",
     icon: ClipboardList,
     title: "All orders",
-    copy: "Monitor every order. Suppliers update delivery status; cancellations, refunds, and COD are handled here.",
+    copy: "Monitor every order. Suppliers confirm and deliver; admin initiates delivery and settles refunds and COD.",
     search: {},
   },
 ];

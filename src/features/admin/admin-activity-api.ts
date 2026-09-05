@@ -34,6 +34,7 @@ export type ActivityOrder = {
   created_at: string;
   delivered_at: string | null;
   delivery_verified_at: string | null;
+  delivery_initiated_at: string | null;
   delivery_phone: string | null;
   delivery_address: string | null;
   delivery_city: string | null;
@@ -73,11 +74,6 @@ export type ActivityResponse = {
   orders: ActivityOrder[];
 };
 
-export type CancellationCharges = {
-  platformCharge: number;
-  deliveryCharge?: number;
-};
-
 export function orderPaidTotal(order: Pick<ActivityOrder, "total" | "delivery_charge">): number {
   return Math.max(order.total + order.delivery_charge, 0);
 }
@@ -87,28 +83,40 @@ export async function loadAdminActivity(): Promise<ActivityResponse> {
 }
 
 /**
- * Admin status changes are cancellation-only: approve a request (cancel) or
- * reject it (same status). Suppliers own confirm, out for delivery, delivered.
+ * Admin delivery initiation: after every supplier confirms, admin hands the
+ * order to the suppliers by starting the delivery process. Suppliers then keep
+ * the delivery status (dispatched, out for delivery, delivered) up to date.
  */
-export async function updateOrderStatus(
-  orderId: string,
-  status: string,
-  charges: CancellationCharges = { platformCharge: 0 },
-): Promise<void> {
-  await invokeAdmin<unknown>(
-    {
-      action: "update-status",
-      orderId,
-      status,
-      platformCharge: charges.platformCharge,
-      deliveryCharge: 0,
-    },
-    ADMIN_ACTIVITY_FUNCTION,
-  );
+export async function initiateDelivery(orderId: string): Promise<void> {
+  await invokeAdmin<unknown>({ action: "initiate-delivery", orderId }, ADMIN_ACTIVITY_FUNCTION);
 }
 
 export async function completeManualRefund(orderId: string): Promise<void> {
   await invokeAdmin<unknown>({ action: "complete-refund", orderId }, ADMIN_ACTIVITY_FUNCTION);
+}
+
+/** True once admin started the delivery process for this order. */
+export function isDeliveryInitiated(order: ActivityOrder): boolean {
+  return Boolean(order.delivery_initiated_at);
+}
+
+function hasPendingPackages(order: ActivityOrder): boolean {
+  return (order.packages ?? []).some((pkg) => pkg.status === "pending");
+}
+
+/**
+ * The one admin fulfillment action: start delivery once every supplier has
+ * confirmed, the order is paid, and nobody asked to cancel it.
+ */
+export function canInitiateDelivery(order: ActivityOrder): boolean {
+  return (
+    order.status === "confirmed" &&
+    !isDeliveryInitiated(order) &&
+    !order.cancel_requested &&
+    (order.packages ?? []).length > 0 &&
+    !hasPendingPackages(order) &&
+    canFulfillOrder(order)
+  );
 }
 
 export function packageStatusLabel(status: string): string {
@@ -116,9 +124,9 @@ export function packageStatusLabel(status: string): string {
     case "pending":
       return "Waiting on supplier";
     case "confirmed":
-      return "Ready to go out";
+      return "Confirmed";
     case "shipped":
-      return "Out for delivery";
+      return "Dispatched";
     case "delivered":
       return "Delivered";
     case "declined":

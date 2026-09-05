@@ -52,8 +52,9 @@ function notificationIcon(type: string): LucideIcon {
     case "order_confirmed":
     case "order_needs_confirmation":
       return CircleCheckBig;
-    case "supplier_items_cancelled":
-      return CircleX;
+    case "delivery_initiated":
+    case "order_dispatched":
+    case "order_out_for_delivery":
     case "order_shipped":
       return Truck;
     case "order_delivered":
