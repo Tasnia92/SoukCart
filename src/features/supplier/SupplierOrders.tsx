@@ -69,7 +69,6 @@ import {
   type SupplierDeliveryAction,
   type SupplierOrder,
 } from "./supplier-orders-api.ts";
-import { requestSellerReturn } from "./supplier-returns-api.ts";
 
 type SupplierOrdersProps = {
   loadOrders?: () => Promise<SupplierOrder[]>;
@@ -110,10 +109,6 @@ function isAwaitingPayment(order: SupplierOrder): boolean {
   return (
     order.status === "pending" && order.payment_method !== "cod" && order.payment_status !== "paid"
   );
-}
-
-function canOpenReturn(order: SupplierOrder): boolean {
-  return order.status === "delivered" && !order.cancel_requested;
 }
 
 function csvEscape(value: string): string {
@@ -229,9 +224,6 @@ export function SupplierOrders({ loadOrders = loadSupplierOrders }: SupplierOrde
   const [declineTarget, setDeclineTarget] = useState<SupplierOrder | null>(null);
   const [declineReason, setDeclineReason] = useState("");
   const [declineInvalid, setDeclineInvalid] = useState(false);
-  const [returnTarget, setReturnTarget] = useState<SupplierOrder | null>(null);
-  const [returnReason, setReturnReason] = useState("");
-  const [returnInvalid, setReturnInvalid] = useState(false);
 
   const isSeller = state.status === "seller";
   const retry = useCallback(() => setLoadVersion((version) => version + 1), []);
@@ -477,36 +469,6 @@ export function SupplierOrders({ loadOrders = loadSupplierOrders }: SupplierOrde
       .finally(() => setBusyId(null));
   };
 
-  const confirmReturn = () => {
-    const order = returnTarget;
-    if (!order) return;
-    if (returnReason.trim().length < 3) {
-      setReturnInvalid(true);
-      return;
-    }
-    const reason = returnReason.trim();
-    setReturnTarget(null);
-    setReturnReason("");
-    setReturnInvalid(false);
-    setBusyId(order.id);
-    void requestSellerReturn(order.id, reason)
-      .then(() => {
-        setNotice({
-          message: `Return opened for order #${shortId(order.id)}.`,
-          state: "success",
-        });
-        retry();
-      })
-      .catch((returnError: unknown) => {
-        setNotice({
-          message:
-            returnError instanceof Error ? returnError.message : "The return could not be opened.",
-          state: "error",
-        });
-      })
-      .finally(() => setBusyId(null));
-  };
-
   const byId = new Map((orders ?? []).map((order) => [order.id, order]));
   const rows = filtered.map((order) => toRow(order, images));
   const openOrder = orders?.find((order) => order.id === openOrderId) ?? null;
@@ -616,16 +578,6 @@ export function SupplierOrders({ loadOrders = loadSupplierOrders }: SupplierOrde
                 },
               });
             }
-            if (canOpenReturn(order)) {
-              items.push({
-                label: "Open return",
-                onSelect: () => {
-                  setReturnReason("");
-                  setReturnInvalid(false);
-                  setReturnTarget(order);
-                },
-              });
-            }
             if (canSupplierCancel(order) || order.cancel_requested) {
               items.push({
                 label: "Cancel order",
@@ -669,7 +621,7 @@ export function SupplierOrders({ loadOrders = loadSupplierOrders }: SupplierOrde
             : undefined
         }
         footer={
-          openOrder ? (
+          openOrder && (needsAction(openOrder) || openOrder.cancel_requested) ? (
             <>
               {hasRetailerCancellationRequest(openOrder) ? (
                 <>
@@ -713,20 +665,6 @@ export function SupplierOrders({ loadOrders = loadSupplierOrders }: SupplierOrde
                   }}
                 >
                   Decline items
-                </Button>
-              ) : null}
-              {canOpenReturn(openOrder) ? (
-                <Button
-                  type="button"
-                  variant="outline"
-                  disabled={busyId === openOrder.id}
-                  onClick={() => {
-                    setReturnReason("");
-                    setReturnInvalid(false);
-                    setReturnTarget(openOrder);
-                  }}
-                >
-                  Open return
                 </Button>
               ) : null}
               {canSupplierCancel(openOrder) || openOrder.cancel_requested ? (
@@ -838,59 +776,6 @@ export function SupplierOrders({ loadOrders = loadSupplierOrders }: SupplierOrde
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
-
-      <Dialog
-        open={returnTarget !== null}
-        onOpenChange={(open) => {
-          if (!open) {
-            setReturnTarget(null);
-            setReturnReason("");
-            setReturnInvalid(false);
-          }
-        }}
-      >
-        <DialogContent>
-          <DialogHeader>
-            <DialogTitle>
-              Open return{returnTarget ? ` for #${shortId(returnTarget.id)}` : ""}
-            </DialogTitle>
-            <DialogDescription>
-              Start a return for this delivered order. The retailer will be notified.
-            </DialogDescription>
-          </DialogHeader>
-          <FieldGroup>
-            <Field data-invalid={returnInvalid || undefined}>
-              <FieldLabel htmlFor="return-reason">Reason</FieldLabel>
-              <Textarea
-                id="return-reason"
-                value={returnReason}
-                aria-invalid={returnInvalid || undefined}
-                onChange={(event) => {
-                  setReturnReason(event.target.value);
-                  if (event.target.value.trim().length >= 3) setReturnInvalid(false);
-                }}
-                placeholder="Why is this return being opened?"
-              />
-            </Field>
-          </FieldGroup>
-          <DialogFooter>
-            <Button
-              variant="outline"
-              type="button"
-              onClick={() => {
-                setReturnTarget(null);
-                setReturnReason("");
-                setReturnInvalid(false);
-              }}
-            >
-              Cancel
-            </Button>
-            <Button type="button" onClick={confirmReturn}>
-              Open return
-            </Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
 
       <Dialog
         open={cancelTarget !== null}
