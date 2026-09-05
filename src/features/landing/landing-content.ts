@@ -139,7 +139,7 @@ export const RETAILER_STEPS: {
     icon: TruckIcon,
     step: "4",
     title: "Track & Receive",
-    copy: "Watch delivery status as suppliers confirm and deliver your order.",
+    copy: "Watch delivery status as suppliers confirm and the admin team delivers your order.",
   },
   {
     icon: StoreIcon,

@@ -372,22 +372,26 @@ export function orderTotal(order: RetailerOrder): number {
 }
 
 /**
- * The retailer may ask to cancel (and get a refund) only while the order is
- * still on its way — never after it was marked delivered.
+ * The retailer may ask to cancel (and get a refund) only while suppliers are
+ * still confirming — never after admin started the delivery process, and never
+ * after the order was marked delivered.
  */
 export function canCancelOrder(order: RetailerOrder): boolean {
-  return order.status !== "cancelled" && order.status !== "delivered" && !order.cancel_requested;
+  return (
+    order.status !== "cancelled" &&
+    order.status !== "delivered" &&
+    order.status !== "shipped" &&
+    !order.delivery_initiated_at &&
+    !order.cancel_requested
+  );
 }
 
 /**
- * True once any parcel on the order was marked out for delivery (or already
- * delivered). The prepaid delivery charge stops being refundable at that
- * point — only merchandise comes back after that.
+ * True once admin started the delivery process. From that point the order is
+ * locked: no cancellation from any dashboard and no refund applies.
  */
 export function orderIsOutOfDelivery(order: RetailerOrder): boolean {
-  return order.shipments.some(
-    (shipment) => shipment.status === "out_for_delivery" || shipment.status === "delivered",
-  );
+  return Boolean(order.delivery_initiated_at) || order.status === "shipped";
 }
 
 export function canRequestCodDeliveryRefund(order: RetailerOrder): boolean {

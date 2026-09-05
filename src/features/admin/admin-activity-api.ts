@@ -51,6 +51,7 @@ export type ActivityOrder = {
   total: number;
   lines: ActivityLine[];
   packages: ActivityPackage[];
+  shipments: ActivityShipment[];
 };
 
 export type ActivityPackage = {
@@ -59,6 +60,11 @@ export type ActivityPackage = {
   status: string;
   declined_at: string | null;
   decline_reason: string | null;
+};
+
+export type ActivityShipment = {
+  seller_id: string;
+  status: string;
 };
 
 export type ActivitySummary = {
@@ -83,12 +89,83 @@ export async function loadAdminActivity(): Promise<ActivityResponse> {
 }
 
 /**
- * Admin delivery initiation: after every supplier confirms, admin hands the
- * order to the suppliers by starting the delivery process. Suppliers then keep
- * the delivery status (dispatched, out for delivery, delivered) up to date.
+ * Admin delivery initiation: after every supplier confirms, admin starts the
+ * delivery process. From that point the order is locked — nobody can cancel
+ * it — and admin keeps the delivery status up to date.
  */
 export async function initiateDelivery(orderId: string): Promise<void> {
   await invokeAdmin<unknown>({ action: "initiate-delivery", orderId }, ADMIN_ACTIVITY_FUNCTION);
+}
+
+/** The delivery ladder admin owns once the process has started. */
+export const ADMIN_DELIVERY_STATUSES = [
+  "dispatched",
+  "in_transit",
+  "out_for_delivery",
+  "delivered",
+] as const;
+
+export type AdminDeliveryStatus = (typeof ADMIN_DELIVERY_STATUSES)[number];
+
+const DELIVERY_STATUS_RANK: Record<string, number> = {
+  dispatched: 0,
+  shipped: 0,
+  in_transit: 1,
+  out_for_delivery: 2,
+  delivered: 3,
+};
+
+export function deliveryStatusLabel(status: string): string {
+  switch (status) {
+    case "dispatched":
+    case "shipped":
+      return "Dispatched";
+    case "in_transit":
+      return "In transit";
+    case "out_for_delivery":
+      return "Out for delivery";
+    case "delivered":
+      return "Delivered";
+    default:
+      return status;
+  }
+}
+
+/** The furthest any parcel on the order has reached, or null before dispatch. */
+export function orderDeliveryStatus(
+  order: Pick<ActivityOrder, "shipments">,
+): AdminDeliveryStatus | null {
+  let best: AdminDeliveryStatus | null = null;
+  for (const shipment of order.shipments ?? []) {
+    const rank = DELIVERY_STATUS_RANK[shipment.status];
+    if (rank === undefined) continue;
+    if (!best || rank > DELIVERY_STATUS_RANK[best]) {
+      best =
+        shipment.status === "shipped" ? "dispatched" : (shipment.status as AdminDeliveryStatus);
+    }
+  }
+  return best;
+}
+
+/** The next step admin can take on the delivery ladder, or null when done. */
+export function nextDeliveryStatus(
+  order: Pick<ActivityOrder, "shipments" | "status">,
+): AdminDeliveryStatus | null {
+  if (order.status === "delivered") return null;
+  const current = orderDeliveryStatus(order);
+  if (!current) return "dispatched";
+  return ADMIN_DELIVERY_STATUSES[DELIVERY_STATUS_RANK[current] + 1] ?? null;
+}
+
+/** Admin moves every parcel on the order to the next delivery step. */
+export async function updateDeliveryStatus(
+  orderId: string,
+  status: AdminDeliveryStatus,
+): Promise<void> {
+  await invokeAdmin<unknown>(
+    { action: "update-delivery", orderId, status },
+    ADMIN_ACTIVITY_FUNCTION,
+  );
 }
 
 export async function completeManualRefund(orderId: string): Promise<void> {
@@ -106,7 +183,8 @@ function hasPendingPackages(order: ActivityOrder): boolean {
 
 /**
  * The one admin fulfillment action: start delivery once every supplier has
- * confirmed, the order is paid, and nobody asked to cancel it.
+ * confirmed, the order is paid, and nobody asked to cancel it. This locks the
+ * order against cancellation from the retailer and supplier dashboards.
  */
 export function canInitiateDelivery(order: ActivityOrder): boolean {
   return (
@@ -116,6 +194,16 @@ export function canInitiateDelivery(order: ActivityOrder): boolean {
     (order.packages ?? []).length > 0 &&
     !hasPendingPackages(order) &&
     canFulfillOrder(order)
+  );
+}
+
+/** Admin can move the delivery ladder forward once the process has started. */
+export function canAdvanceDelivery(order: ActivityOrder): boolean {
+  return (
+    isDeliveryInitiated(order) &&
+    order.status !== "cancelled" &&
+    order.status !== "delivered" &&
+    nextDeliveryStatus(order) !== null
   );
 }
 

@@ -110,7 +110,7 @@ function Hero() {
   return (
     <section className="relative isolate overflow-hidden" aria-labelledby="ld-hero-title">
       <img
-        src="/hero-bg.png"
+        src="/hero-bg.jpg"
         alt=""
         aria-hidden="true"
         className="absolute inset-0 size-full object-cover object-[72%_center]"

@@ -15,6 +15,7 @@ const corsHeaders = {
 type RequestBody = {
   action?: unknown;
   orderId?: unknown;
+  status?: unknown;
 };
 
 type Caller = {
@@ -61,6 +62,7 @@ type ActivityOrder = {
   total: number;
   lines: ActivityLine[];
   packages: ActivityPackage[];
+  shipments: ActivityShipment[];
 };
 
 type ActivityPackage = {
@@ -69,6 +71,11 @@ type ActivityPackage = {
   status: string;
   declined_at: string | null;
   decline_reason: string | null;
+};
+
+type ActivityShipment = {
+  seller_id: string;
+  status: string;
 };
 
 type ActivitySummary = {
@@ -109,6 +116,9 @@ Deno.serve(async (request) => {
     }
     if (body.action === "initiate-delivery") {
       return await initiateDelivery(caller, body);
+    }
+    if (body.action === "update-delivery") {
+      return await updateDeliveryStatus(caller, body);
     }
     if (body.action === "complete-refund") {
       return await completeRefund(caller, body);
@@ -155,7 +165,7 @@ async function listActivity(): Promise<Response> {
   const { data, error } = await admin
     .from("orders")
     .select(
-      "id, status, cancel_requested, cancellation_initiator, cancellation_reason, payment_status, payment_method, created_at, delivered_at, delivery_verified_at, delivery_initiated_at, delivery_phone, delivery_address, delivery_city, delivery_postcode, platform_charge, delivery_charge, delivery_payment_status, refund_amount, manual_refund_status, refund_completed_at, retailer_id, users!orders_retailer_id_fkey(name, email), order_items(id, product_id, quantity, unit_price, products(id, name, seller_id, users!products_seller_id_fkey(name, email))), order_supplier_acceptances(supplier_id, status, declined_at, decline_reason)",
+      "id, status, cancel_requested, cancellation_initiator, cancellation_reason, payment_status, payment_method, created_at, delivered_at, delivery_verified_at, delivery_initiated_at, delivery_phone, delivery_address, delivery_city, delivery_postcode, platform_charge, delivery_charge, delivery_payment_status, refund_amount, manual_refund_status, refund_completed_at, retailer_id, users!orders_retailer_id_fkey(name, email), order_items(id, product_id, quantity, unit_price, products(id, name, seller_id, users!products_seller_id_fkey(name, email))), order_supplier_acceptances(supplier_id, status, declined_at, decline_reason), order_shipments(seller_id, status)",
     )
     .order("created_at", { ascending: false })
     .limit(1000);
@@ -211,6 +221,15 @@ async function listActivity(): Promise<Response> {
       total: roundMoney(lines.reduce((sum, line) => sum + line.amount, 0)),
       lines,
       packages: packagesFrom(row, lines),
+      shipments: (row.order_shipments ?? [])
+        .filter(
+          (shipment: ShipmentRow) =>
+            typeof shipment.seller_id === "string" && typeof shipment.status === "string",
+        )
+        .map((shipment: ShipmentRow) => ({
+          seller_id: shipment.seller_id as string,
+          status: shipment.status as string,
+        })),
     };
   });
 
@@ -242,6 +261,30 @@ async function initiateDelivery(caller: Caller, body: RequestBody): Promise<Resp
 
   const { data, error } = await admin.rpc("admin_initiate_delivery", {
     p_order_id: orderId,
+    p_admin_id: caller.id,
+  });
+  if (error) {
+    return json({ error: error.message }, 400);
+  }
+  return json({ order: data });
+}
+
+const DELIVERY_STATUSES = ["dispatched", "in_transit", "out_for_delivery", "delivered"] as const;
+
+/** Admin keeps the delivery ladder moving after initiating it. */
+async function updateDeliveryStatus(caller: Caller, body: RequestBody): Promise<Response> {
+  const orderId = readUuid(body.orderId);
+  const status = typeof body.status === "string" ? body.status : "";
+  if (!orderId) {
+    return json({ error: "A valid order is required." }, 400);
+  }
+  if (!(DELIVERY_STATUSES as readonly string[]).includes(status)) {
+    return json({ error: "Choose a valid delivery status." }, 400);
+  }
+
+  const { data, error } = await admin.rpc("admin_update_delivery_status", {
+    p_order_id: orderId,
+    p_status: status,
     p_admin_id: caller.id,
   });
   if (error) {
@@ -292,6 +335,12 @@ type OrderRow = {
   users: unknown;
   order_items: OrderItemRow[] | null;
   order_supplier_acceptances?: PackageRow[] | null;
+  order_shipments?: ShipmentRow[] | null;
+};
+
+type ShipmentRow = {
+  seller_id?: string | null;
+  status?: string | null;
 };
 
 type PackageRow = {

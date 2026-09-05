@@ -17,10 +17,11 @@ import { StatusBadge, statusLabel, type OrderStatus } from "./order-presentation
 
 /**
  * The full order progression, visible to every role:
- * placed → supplier confirmed → admin initiated delivery →
- * supplier dispatched → out for delivery → delivered.
+ * placed → supplier confirmed → admin started delivery →
+ * dispatched → out for delivery → delivered.
  * `delivery_initiated` and `out_for_delivery` are not order statuses — they are
- * derived from the admin gate and the parcel state.
+ * derived from the admin gate and the parcel state. Suppliers only confirm or
+ * cancel; the admin team runs the whole delivery ladder.
  */
 export const DELIVERY_STEPS = [
   { id: "pending", label: "Placed", hint: "Order received" },
@@ -136,17 +137,17 @@ export function deliveryStatusCopy(
   if (audience === "supplier") {
     switch (status) {
       case "pending":
-        return "Confirm this order, then keep delivery status up to date.";
+        return "Confirm this order, or cancel it. The admin team handles the delivery process.";
       case "confirmed":
         return initiated
-          ? "Delivery initiated. Mark the parcel dispatched when it leaves your shop."
-          : "Waiting for admin to initiate delivery. Have the parcel ready to go.";
+          ? "Delivery started. The admin team keeps the delivery status up to date."
+          : "Waiting for admin to start the delivery process.";
       case "shipped":
         return progress.parcelStatus === "out_for_delivery"
-          ? "Out for delivery. Mark it delivered once the retailer receives it."
-          : "Dispatched. Mark it out for delivery when the courier takes it.";
+          ? "Out for delivery. The admin team is bringing the parcel to the retailer."
+          : "Dispatched. The admin team is handling delivery.";
       case "delivered":
-        return "You marked this order delivered.";
+        return "Delivery is complete.";
       default:
         return `Current status: ${statusLabel(status)}.`;
     }
@@ -154,15 +155,15 @@ export function deliveryStatusCopy(
 
   switch (status) {
     case "pending":
-      return "Waiting for the suppliers to confirm. Suppliers keep delivery status up to date.";
+      return "Waiting for the suppliers to confirm. Suppliers can only confirm or cancel.";
     case "confirmed":
       return initiated
-        ? "Delivery initiated. The suppliers mark the parcels dispatched, out for delivery, and delivered."
-        : "Confirmed. Initiate delivery once every supplier has confirmed.";
+        ? "Delivery started. Keep the delivery status up to date — the order is locked against cancellation."
+        : "Confirmed. Start the delivery process once every supplier has confirmed.";
     case "shipped":
       return progress.parcelStatus === "out_for_delivery"
-        ? "Out for delivery. The supplier marks it delivered once it arrives."
-        : "Dispatched. The suppliers keep the delivery status up to date.";
+        ? "Out for delivery. Mark it delivered once it arrives."
+        : "Dispatched. Keep the delivery status up to date.";
     case "delivered":
       return "Delivery is complete.";
     default:

@@ -54,6 +54,7 @@ function notificationIcon(type: string): LucideIcon {
       return CircleCheckBig;
     case "delivery_initiated":
     case "order_dispatched":
+    case "order_in_transit":
     case "order_out_for_delivery":
     case "order_shipped":
       return Truck;

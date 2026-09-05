@@ -119,10 +119,10 @@ export async function loadSupplierOrders(): Promise<SupplierOrder[]> {
 }
 
 /**
- * The delivery steps the supplier owns: confirm, dispatched, out for delivery,
- * delivered. Dispatching only unlocks after admin initiates delivery.
+ * The supplier's one lifecycle action: confirm. Delivery is the admin team's
+ * job; the supplier can only confirm or cancel.
  */
-export type SupplierDeliveryAction = "confirmed" | "dispatched" | "out_for_delivery" | "delivered";
+export type SupplierDeliveryAction = "confirmed";
 
 export async function setSupplierOrderStatus(
   orderId: string,
@@ -139,7 +139,7 @@ export async function setSupplierOrderStatus(
   return data;
 }
 
-/** The admin gate: suppliers stay blocked until admin initiates delivery. */
+/** The admin gate: once admin starts delivery, the order is locked. */
 export function isDeliveryInitiated(order: Pick<SupplierOrder, "delivery_initiated_at">): boolean {
   return Boolean(order.delivery_initiated_at);
 }
@@ -221,42 +221,6 @@ export function canConfirmOrder(order: SupplierOrder): boolean {
   return order.package_status === "pending" && !order.cancel_requested && canFulfillPayment(order);
 }
 
-/** Step 1 of delivery: parcel leaves the shop once admin initiated delivery. */
-export function canDispatchOrder(order: SupplierOrder): boolean {
-  return (
-    order.package_status === "confirmed" &&
-    isDeliveryInitiated(order) &&
-    order.status !== "cancelled" &&
-    order.status !== "delivered" &&
-    !order.cancel_requested &&
-    canFulfillPayment(order)
-  );
-}
-
-/** Step 2 of delivery: the courier takes the parcel out for delivery. */
-export function canMarkOutForDelivery(order: SupplierOrder): boolean {
-  return (
-    order.package_status === "shipped" &&
-    isDeliveryInitiated(order) &&
-    order.shipment_status !== "out_for_delivery" &&
-    order.shipment_status !== "delivered" &&
-    order.status !== "cancelled" &&
-    order.status !== "delivered" &&
-    !order.cancel_requested
-  );
-}
-
-/** Step 3 of delivery: parcel arrived at the retailer. */
-export function canDeliverOrder(order: SupplierOrder): boolean {
-  return (
-    order.package_status === "shipped" &&
-    isDeliveryInitiated(order) &&
-    order.shipment_status === "out_for_delivery" &&
-    order.status !== "cancelled" &&
-    !order.cancel_requested
-  );
-}
-
 export function canDeclineOrderItems(order: SupplierOrder): boolean {
   return (
     order.package_status === "pending" &&
@@ -282,11 +246,17 @@ export async function declineSupplierItems(orderId: string, reason: string): Pro
   }
 }
 
+/**
+ * The supplier can cancel only before admin starts the delivery process.
+ * After that the order is locked for everyone and no refund applies.
+ */
 export function canSupplierCancel(order: SupplierOrder): boolean {
   return (
     order.supplier_can_cancel &&
     order.status !== "cancelled" &&
     order.status !== "delivered" &&
+    order.status !== "shipped" &&
+    !isDeliveryInitiated(order) &&
     !order.cancel_requested
   );
 }

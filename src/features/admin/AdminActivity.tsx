@@ -58,19 +58,25 @@ import {
 import { formatDate, formatPrice, initials } from "../workspace/format.ts";
 import { recordIdFromHash, searchParam } from "../workspace/search.ts";
 import {
+  canAdvanceDelivery,
   canFulfillOrder,
   canInitiateDelivery,
   collectCodPayment,
   completeManualRefund,
+  deliveryStatusLabel,
   filterActivityOrders,
   initiateDelivery,
   isDeliveryInitiated,
   loadAdminActivity,
   needsCodCollection,
+  nextDeliveryStatus,
+  orderDeliveryStatus,
   packageStatusLabel,
   parseAdminOrderView,
+  updateDeliveryStatus,
   type ActivityOrder,
   type ActivityResponse,
+  type AdminDeliveryStatus,
 } from "./admin-activity-api.ts";
 
 type AdminActivityProps = {
@@ -99,6 +105,10 @@ export function AdminActivity({ loadActivity = loadAdminActivity }: AdminActivit
   const [notice, setNotice] = useState<Notice>(null);
   const [busyId, setBusyId] = useState<string | null>(null);
   const [initiateTarget, setInitiateTarget] = useState<ActivityOrder | null>(null);
+  const [deliveryTarget, setDeliveryTarget] = useState<{
+    order: ActivityOrder;
+    status: AdminDeliveryStatus;
+  } | null>(null);
   const [refundConfirmation, setRefundConfirmation] = useState<ActivityOrder | null>(null);
   const [codConfirmation, setCodConfirmation] = useState<ActivityOrder | null>(null);
 
@@ -158,7 +168,7 @@ export function AdminActivity({ loadActivity = loadAdminActivity }: AdminActivit
     void initiateDelivery(order.id)
       .then(() => {
         setNotice({
-          message: `Delivery was initiated for order #${shortId(order.id)}. The suppliers will dispatch the parcels and keep the status up to date.`,
+          message: `Delivery was initiated for order #${shortId(order.id)}. The order is now locked against cancellation — keep the delivery status up to date below.`,
           state: "success",
         });
         setLoadVersion((version) => version + 1);
@@ -169,6 +179,31 @@ export function AdminActivity({ loadActivity = loadAdminActivity }: AdminActivit
             initiateError instanceof Error
               ? initiateError.message
               : "Delivery could not be initiated.",
+          state: "error",
+        });
+      })
+      .finally(() => setBusyId(null));
+  };
+
+  const confirmUpdateDelivery = () => {
+    if (!deliveryTarget) return;
+    const { order, status } = deliveryTarget;
+    setDeliveryTarget(null);
+    setBusyId(order.id);
+    void updateDeliveryStatus(order.id, status)
+      .then(() => {
+        setNotice({
+          message: `Order #${shortId(order.id)} was marked ${deliveryStatusLabel(status).toLowerCase()}. The retailer and suppliers were notified.`,
+          state: "success",
+        });
+        setLoadVersion((version) => version + 1);
+      })
+      .catch((deliveryError: unknown) => {
+        setNotice({
+          message:
+            deliveryError instanceof Error
+              ? deliveryError.message
+              : "The delivery status could not be updated.",
           state: "error",
         });
       })
@@ -335,7 +370,12 @@ export function AdminActivity({ loadActivity = loadAdminActivity }: AdminActivit
                                     </OrderFlag>
                                   ) : null}
                                   {isDeliveryInitiated(order) ? (
-                                    <OrderFlag>Delivery initiated</OrderFlag>
+                                    <OrderFlag>Delivery started · locked</OrderFlag>
+                                  ) : null}
+                                  {orderDeliveryStatus(order) ? (
+                                    <OrderFlag>
+                                      {deliveryStatusLabel(orderDeliveryStatus(order) as string)}
+                                    </OrderFlag>
                                   ) : null}
                                   {order.delivery_verified_at ? (
                                     <OrderFlag>Delivery verified</OrderFlag>
@@ -416,7 +456,10 @@ export function AdminActivity({ loadActivity = loadAdminActivity }: AdminActivit
                               <DeliveryStatusCard
                                 status={order.status}
                                 audience="admin"
-                                progress={{ deliveryInitiated: isDeliveryInitiated(order) }}
+                                progress={{
+                                  deliveryInitiated: isDeliveryInitiated(order),
+                                  parcelStatus: orderDeliveryStatus(order),
+                                }}
                               />
                               {(order.packages ?? []).length ? (
                                 <ul className="flex flex-col gap-2">
@@ -435,7 +478,7 @@ export function AdminActivity({ loadActivity = loadAdminActivity }: AdminActivit
                                           {pkg.decline_reason ? ` · ${pkg.decline_reason}` : ""}
                                         </p>
                                       </div>
-                                      <Badge variant="outline">Supplier updates status</Badge>
+                                      <Badge variant="outline">Confirmed by supplier</Badge>
                                     </li>
                                   ))}
                                 </ul>
@@ -458,17 +501,18 @@ export function AdminActivity({ loadActivity = loadAdminActivity }: AdminActivit
                                   </AlertTitle>
                                   <AlertDescription>
                                     {canInitiateDelivery(order)
-                                      ? "Every supplier confirmed. Initiate delivery to start the delivery process — the suppliers then mark the parcels dispatched, out for delivery, and delivered."
-                                      : "Some items are still waiting for supplier confirmation. Delivery can be initiated once every supplier confirms."}
+                                      ? "Every supplier confirmed. Start the delivery process to take over — the order is then locked against cancellation and you keep the delivery status up to date."
+                                      : "Some items are still waiting for supplier confirmation. Delivery can be started once every supplier confirms."}
                                   </AlertDescription>
                                 </Alert>
                               ) : null}
                               {isDeliveryInitiated(order) && order.status !== "delivered" ? (
                                 <Alert>
-                                  <AlertTitle>Delivery initiated</AlertTitle>
+                                  <AlertTitle>Delivery in progress</AlertTitle>
                                   <AlertDescription>
-                                    The suppliers keep the delivery status up to date: dispatched,
-                                    out for delivery, delivered. Admin cannot change it.
+                                    The delivery process has started, so this order can no longer be
+                                    cancelled and no refund applies. Keep the status moving:
+                                    dispatched, in transit, out for delivery, delivered.
                                   </AlertDescription>
                                 </Alert>
                               ) : null}
@@ -497,6 +541,27 @@ export function AdminActivity({ loadActivity = loadAdminActivity }: AdminActivit
                                       <Spinner data-icon="inline-start" />
                                     ) : null}
                                     Initiate delivery
+                                  </Button>
+                                ) : null}
+                                {canAdvanceDelivery(order) ? (
+                                  <Button
+                                    type="button"
+                                    size="sm"
+                                    disabled={busyId === order.id}
+                                    onClick={() =>
+                                      setDeliveryTarget({
+                                        order,
+                                        status: nextDeliveryStatus(order) as AdminDeliveryStatus,
+                                      })
+                                    }
+                                  >
+                                    {busyId === order.id ? (
+                                      <Spinner data-icon="inline-start" />
+                                    ) : null}
+                                    Mark{" "}
+                                    {deliveryStatusLabel(
+                                      nextDeliveryStatus(order) as string,
+                                    ).toLowerCase()}
                                   </Button>
                                 ) : null}
                                 {needsCodCollection(order) ? (
@@ -564,14 +629,42 @@ export function AdminActivity({ loadActivity = loadAdminActivity }: AdminActivit
               Initiate delivery for order #{initiateTarget ? shortId(initiateTarget.id) : ""}?
             </AlertDialogTitle>
             <AlertDialogDescription>
-              This starts the delivery process. The suppliers are asked to dispatch their parcels
-              and keep the delivery status up to date — dispatched, out for delivery, delivered.
+              This starts the delivery process and locks the order: neither the retailer nor the
+              supplier can cancel it from here on, and no refund policy applies. You then keep the
+              delivery status up to date — dispatched, in transit, out for delivery, delivered.
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
             <AlertDialogCancel type="button">Not yet</AlertDialogCancel>
             <AlertDialogAction type="button" onClick={confirmInitiateDelivery}>
               Initiate delivery
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+
+      <AlertDialog
+        open={deliveryTarget !== null}
+        onOpenChange={(open) => {
+          if (!open) setDeliveryTarget(null);
+        }}
+      >
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>
+              {deliveryTarget
+                ? `Mark order #${shortId(deliveryTarget.order.id)} ${deliveryStatusLabel(deliveryTarget.status).toLowerCase()}?`
+                : ""}
+            </AlertDialogTitle>
+            <AlertDialogDescription>
+              Every parcel on this order moves to the next delivery step and the retailer and
+              suppliers are notified. Delivery status only moves forward.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel type="button">Not yet</AlertDialogCancel>
+            <AlertDialogAction type="button" onClick={confirmUpdateDelivery}>
+              Confirm status
             </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>

@@ -3,13 +3,11 @@ import { useCallback, useEffect, useMemo, useState } from "react";
 import {
   Ban,
   Check,
-  CheckCheck,
   ChevronDown,
   Download,
   Package,
   RefreshCw,
   Search,
-  Truck,
   type LucideIcon,
 } from "lucide-react";
 import {
@@ -71,9 +69,6 @@ import {
   approveSupplierCancellation,
   canConfirmOrder,
   canDeclineOrderItems,
-  canDeliverOrder,
-  canDispatchOrder,
-  canMarkOutForDelivery,
   canSupplierCancel,
   cancelSupplierOrder,
   declineSupplierItems,
@@ -133,9 +128,7 @@ function needsAction(order: SupplierOrder): boolean {
   return (
     canConfirmOrder(order) ||
     canDeclineOrderItems(order) ||
-    canDispatchOrder(order) ||
-    canMarkOutForDelivery(order) ||
-    canDeliverOrder(order) ||
+    canSupplierCancel(order) ||
     hasRetailerCancellationRequest(order)
   );
 }
@@ -242,17 +235,11 @@ function primaryAction(order: SupplierOrder): FulfillAction | null {
   if (hasRetailerCancellationRequest(order)) return null;
   if (order.cancel_requested) return null;
   if (canConfirmOrder(order)) return "confirmed";
-  if (canDispatchOrder(order)) return "dispatched";
-  if (canMarkOutForDelivery(order)) return "out_for_delivery";
-  if (canDeliverOrder(order)) return "delivered";
   return null;
 }
 
 const ACTION_META: Record<FulfillAction, { icon: LucideIcon }> = {
   confirmed: { icon: Check },
-  dispatched: { icon: Truck },
-  out_for_delivery: { icon: Truck },
-  delivered: { icon: CheckCheck },
 };
 
 /** Short label for the collapsed row when there is no button to show. */
@@ -263,8 +250,9 @@ function headerHint(order: SupplierOrder): string | null {
   }
   if (order.delivery_payment_status !== "paid") return "Awaiting delivery payment";
   if (order.status === "pending") return "Awaiting payment";
+  if (order.status === "shipped") return "Admin is delivering";
   if (order.package_status === "confirmed" && !isDeliveryInitiated(order)) {
-    return "Awaiting delivery start";
+    return "Awaiting admin delivery";
   }
   if (order.package_status === "declined") return "Items declined";
   return null;
@@ -278,9 +266,9 @@ function orderExplanation(order: SupplierOrder): string | null {
       : "This order was cancelled.";
   }
   if (hasRetailerCancellationRequest(order)) {
-    return order.shipment_status === "out_for_delivery"
-      ? "The retailer asked to cancel this order. The parcel is out for delivery: approving cancels it and refunds the merchandise, but the delivery charge is kept."
-      : "The retailer asked to cancel this order. Approving cancels it and refunds everything the retailer paid in advance, including the delivery charge.";
+    return order.delivery_initiated_at
+      ? "The retailer asked to cancel this order, but the delivery process has already started. The order can no longer be cancelled."
+      : "The retailer asked to cancel this order. Approving cancels it: online orders are refunded in full and COD orders get the prepaid delivery charge back.";
   }
   if (order.cancel_requested) {
     return "You requested cancellation of this order. Confirm below to cancel it now.";
@@ -295,7 +283,7 @@ function orderExplanation(order: SupplierOrder): string | null {
     return "Waiting for online payment before fulfillment.";
   }
   if (order.package_status === "confirmed" && !isDeliveryInitiated(order)) {
-    return "Waiting for admin to initiate delivery. Have the parcel ready to hand over.";
+    return "Waiting for admin to start the delivery process. The admin team handles all delivery.";
   }
   if (order.package_status === "declined") {
     return `You declined these items${order.decline_reason ? ` · ${order.decline_reason}` : ""}`;
@@ -711,12 +699,8 @@ export function SupplierOrders({ loadOrders = loadSupplierOrders }: SupplierOrde
         setNotice({
           message:
             status === "confirmed"
-              ? `Order #${shortId(order.id)} is confirmed. Delivery starts once admin initiates it.`
-              : status === "dispatched"
-                ? `Order #${shortId(order.id)} is dispatched. Mark it out for delivery when the courier takes it.`
-                : status === "out_for_delivery"
-                  ? `Order #${shortId(order.id)} is out for delivery. Mark it delivered once the retailer receives it.`
-                  : `Order #${shortId(order.id)} is marked delivered. The retailer can verify the delivery.`,
+              ? `Order #${shortId(order.id)} is confirmed. Admin starts and handles the delivery process.`
+              : `Order #${shortId(order.id)} was updated.`,
           state: "success",
         });
         retry();
@@ -745,7 +729,7 @@ export function SupplierOrders({ loadOrders = loadSupplierOrders }: SupplierOrde
           setNotice({
             message:
               result.manualRefundStatus === "pending" && result.refundAmount > 0
-                ? `Order #${shortId(order.id)} was cancelled. A manual refund of ${formatPrice(result.refundAmount)} for merchandise is pending.`
+                ? `Order #${shortId(order.id)} was cancelled. A manual refund of ${formatPrice(result.refundAmount)} is queued for the admin team.`
                 : `Order #${shortId(order.id)} was cancelled. The retailer was notified.`,
             state: "success",
           });
@@ -887,7 +871,7 @@ export function SupplierOrders({ loadOrders = loadSupplierOrders }: SupplierOrde
       <PageHeader
         eyebrow="Fulfillment"
         title="Orders"
-        copy="Confirm orders you can fulfill and keep delivery status up to date. The next step for each order is one click away on its row."
+        copy="Confirm orders you can fulfill or cancel them. The admin team handles the delivery process — you are notified of each step."
         actions={
           <>
             {updatedAt ? (
@@ -1037,23 +1021,13 @@ export function SupplierOrders({ loadOrders = loadSupplierOrders }: SupplierOrde
               {fulfillTarget
                 ? fulfillTarget.action === "confirmed"
                   ? `Confirm order #${shortId(fulfillTarget.order.id)}?`
-                  : fulfillTarget.action === "dispatched"
-                    ? `Mark order #${shortId(fulfillTarget.order.id)} dispatched?`
-                    : fulfillTarget.action === "out_for_delivery"
-                      ? `Mark order #${shortId(fulfillTarget.order.id)} out for delivery?`
-                      : `Mark order #${shortId(fulfillTarget.order.id)} delivered?`
+                  : `Update order #${shortId(fulfillTarget.order.id)}?`
                 : ""}
             </AlertDialogTitle>
             <AlertDialogDescription>
               {fulfillTarget?.action === "confirmed"
-                ? "Confirm that you can fulfill this order. Delivery starts once admin initiates it."
-                : fulfillTarget?.action === "dispatched"
-                  ? "Tell the retailer the parcel has left your shop. Then keep the delivery status up to date."
-                  : fulfillTarget?.action === "out_for_delivery"
-                    ? "Tell the retailer the parcel is on its way. You will mark it delivered once it arrives."
-                    : fulfillTarget?.action === "delivered"
-                      ? "Only mark delivered after the retailer has received the parcel. They can then verify the delivery."
-                      : ""}
+                ? "Confirm that you can fulfill this order. The admin team then starts and handles the whole delivery process."
+                : ""}
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
@@ -1084,9 +1058,7 @@ export function SupplierOrders({ loadOrders = loadSupplierOrders }: SupplierOrde
             </AlertDialogTitle>
             <AlertDialogDescription>
               {cancelDecision?.approve
-                ? cancelDecision.order.shipment_status === "out_for_delivery"
-                  ? "The whole order is cancelled. The parcel is out for delivery: merchandise is refunded, but the prepaid delivery charge is kept."
-                  : "The whole order is cancelled and everything the retailer paid in advance goes back, including the prepaid delivery charge."
+                ? "The whole order is cancelled. Online orders are refunded in full (merchandise + delivery); COD orders get the prepaid delivery charge back — settled by the admin team."
                 : "The order continues as normal and the retailer is notified."}
             </AlertDialogDescription>
           </AlertDialogHeader>
@@ -1172,9 +1144,9 @@ export function SupplierOrders({ loadOrders = loadSupplierOrders }: SupplierOrde
               Cancel order{cancelTarget ? ` #${shortId(cancelTarget.id)}` : ""}
             </DialogTitle>
             <DialogDescription>
-              {cancelTarget?.shipment_status === "out_for_delivery"
-                ? "This cancels the order immediately. The parcel is out for delivery: merchandise is refunded, but the prepaid delivery charge is kept. Use this when you cannot fulfill the order."
-                : "This cancels the order immediately. The retailer is refunded everything paid in advance — merchandise plus prepaid delivery for online orders, the prepaid delivery charge for COD. Use this when you cannot fulfill the order."}
+              This cancels the order immediately. Online orders are refunded in full (merchandise +
+              prepaid delivery); COD orders get the prepaid delivery charge back — settled by the
+              admin team. Use this when you cannot fulfill the order.
             </DialogDescription>
           </DialogHeader>
           <FieldGroup>

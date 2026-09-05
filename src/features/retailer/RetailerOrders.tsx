@@ -74,7 +74,6 @@ import {
   needsGatewayPaymentVerification,
   ORDER_SORTS,
   orderMerchandiseTotal,
-  orderIsOutOfDelivery,
   orderTotal,
   packageStatusLabel,
   parseOrderSort,
@@ -148,14 +147,10 @@ function cancelHint(order: RetailerOrder): string {
   const prepaidDelivery =
     order.payment_method === "cod" && order.delivery_payment_status === "paid";
   if (paidOnline) {
-    return orderIsOutOfDelivery(order)
-      ? "The parcel is out for delivery: merchandise is refunded, but the prepaid delivery charge is kept."
-      : "If the suppliers approve, the paid merchandise and the delivery charge are refunded in full.";
+    return "If the suppliers approve, the full advance payment — merchandise plus the delivery charge — is refunded by the admin team.";
   }
   if (prepaidDelivery) {
-    return orderIsOutOfDelivery(order)
-      ? "The parcel is out for delivery: the prepaid delivery charge is kept."
-      : "If the suppliers approve, the prepaid delivery charge is refunded in full.";
+    return "If the suppliers approve, the prepaid delivery charge is refunded by the admin team.";
   }
   return "";
 }
