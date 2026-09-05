@@ -87,6 +87,59 @@ export const PRODUCT_UNITS: ReadonlyArray<ProductUnitOption> = [
 export const DEFAULT_PRODUCT_UNIT = "piece";
 
 /**
+ * Canonical value for a free-text unit: plurals, abbreviations, and alternate
+ * spellings map onto the curated `PRODUCT_UNITS` values; unrecognized values
+ * are kept verbatim (trimmed) so legacy listings stay editable.
+ */
+const UNIT_ALIASES: Readonly<Record<string, string>> = {
+  kg: "kg",
+  kgs: "kg",
+  kilo: "kg",
+  kilos: "kg",
+  kilogram: "kg",
+  kilograms: "kg",
+  g: "g",
+  gm: "g",
+  gram: "g",
+  grams: "g",
+  l: "litre",
+  ltr: "litre",
+  liter: "litre",
+  liters: "litre",
+  litre: "litre",
+  litres: "litre",
+  piece: "piece",
+  pieces: "piece",
+  pc: "piece",
+  pcs: "piece",
+  unit: "piece",
+  units: "piece",
+  dozen: "dozen",
+  dozens: "dozen",
+  packet: "packet",
+  packets: "packet",
+  pkt: "packet",
+  pkts: "packet",
+  box: "box",
+  boxes: "box",
+  carton: "carton",
+  cartons: "carton",
+  crate: "crate",
+  crates: "crate",
+  sack: "sack",
+  sacks: "sack",
+  bundle: "bundle",
+  bundles: "bundle",
+  bottle: "bottle",
+  bottles: "bottle",
+};
+
+export function normalizeProductUnit(unit: string): string {
+  const trimmed = unit.trim();
+  return UNIT_ALIASES[trimmed.toLowerCase()] ?? (trimmed || DEFAULT_PRODUCT_UNIT);
+}
+
+/**
  * Unit picker options, with a product's current unit appended when it is a
  * legacy free-text value that is not part of the curated list.
  */
@@ -465,6 +518,7 @@ export async function createSupplierProduct(
   assertValidProduct(payload, { requireImage: true, imageUrl });
   const { error } = await supabase.from("products").insert({
     ...payload,
+    unit: normalizeProductUnit(payload.unit),
     seller_id: sellerId,
     image_url: imageUrl,
     is_active: true,
@@ -481,7 +535,7 @@ export async function updateSupplierProduct(
   assertValidProduct(payload, { allowZeroStock: true, requireImage: true, imageUrl });
   const { error } = await supabase
     .from("products")
-    .update({ ...payload, image_url: imageUrl })
+    .update({ ...payload, unit: normalizeProductUnit(payload.unit), image_url: imageUrl })
     .eq("id", productId)
     .eq("seller_id", sellerId);
   if (error) throw new Error(friendlyProductError(error));

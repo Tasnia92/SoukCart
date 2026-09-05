@@ -186,6 +186,11 @@ export function sortProducts(
   }
 }
 
+/** Smallest orderable quantity for a product: its MOQ, never below 1. */
+export function minOrderQuantity(product: Pick<RetailerProduct, "min_order_qty">): number {
+  return Math.max(1, product.min_order_qty || 1);
+}
+
 // Resolves the total quantity to persist, throwing the legacy stock messages when the
 // requested addition would exceed available stock.
 export function nextCartQuantity(
@@ -193,7 +198,7 @@ export function nextCartQuantity(
   inCart: number,
   requested: number,
 ): number {
-  const minQty = Math.max(1, product.min_order_qty || 1);
+  const minQty = minOrderQuantity(product);
   const wanted = inCart === 0 ? Math.max(minQty, requested) : inCart + requested;
   if (wanted > product.stock) {
     const remaining = product.stock - inCart;

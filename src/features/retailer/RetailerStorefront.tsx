@@ -50,6 +50,7 @@ import {
   getCategoryCounts,
   loadActiveProducts,
   loadCartQuantities,
+  minOrderQuantity,
   nextCartQuantity,
   parseProductSort,
   PRODUCT_SORTS,
@@ -258,7 +259,7 @@ export function RetailerStorefront({
 
   const setQuantity = (product: RetailerProduct, change: number) => {
     setQuantities((prev) => {
-      const minQty = Math.max(1, product.min_order_qty || 1);
+      const minQty = minOrderQuantity(product);
       const current = prev[product.id] ?? minQty;
       const next = Math.min(Math.max(minQty, current + change), product.stock);
       return { ...prev, [product.id]: next };
@@ -270,7 +271,11 @@ export function RetailerStorefront({
 
     let wanted: number;
     try {
-      wanted = nextCartQuantity(product, cart[product.id] ?? 0, quantities[product.id] ?? 1);
+      wanted = nextCartQuantity(
+        product,
+        cart[product.id] ?? 0,
+        quantities[product.id] ?? minOrderQuantity(product),
+      );
     } catch (validationError) {
       setNotice({
         message:
@@ -286,7 +291,9 @@ export function RetailerStorefront({
     try {
       await addToCart(retailerId, product.id, wanted);
       setCart((prev) => ({ ...prev, [product.id]: wanted }));
-      setQuantities((prev) => ({ ...prev, [product.id]: 1 }));
+      // Restart the stepper from the product's minimum order quantity, the
+      // same value a fresh page load would show.
+      setQuantities((prev) => ({ ...prev, [product.id]: minOrderQuantity(product) }));
       setAddedId(product.id);
       if (addedTimer.current) clearTimeout(addedTimer.current);
       addedTimer.current = setTimeout(() => {
@@ -467,7 +474,7 @@ export function RetailerStorefront({
                 <ProductCard
                   key={product.id}
                   product={product}
-                  quantity={quantities[product.id] ?? product.min_order_qty}
+                  quantity={quantities[product.id] ?? minOrderQuantity(product)}
                   inCart={cart[product.id] ?? 0}
                   adding={addingId === product.id}
                   added={addedId === product.id}
@@ -533,8 +540,8 @@ export function ProductCard({
   onAdd: (product: RetailerProduct) => void;
 }) {
   const outOfStock = product.stock <= 0;
-  const atMax = !outOfStock && inCart >= product.stock;
   const lowStock = !outOfStock && product.stock <= 5;
+  const inOrder = inCart > 0 || added;
 
   return (
     <article className="h-full">
@@ -597,44 +604,75 @@ export function ProductCard({
           ) : null}
         </CardContent>
         <CardFooter className="mt-auto flex-col items-stretch gap-2 border-t pt-3 pb-3 sm:flex-row sm:flex-wrap sm:items-center sm:justify-between sm:gap-2">
-          <div
-            className="flex items-center gap-2"
-            role="group"
-            aria-label={`Quantity for ${product.name}`}
-          >
-            <Button
-              type="button"
-              variant="outline"
-              size="icon-sm"
-              aria-label="Decrease quantity"
-              disabled={outOfStock || quantity <= product.min_order_qty}
-              onClick={() => onStep(product, -1)}
-            >
-              <Minus />
-            </Button>
-            <output className="min-w-8 text-center font-medium tabular-nums">{quantity}</output>
-            <Button
-              type="button"
-              variant="outline"
-              size="icon-sm"
-              aria-label="Increase quantity"
-              disabled={outOfStock || quantity >= product.stock}
-              onClick={() => onStep(product, 1)}
-            >
-              <Plus />
-            </Button>
-          </div>
-          <Button
-            type="button"
-            size="sm"
-            className="shrink-0"
-            variant={added ? "secondary" : "default"}
-            disabled={outOfStock || atMax || adding}
-            onClick={() => onAdd(product)}
-          >
-            {added ? <Check data-icon="inline-start" /> : <ShoppingCart data-icon="inline-start" />}
-            {added ? "Added" : atMax ? "All in cart" : "Add"}
-          </Button>
+          {inOrder ? (
+            <>
+              <span className="text-sm text-muted-foreground">
+                {added ? (
+                  "Added to your order."
+                ) : (
+                  <>
+                    <span className="font-medium tabular-nums text-foreground">{inCart}</span> in
+                    order
+                  </>
+                )}
+              </span>
+              <Button
+                asChild
+                size="sm"
+                variant={added ? "default" : "secondary"}
+                className="shrink-0"
+              >
+                <RouterLink to="/retailer/cart">
+                  {added ? (
+                    <Check data-icon="inline-start" />
+                  ) : (
+                    <ArrowRight data-icon="inline-end" />
+                  )}
+                  View order
+                </RouterLink>
+              </Button>
+            </>
+          ) : (
+            <>
+              <div
+                className="flex items-center gap-2"
+                role="group"
+                aria-label={`Quantity for ${product.name}`}
+              >
+                <Button
+                  type="button"
+                  variant="outline"
+                  size="icon-sm"
+                  aria-label="Decrease quantity"
+                  disabled={outOfStock || quantity <= product.min_order_qty}
+                  onClick={() => onStep(product, -1)}
+                >
+                  <Minus />
+                </Button>
+                <output className="min-w-8 text-center font-medium tabular-nums">{quantity}</output>
+                <Button
+                  type="button"
+                  variant="outline"
+                  size="icon-sm"
+                  aria-label="Increase quantity"
+                  disabled={outOfStock || quantity >= product.stock}
+                  onClick={() => onStep(product, 1)}
+                >
+                  <Plus />
+                </Button>
+              </div>
+              <Button
+                type="button"
+                size="sm"
+                className="shrink-0"
+                disabled={outOfStock || adding}
+                onClick={() => onAdd(product)}
+              >
+                <ShoppingCart data-icon="inline-start" />
+                Add
+              </Button>
+            </>
+          )}
         </CardFooter>
       </Card>
     </article>

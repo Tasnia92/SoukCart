@@ -1,7 +1,9 @@
 import { describe, expect, it } from "vite-plus/test";
 import {
   RELATED_PRODUCT_LIMIT,
+  minOrderQuantity,
   relatedProducts,
+  nextCartQuantity,
   type RetailerProduct,
 } from "./retailer-catalog-api.ts";
 
@@ -68,5 +70,35 @@ describe("relatedProducts", () => {
     const related = relatedProducts([current, other], current);
 
     expect(related).toEqual([]);
+  });
+});
+
+describe("minOrderQuantity", () => {
+  it("is the product's minimum order quantity", () => {
+    expect(minOrderQuantity(product({ min_order_qty: 5 }))).toBe(5);
+  });
+
+  it("never goes below 1", () => {
+    expect(minOrderQuantity(product({ min_order_qty: 0 }))).toBe(1);
+  });
+});
+
+describe("nextCartQuantity", () => {
+  it("stores at least the minimum order quantity on the first add", () => {
+    const item = product({ min_order_qty: 5, stock: 24 });
+
+    expect(nextCartQuantity(item, 0, 1)).toBe(5);
+  });
+
+  it("adds the requested quantity on top of what is already in the cart", () => {
+    const item = product({ min_order_qty: 5, stock: 24 });
+
+    expect(nextCartQuantity(item, 5, 5)).toBe(10);
+  });
+
+  it("refuses an addition that would exceed stock", () => {
+    const item = product({ name: "Rice", min_order_qty: 5, stock: 24 });
+
+    expect(() => nextCartQuantity(item, 20, 5)).toThrow("Only 4 more units of Rice are in stock.");
   });
 });

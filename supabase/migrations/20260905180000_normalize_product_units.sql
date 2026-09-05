@@ -1,0 +1,98 @@
+-- Normalize legacy free-text product units to the curated unit list offered in
+-- the supplier form (kg, g, litre, piece, dozen, packet, box, carton, crate,
+-- sack, bundle, bottle). Plural, abbreviated, and alternate spellings map onto
+-- the canonical value; anything unrecognized is left untouched so retailer
+-- listings keep showing whatever the supplier entered.
+-- Order items snapshot the unit at purchase time, so they are normalized too.
+
+update public.products as p
+set unit = case btrim(lower(p.unit))
+  when 'kg' then 'kg'
+  when 'kgs' then 'kg'
+  when 'kilo' then 'kg'
+  when 'kilos' then 'kg'
+  when 'kilogram' then 'kg'
+  when 'kilograms' then 'kg'
+  when 'g' then 'g'
+  when 'gm' then 'g'
+  when 'gram' then 'g'
+  when 'grams' then 'g'
+  when 'l' then 'litre'
+  when 'ltr' then 'litre'
+  when 'liter' then 'litre'
+  when 'liters' then 'litre'
+  when 'litre' then 'litre'
+  when 'litres' then 'litre'
+  when 'piece' then 'piece'
+  when 'pieces' then 'piece'
+  when 'pc' then 'piece'
+  when 'pcs' then 'piece'
+  when 'unit' then 'piece'
+  when 'units' then 'piece'
+  when 'dozen' then 'dozen'
+  when 'dozens' then 'dozen'
+  when 'packet' then 'packet'
+  when 'packets' then 'packet'
+  when 'pkt' then 'packet'
+  when 'pkts' then 'packet'
+  when 'box' then 'box'
+  when 'boxes' then 'box'
+  when 'carton' then 'carton'
+  when 'cartons' then 'carton'
+  when 'crate' then 'crate'
+  when 'crates' then 'crate'
+  when 'sack' then 'sack'
+  when 'sacks' then 'sack'
+  when 'bundle' then 'bundle'
+  when 'bundles' then 'bundle'
+  when 'bottle' then 'bottle'
+  when 'bottles' then 'bottle'
+  else p.unit
+end
+where p.unit is not null;
+
+update public.order_items as oi
+set unit = case btrim(lower(oi.unit))
+  when 'kg' then 'kg'
+  when 'kgs' then 'kg'
+  when 'kilo' then 'kg'
+  when 'kilos' then 'kg'
+  when 'kilogram' then 'kg'
+  when 'kilograms' then 'kg'
+  when 'g' then 'g'
+  when 'gm' then 'g'
+  when 'gram' then 'g'
+  when 'grams' then 'g'
+  when 'l' then 'litre'
+  when 'ltr' then 'litre'
+  when 'liter' then 'litre'
+  when 'liters' then 'litre'
+  when 'litre' then 'litre'
+  when 'litres' then 'litre'
+  when 'piece' then 'piece'
+  when 'pieces' then 'piece'
+  when 'pc' then 'piece'
+  when 'pcs' then 'piece'
+  when 'unit' then 'piece'
+  when 'units' then 'piece'
+  when 'dozen' then 'dozen'
+  when 'dozens' then 'dozen'
+  when 'packet' then 'packet'
+  when 'packets' then 'packet'
+  when 'pkt' then 'packet'
+  when 'pkts' then 'packet'
+  when 'box' then 'box'
+  when 'boxes' then 'box'
+  when 'carton' then 'carton'
+  when 'cartons' then 'carton'
+  when 'crate' then 'crate'
+  when 'crates' then 'crate'
+  when 'sack' then 'sack'
+  when 'sacks' then 'sack'
+  when 'bundle' then 'bundle'
+  when 'bundles' then 'bundle'
+  when 'bottle' then 'bottle'
+  when 'bottles' then 'bottle'
+  else oi.unit
+end
+where oi.unit is not null;
