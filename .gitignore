@@ -39,3 +39,4 @@ opencode.json
 
 .kiro/
 .agents/
+src/routeTree.gen.ts
