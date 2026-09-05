@@ -43,6 +43,10 @@ export type ActivityOrder = {
   delivery_charge: number;
   delivery_payment_status: "unpaid" | "paid" | "failed" | "cancelled";
   refund_amount: number;
+  /** Cumulative refund actually paid to the retailer for this order. */
+  refund_paid_total: number;
+  /** Merchandise refunded through the returns flow for this order. */
+  return_refunded: number;
   manual_refund_status: "not_required" | "review_required" | "pending" | "completed";
   refund_completed_at: string | null;
   retailer_id: string;
@@ -69,7 +73,12 @@ export type ActivityShipment = {
 
 export type ActivitySummary = {
   orders: number;
+  /** Net money collected: payment captured minus every refund paid out. */
   revenue: number;
+  /** Total refunds actually paid: completed manual refunds + applied return refunds. */
+  refunded: number;
+  /** The applied return-refund portion of `refunded`. */
+  returnRefunded: number;
   retailers: number;
   suppliers: number;
   units: number;
@@ -82,6 +91,34 @@ export type ActivityResponse = {
 
 export function orderPaidTotal(order: Pick<ActivityOrder, "total" | "delivery_charge">): number {
   return Math.max(order.total + order.delivery_charge, 0);
+}
+
+/**
+ * Money actually captured for an order, by payment method:
+ *  - online: the gateway captured merchandise + prepaid delivery once `paid`;
+ *  - COD: the delivery charge was prepaid online, and the merchandise is cash
+ *    that counts once it is recorded (`payment_status` paid).
+ * A cancelled-but-paid order still captured its money — refunds net it out.
+ */
+export function orderCapturedTotal(
+  order: Pick<
+    ActivityOrder,
+    "payment_method" | "payment_status" | "delivery_payment_status" | "total" | "delivery_charge"
+  >,
+): number {
+  if (order.payment_method === "cod") {
+    const delivery = order.delivery_payment_status === "paid" ? order.delivery_charge : 0;
+    const merchandise = order.payment_status === "paid" ? order.total : 0;
+    return merchandise + delivery;
+  }
+  return order.payment_status === "paid" ? order.total + order.delivery_charge : 0;
+}
+
+/** Every refund actually paid out for this order: manual refunds + return refunds. */
+export function orderRefundedTotal(
+  order: Pick<ActivityOrder, "refund_paid_total" | "return_refunded">,
+): number {
+  return Math.max(order.refund_paid_total + order.return_refunded, 0);
 }
 
 export async function loadAdminActivity(): Promise<ActivityResponse> {

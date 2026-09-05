@@ -1,5 +1,13 @@
 import { useCallback, useEffect, useRef, useState } from "react";
-import { Activity, Clock3, MessageSquare, RefreshCw, ShieldCheck, Users } from "lucide-react";
+import {
+  Activity,
+  Clock3,
+  MessageSquare,
+  RefreshCw,
+  ShieldCheck,
+  Users,
+  Wallet,
+} from "lucide-react";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -206,6 +214,16 @@ function AdminOverviewBody({ dashboard }: { dashboard: AdminDashboard }) {
           delta={summary.orderValueDelta}
           hint="Total of non-cancelled orders in this window. This is not settled revenue."
           context={`Paid ${formatPrice(summary.paidOrderValue)} · ${summary.orders} orders placed`}
+          to="/admin/activity"
+          linkLabel="Open orders"
+        />
+        <MetricCard
+          icon={Wallet}
+          label="Collected revenue"
+          value={formatPrice(Math.max(summary.collectedRevenue, 0))}
+          period={period}
+          hint="Payment captured minus refunds paid. A payment joins this when it is captured, and leaves it the moment a refund is paid out."
+          context={`${formatPrice(summary.settledRevenue)} settled on delivered orders · ${formatPrice(summary.refundedTotal)} refunded`}
           to="/admin/activity"
           linkLabel="Open orders"
         />

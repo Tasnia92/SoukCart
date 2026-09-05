@@ -54,11 +54,16 @@ type ActivityOrder = {
   delivery_charge: number;
   delivery_payment_status: string;
   refund_amount: number;
+  /** Cumulative refund actually paid out for this order. */
+  refund_paid_total: number;
+  /** Merchandise refunded through the returns flow for this order. */
+  return_refunded: number;
   manual_refund_status: string;
   refund_completed_at: string | null;
   retailer_id: string;
   retailer_name: string;
   retailer_email: string;
+  /** Merchandise only — what the supplier lines add up to. */
   total: number;
   lines: ActivityLine[];
   packages: ActivityPackage[];
@@ -80,7 +85,12 @@ type ActivityShipment = {
 
 type ActivitySummary = {
   orders: number;
+  /** Settled revenue: money collected on delivered + paid orders minus every refund paid out. */
   revenue: number;
+  /** Total refunds actually paid: completed manual refunds + applied return refunds. */
+  refunded: number;
+  /** The applied return-refund portion of `refunded`. */
+  returnRefunded: number;
   retailers: number;
   suppliers: number;
   units: number;
@@ -165,12 +175,34 @@ async function listActivity(): Promise<Response> {
   const { data, error } = await admin
     .from("orders")
     .select(
-      "id, status, cancel_requested, cancellation_initiator, cancellation_reason, payment_status, payment_method, created_at, delivered_at, delivery_verified_at, delivery_initiated_at, delivery_phone, delivery_address, delivery_city, delivery_postcode, platform_charge, delivery_charge, delivery_payment_status, refund_amount, manual_refund_status, refund_completed_at, retailer_id, users!orders_retailer_id_fkey(name, email), order_items(id, product_id, quantity, unit_price, products(id, name, seller_id, users!products_seller_id_fkey(name, email))), order_supplier_acceptances(supplier_id, status, declined_at, decline_reason), order_shipments(seller_id, status)",
+      "id, status, cancel_requested, cancellation_initiator, cancellation_reason, payment_status, payment_method, created_at, delivered_at, delivery_verified_at, delivery_initiated_at, delivery_phone, delivery_address, delivery_city, delivery_postcode, platform_charge, delivery_charge, delivery_payment_status, refund_amount, refund_paid_total, manual_refund_status, refund_completed_at, retailer_id, users!orders_retailer_id_fkey(name, email), order_items(id, product_id, quantity, unit_price, products(id, name, seller_id, users!products_seller_id_fkey(name, email))), order_supplier_acceptances(supplier_id, status, declined_at, decline_reason), order_shipments(seller_id, status)",
     )
     .order("created_at", { ascending: false })
     .limit(1000);
   if (error) {
     throw error;
+  }
+
+  // Money actually refunded out of SoukCart through the returns flow
+  // (order_returns.refund_applied), tracked per order so each order row can
+  // carry its own refunded amount.
+  const returnRefundByOrder = new Map<string, number>();
+  let returnRefundedTotal = 0;
+  const { data: refundedReturns, error: returnsError } = await admin
+    .from("order_returns")
+    .select("order_id, refund_amount")
+    .eq("refund_applied", true);
+  if (returnsError) {
+    throw returnsError;
+  }
+  for (const returnRow of refundedReturns ?? []) {
+    const amount = Number(returnRow.refund_amount ?? 0);
+    if (!Number.isFinite(amount)) continue;
+    returnRefundedTotal += amount;
+    returnRefundByOrder.set(
+      returnRow.order_id,
+      (returnRefundByOrder.get(returnRow.order_id) ?? 0) + amount,
+    );
   }
 
   const orders: ActivityOrder[] = (data ?? []).map((row: OrderRow): ActivityOrder => {
@@ -213,6 +245,8 @@ async function listActivity(): Promise<Response> {
       delivery_payment_status:
         typeof row.delivery_payment_status === "string" ? row.delivery_payment_status : "unpaid",
       refund_amount: Number(row.refund_amount ?? 0),
+      refund_paid_total: Number(row.refund_paid_total ?? 0),
+      return_refunded: roundMoney(returnRefundByOrder.get(row.id) ?? 0),
       manual_refund_status: row.manual_refund_status ?? "not_required",
       refund_completed_at: row.refund_completed_at,
       retailer_id: row.retailer_id,
@@ -233,13 +267,37 @@ async function listActivity(): Promise<Response> {
     };
   });
 
+  /**
+   * Revenue recognition, net cash basis:
+   *  - Money counts as COLLECTED the moment payment is captured on an order:
+   *    online orders capture merchandise + prepaid delivery through the
+   *    gateway; COD orders capture the prepaid delivery charge up front and
+   *    the merchandise when cash is recorded (payment_status paid).
+   *  - Money counts as REFUNDED once the admin completes a manual refund
+   *    (orders.refund_paid_total) or a supplier books a return refund
+   *    (order_returns.refund_applied).
+   *  - `revenue` is the net money SoukCart is holding from these orders.
+   *    Supplier payouts settle separately, on delivered + captured orders,
+   *    through the seller_payouts ledger.
+   */
+  const capturedFor = (order: ActivityOrder): number => {
+    if (order.payment_method === "cod") {
+      const delivery = order.delivery_payment_status === "paid" ? order.delivery_charge : 0;
+      const merchandise = order.payment_status === "paid" ? order.total : 0;
+      return merchandise + delivery;
+    }
+    return order.payment_status === "paid" ? order.total + order.delivery_charge : 0;
+  };
+
+  const captured = orders.reduce((sum, order) => sum + capturedFor(order), 0);
+  const manualRefunded = orders.reduce((sum, order) => sum + order.refund_paid_total, 0);
+  const refunded = manualRefunded + returnRefundedTotal;
+
   const summary: ActivitySummary = {
     orders: orders.length,
-    revenue: roundMoney(
-      orders
-        .filter((order) => order.payment_status === "paid")
-        .reduce((sum, order) => sum + order.total, 0),
-    ),
+    revenue: roundMoney(captured - refunded),
+    refunded: roundMoney(refunded),
+    returnRefunded: roundMoney(returnRefundedTotal),
     retailers: new Set(orders.map((order) => order.retailer_id)).size,
     suppliers: new Set(
       orders.flatMap((order) => order.lines.map((line) => line.supplier_id).filter(Boolean)),
@@ -329,6 +387,7 @@ type OrderRow = {
   delivery_charge: number | string | null;
   delivery_payment_status: string | null;
   refund_amount: number | string | null;
+  refund_paid_total: number | string | null;
   manual_refund_status: string | null;
   refund_completed_at: string | null;
   retailer_id: string;

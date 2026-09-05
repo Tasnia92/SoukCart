@@ -26,7 +26,12 @@ import {
 } from "../../components/dashboard/dashboard-model.ts";
 import { shortId } from "../orders/order-presentation.tsx";
 import { formatPrice } from "../workspace/format.ts";
-import { loadAdminActivity, type ActivityOrder } from "./admin-activity-api.ts";
+import {
+  loadAdminActivity,
+  orderCapturedTotal,
+  orderRefundedTotal,
+  type ActivityOrder,
+} from "./admin-activity-api.ts";
 import { loadAdminComplaints, type AdminComplaint } from "./admin-complaints-api.ts";
 import { loadAdminOverviewUsers, type AdminOverviewUser } from "./admin-overview-api.ts";
 import {
@@ -64,6 +69,16 @@ export type AdminSummary = {
   orderValueDelta: MetricDelta;
   /** Subset of order value where payment_status is paid. */
   paidOrderValue: number;
+  /**
+   * Money SoukCart is holding from orders placed in the window: payment
+   * captured (online gateway, COD delivery prepaid, COD cash recorded) minus
+   * every refund actually paid out. This is the revenue number.
+   */
+  collectedRevenue: number;
+  /** Delivered + paid money in the window, net of return refunds. */
+  settledRevenue: number;
+  /** Refunds actually paid out for orders placed in the window. */
+  refundedTotal: number;
   orders: number;
   ordersAwaitingAction: number;
   pendingOrders: number;
@@ -221,7 +236,7 @@ function refundQueueItem(order: ActivityOrder, now: number): AdminQueueItem {
     sla,
     at: order.created_at,
     amount: order.refund_amount,
-    to: "/admin/activity",
+    to: "/admin/order",
     search: { order: order.id },
     hash: `order-${order.id}`,
     actionLabel: awaitingReview ? "Review" : "Settle",
@@ -245,7 +260,7 @@ function cancellationQueueItem(order: ActivityOrder, now: number): AdminQueueIte
     sla: slaBucketFor(order.created_at, "cancellation", now),
     at: order.created_at,
     amount: order.total,
-    to: "/admin/activity",
+    to: "/admin/order",
     search: { order: order.id },
     hash: `order-${order.id}`,
     actionLabel: "Review",
@@ -371,6 +386,26 @@ export function buildAdminDashboard(
   const previousOrderValue = sumPreviousWindow(orderValueItems, now, windowDays);
   const paidOrderValue = sumWindow(paidValueItems, now, windowDays);
 
+  // Revenue recognition (net cash): money joins the collected total when the
+  // payment is captured, and leaves it when a refund is actually paid out.
+  const capturedItems = orders.map((order) => ({
+    at: order.created_at,
+    value: orderCapturedTotal(order),
+  }));
+  const refundedItems = orders.map((order) => ({
+    at: order.created_at,
+    value: orderRefundedTotal(order),
+  }));
+  const settledItems = orders
+    .filter((order) => order.status === "delivered" && order.payment_status === "paid")
+    .map((order) => ({
+      at: order.created_at,
+      value: order.total + order.delivery_charge - orderRefundedTotal(order),
+    }));
+  const capturedValue = sumWindow(capturedItems, now, windowDays);
+  const refundedTotal = sumWindow(refundedItems, now, windowDays);
+  const settledRevenue = sumWindow(settledItems, now, windowDays);
+
   const pendingOrders = orders.filter(awaitsConfirmation);
   const cancellations = orders.filter(hasOpenCancellation);
   const refunds = orders.filter(needsRefundAction);
@@ -417,6 +452,9 @@ export function buildAdminDashboard(
       orderValue,
       orderValueDelta: periodDelta(orderValue, previousOrderValue, windowDays),
       paidOrderValue,
+      collectedRevenue: capturedValue - refundedTotal,
+      settledRevenue,
+      refundedTotal,
       orders: merchandise.filter((order) => isWithinWindow(order.created_at, now, windowDays))
         .length,
       ordersAwaitingAction: awaitingAction.size,
