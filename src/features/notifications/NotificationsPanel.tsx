@@ -73,16 +73,19 @@ function notificationIcon(type: string): LucideIcon {
 function notificationHref(
   notification: OrderNotification,
   role: "retailer" | "seller" | "admin" | null,
-): { to: string; search?: Record<string, string> } | null {
+): { to: string; search?: Record<string, string>; params?: Record<string, string> } | null {
   if (notification.order_id) {
     if (role === "seller") {
       return { to: "/supplier/orders", search: { order: notification.order_id } };
     }
     if (role === "retailer") {
-      return { to: "/retailer/orders", search: { order: notification.order_id } };
+      return {
+        to: "/retailer/orders/$orderId",
+        params: { orderId: notification.order_id },
+      };
     }
     if (role === "admin") {
-      return { to: "/admin/activity", search: { order: notification.order_id } };
+      return { to: "/admin/order", search: { order: notification.order_id } };
     }
   }
 
@@ -147,7 +150,11 @@ export function NotificationsBell({
     markRead(notification);
     const href = notificationHref(notification, role);
     if (!href) return;
-    void navigate({ to: href.to as never, search: (href.search ?? {}) as never });
+    void navigate({
+      to: href.to as never,
+      search: (href.search ?? {}) as never,
+      params: (href.params ?? {}) as never,
+    });
   };
 
   const unread = notifications.filter((notification) => !notification.read_at).length;

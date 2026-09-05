@@ -32,6 +32,10 @@
   --color-chart-3: var(--chart-3);
   --color-chart-4: var(--chart-4);
   --color-chart-5: var(--chart-5);
+  --color-status-pending: var(--status-pending);
+  --color-status-shipped: var(--status-shipped);
+  --color-status-delivered: var(--status-delivered);
+  --color-status-cancelled: var(--status-cancelled);
   --color-sidebar: var(--sidebar);
   --color-sidebar-foreground: var(--sidebar-foreground);
   --color-sidebar-primary: var(--sidebar-primary);
@@ -91,6 +95,10 @@
   --chart-3: oklch(0.445 0.124 34.816);
   --chart-4: oklch(0.372 0.1 34.734);
   --chart-5: oklch(0.55 0.14 36);
+  --status-pending: oklch(0.7 0.15 55);
+  --status-shipped: oklch(0.55 0.12 250);
+  --status-delivered: oklch(0.64 0.15 155);
+  --status-cancelled: oklch(0.63 0.2 15);
   --radius: 0.625rem;
   --sidebar: oklch(0.987 0.002 197.1);
   --sidebar-foreground: oklch(0.148 0.004 228.8);
@@ -126,6 +134,10 @@
   --chart-3: oklch(0.445 0.124 34.816);
   --chart-4: oklch(0.372 0.1 34.734);
   --chart-5: oklch(0.55 0.14 36);
+  --status-pending: oklch(0.8 0.12 55);
+  --status-shipped: oklch(0.75 0.1 250);
+  --status-delivered: oklch(0.78 0.13 155);
+  --status-cancelled: oklch(0.75 0.16 15);
   --sidebar: oklch(0.218 0.008 223.9);
   --sidebar-foreground: oklch(0.987 0.002 197.1);
   --sidebar-primary: oklch(0.7 0.15 36.5);

@@ -819,7 +819,7 @@ export function AdminRecentOrders({ dashboard }: { dashboard: AdminDashboard }) 
       eyebrow="Latest"
       title="Recent orders"
       meta={dashboard.recent.length ? `Newest ${dashboard.recent.length}` : "No orders yet"}
-      action={<DashboardLink to="/admin/activity">All orders</DashboardLink>}
+      action={<DashboardLink to="/admin/order">All orders</DashboardLink>}
     >
       {dashboard.recent.length ? (
         <>
@@ -838,7 +838,7 @@ export function AdminRecentOrders({ dashboard }: { dashboard: AdminDashboard }) 
                   <StatusBadge status={order.status} />
                   <Button size="sm" variant="ghost" asChild>
                     <RouterLink
-                      to="/admin/activity"
+                      to="/admin/order"
                       search={{ order: order.id }}
                       hash={`order-${order.id}`}
                     >
@@ -857,7 +857,7 @@ export function AdminRecentOrders({ dashboard }: { dashboard: AdminDashboard }) 
               rowKey={(order) => order.id}
               onRowClick={(order) => {
                 void navigate({
-                  to: "/admin/activity",
+                  to: "/admin/order",
                   search: { order: order.id },
                   hash: `order-${order.id}`,
                 } as never);

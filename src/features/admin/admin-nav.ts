@@ -15,7 +15,7 @@ import {
   Banknote,
   type LucideIcon,
 } from "lucide-react";
-import type { WorkspaceNavMenuChoice, WorkspaceNavItem } from "../workspace/WorkspaceShell.tsx";
+import type { WorkspaceNavItem } from "../workspace/WorkspaceShell.tsx";
 import type { AdminOrderView } from "./admin-activity-api.ts";
 
 export type AdminOrderViewMeta = {
@@ -82,12 +82,13 @@ export function adminOrderViewMeta(view: AdminOrderView): AdminOrderViewMeta {
   return ADMIN_ORDER_VIEWS.find((item) => item.id === view) ?? ADMIN_ORDER_VIEWS[0];
 }
 
-/** Shared admin sidebar navigation — order views collapse under "Order management". */
+/** Shared admin sidebar navigation — order status lives as in-page tabs, not nested views. */
 export function adminNavItems(
   activePath: string,
-  orderView: AdminOrderView = "all",
+  _orderView: AdminOrderView = "all",
 ): WorkspaceNavItem[] {
-  const onOrders = activePath.startsWith("/admin/activity");
+  const onOrders =
+    activePath.startsWith("/admin/order") || activePath.startsWith("/admin/activity");
   return [
     {
       to: "/admin",
@@ -102,20 +103,10 @@ export function adminNavItems(
       active: activePath.startsWith("/admin/inbox"),
     },
     {
-      to: "/admin/activity",
+      to: "/admin/order",
       icon: ClipboardList,
-      label: "Order management",
+      label: "Orders",
       active: onOrders,
-      menu: ADMIN_ORDER_VIEWS.map(
-        (view): WorkspaceNavMenuChoice => ({
-          id: view.id,
-          label: view.label,
-          icon: view.icon,
-          to: "/admin/activity",
-          search: view.search,
-          active: onOrders && view.id === orderView,
-        }),
-      ),
     },
     {
       to: "/admin/payouts",

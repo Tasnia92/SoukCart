@@ -157,7 +157,7 @@ function ResultCard({ card }: { card: Card }): ReactNode {
     ? "Your order is with the suppliers."
     : "No charge was made. You can try again from your cart.";
   const href = ok ? (hasSession ? "/retailer/orders" : "/") : "/retailer/cart";
-  const label = ok ? (hasSession ? "View orders" : "Sign in") : "Back to cart";
+  const label = ok ? (hasSession ? "View order" : "Sign in") : "Back to cart";
 
   return (
     <Empty role="status" aria-live="polite">

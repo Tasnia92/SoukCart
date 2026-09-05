@@ -1,15 +1,6 @@
 import { useNavigate, useRouterState } from "@tanstack/react-router";
 import { useCallback, useEffect, useMemo, useState } from "react";
-import {
-  Ban,
-  Check,
-  ChevronDown,
-  Download,
-  Package,
-  RefreshCw,
-  Search,
-  type LucideIcon,
-} from "lucide-react";
+import { Ban, Download, RefreshCw } from "lucide-react";
 import {
   AlertDialog,
   AlertDialogAction,
@@ -20,10 +11,8 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
-import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { Card, CardContent } from "@/components/ui/card";
-import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
+import { Checkbox } from "@/components/ui/checkbox";
 import {
   Dialog,
   DialogContent,
@@ -33,36 +22,35 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog";
 import { Field, FieldGroup, FieldLabel } from "@/components/ui/field";
-import {
-  Select,
-  SelectContent,
-  SelectGroup,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select";
 import { Spinner } from "@/components/ui/spinner";
 import { Textarea } from "@/components/ui/textarea";
-import { cn } from "@/lib/utils";
 import {
-  EmptyState,
   InlineNotice,
   LoadingState,
   PageHeader,
-  SearchToolbar,
   WorkspaceError,
   type NoticeState,
 } from "../../components/ui/Workspace.tsx";
 import { useSessionSnapshot, useSessionStore } from "../../session.tsx";
 import { useTableChanges } from "../../workspace-realtime.ts";
-import { DeliveryStatusCard, deliveryActionLabel } from "../orders/DeliveryStatus.tsx";
+import { deliveryActionLabel } from "../orders/DeliveryStatus.tsx";
+import { OrderDetailSheet } from "../orders/order-detail-sheet.tsx";
 import {
   DeliveryDetails,
-  PaymentBadge,
+  matchesStatusTab,
+  orderTypeOf,
+  primaryProductName,
   shortId,
-  StatusBadge,
+  statusTabOf,
+  type OrderStatusTab,
 } from "../orders/order-presentation.tsx";
-import { formatDate, formatPrice, formatUpdatedAt } from "../workspace/format.ts";
+import {
+  OrdersDataTable,
+  type OrderMenuItem,
+  type OrderTableRow,
+} from "../orders/orders-data-table.tsx";
+import { loadProductImageMap } from "../orders/product-images.ts";
+import { formatPrice } from "../workspace/format.ts";
 import { searchParam } from "../workspace/search.ts";
 import { SupplierWorkspaceShell } from "./supplier-shared.tsx";
 import {
@@ -88,40 +76,25 @@ type SupplierOrdersProps = {
 };
 
 type Notice = { message: string; state: NoticeState } | null;
-type OrderFilter =
-  | "action"
-  | "awaiting-payment"
-  | "in-progress"
-  | "delivered"
-  | "cancelled"
-  | "all";
-type OrderSort = "oldest" | "newest" | "value" | "city";
 type FulfillAction = SupplierDeliveryAction;
 type CancelDecision = { order: SupplierOrder; approve: boolean };
 
-const ORDER_FILTERS = new Set<OrderFilter>([
-  "action",
-  "awaiting-payment",
-  "in-progress",
-  "delivered",
-  "cancelled",
-  "all",
-]);
-
-/** Legacy filter values still used by deep links; canonicalize onto the six options. */
-const FILTER_ALIASES: Record<string, OrderFilter> = {
-  "to-confirm": "action",
-  "cancellation-requested": "action",
-  "to-ship": "in-progress",
-  "in-transit": "in-progress",
-};
-
 const ORDERS_LIVE_TABLES = ["orders"] as const;
 
-function parseOrderFilter(value: string | null): OrderFilter {
-  if (value && ORDER_FILTERS.has(value as OrderFilter)) return value as OrderFilter;
-  if (value && value in FILTER_ALIASES) return FILTER_ALIASES[value];
-  return "action";
+function parseTab(value: string | null): OrderStatusTab {
+  if (
+    value === "all" ||
+    value === "pending" ||
+    value === "shipped" ||
+    value === "delivered" ||
+    value === "cancelled"
+  ) {
+    return value;
+  }
+  if (value === "in-progress" || value === "to-ship" || value === "in-transit") return "shipped";
+  if (value === "action" || value === "to-confirm" || value === "awaiting-payment")
+    return "pending";
+  return "pending";
 }
 
 function needsAction(order: SupplierOrder): boolean {
@@ -141,53 +114,6 @@ function isAwaitingPayment(order: SupplierOrder): boolean {
 
 function canOpenReturn(order: SupplierOrder): boolean {
   return order.status === "delivered" && !order.cancel_requested;
-}
-
-/** Confirmed (waiting on the admin gate) or already moving toward the retailer. */
-function isInProgress(order: SupplierOrder): boolean {
-  if (order.cancel_requested) return false;
-  if (order.status === "cancelled" || order.status === "delivered") return false;
-  return order.package_status === "confirmed" || order.status === "shipped";
-}
-
-function matchesFilter(order: SupplierOrder, filter: OrderFilter): boolean {
-  if (filter === "all") return true;
-  if (filter === "action") return needsAction(order);
-  if (filter === "awaiting-payment") return isAwaitingPayment(order);
-  if (filter === "in-progress") return isInProgress(order);
-  if (filter === "delivered") return order.status === "delivered";
-  return order.status === "cancelled";
-}
-
-/** Hours elapsed since created_at, floored at zero to absorb clock skew. */
-function waitingHours(createdAt: string, now = Date.now()): number {
-  return Math.floor(Math.max(0, now - new Date(createdAt).getTime()) / 3_600_000);
-}
-
-/** Relative wait label from created_at: hours under 48h, otherwise days. */
-function formatWaitingLabel(createdAt: string, now = Date.now()): string {
-  const hours = waitingHours(createdAt, now);
-  if (hours < 48) {
-    if (hours < 1) return "Waiting under an hour";
-    if (hours === 1) return "Waiting 1 hour";
-    return `Waiting ${hours} hours`;
-  }
-  const days = Math.floor(hours / 24);
-  return days === 1 ? "Waiting 1 day" : `Waiting ${days} days`;
-}
-
-function sortOrders(orders: SupplierOrder[], sort: OrderSort): SupplierOrder[] {
-  const next = [...orders];
-  if (sort === "oldest") {
-    next.sort((a, b) => a.created_at.localeCompare(b.created_at));
-  } else if (sort === "newest") {
-    next.sort((a, b) => b.created_at.localeCompare(a.created_at));
-  } else if (sort === "value") {
-    next.sort((a, b) => b.supplier_total - a.supplier_total);
-  } else {
-    next.sort((a, b) => (a.delivery_city ?? "").localeCompare(b.delivery_city ?? ""));
-  }
-  return next;
 }
 
 function csvEscape(value: string): string {
@@ -222,43 +148,6 @@ function exportOrdersCsv(orders: readonly SupplierOrder[]): void {
   URL.revokeObjectURL(url);
 }
 
-function deliveryProgress(order: SupplierOrder) {
-  return {
-    deliveryInitiated: isDeliveryInitiated(order),
-    parcelStatus: order.shipment_status,
-  };
-}
-
-/** The one next step this supplier can take right now, or null when blocked. */
-function primaryAction(order: SupplierOrder): FulfillAction | null {
-  if (order.status === "cancelled") return null;
-  if (hasRetailerCancellationRequest(order)) return null;
-  if (order.cancel_requested) return null;
-  if (canConfirmOrder(order)) return "confirmed";
-  return null;
-}
-
-const ACTION_META: Record<FulfillAction, { icon: LucideIcon }> = {
-  confirmed: { icon: Check },
-};
-
-/** Short label for the collapsed row when there is no button to show. */
-function headerHint(order: SupplierOrder): string | null {
-  if (order.status === "cancelled") return "Cancelled";
-  if (order.status === "delivered") {
-    return order.delivery_verified_at ? "Completed" : "Delivered";
-  }
-  if (order.delivery_payment_status !== "paid") return "Awaiting delivery payment";
-  if (order.status === "pending") return "Awaiting payment";
-  if (order.status === "shipped") return "Admin is delivering";
-  if (order.package_status === "confirmed" && !isDeliveryInitiated(order)) {
-    return "Awaiting admin delivery";
-  }
-  if (order.package_status === "declined") return "Items declined";
-  return null;
-}
-
-/** Full-sentence explanation shown inside the expanded order. */
 function orderExplanation(order: SupplierOrder): string | null {
   if (order.status === "cancelled") {
     return order.manual_refund_status === "pending"
@@ -267,23 +156,21 @@ function orderExplanation(order: SupplierOrder): string | null {
   }
   if (hasRetailerCancellationRequest(order)) {
     return order.delivery_initiated_at
-      ? "The retailer asked to cancel this order, but the delivery process has already started. The order can no longer be cancelled."
-      : "The retailer asked to cancel this order. Approving cancels it: online orders are refunded in full and COD orders get the prepaid delivery charge back.";
+      ? "The retailer asked to cancel, but delivery has already started so it can no longer be cancelled."
+      : "The retailer asked to cancel this order. Approving cancels it.";
   }
   if (order.cancel_requested) {
     return "You requested cancellation of this order. Confirm below to cancel it now.";
   }
   if (order.delivery_payment_status !== "paid") {
-    return "Waiting for the retailer to pay the delivery charge before fulfillment.";
+    return "Waiting for the retailer to pay the delivery charge.";
   }
-  if (order.status === "delivered" && order.delivery_verified_at) {
-    return "Delivery verified · the order is closed.";
-  }
+  if (order.status === "delivered") return "Delivery is complete.";
   if (order.status === "pending" && !canConfirmOrder(order)) {
     return "Waiting for online payment before fulfillment.";
   }
   if (order.package_status === "confirmed" && !isDeliveryInitiated(order)) {
-    return "Waiting for admin to start the delivery process. The admin team handles all delivery.";
+    return "Waiting for admin to start delivery.";
   }
   if (order.package_status === "declined") {
     return `You declined these items${order.decline_reason ? ` · ${order.decline_reason}` : ""}`;
@@ -291,241 +178,21 @@ function orderExplanation(order: SupplierOrder): string | null {
   return null;
 }
 
-/**
- * One order as a collapsible row. The collapsed header always shows the next
- * action button, so the queue can be worked without expanding anything.
- */
-function OrderCard({
-  order,
-  waitingLabel,
-  urgent,
-  busy,
-  open,
-  onToggle,
-  onFulfill,
-  onCancel,
-  onDecline,
-  onReturn,
-  onDecideCancellation,
-}: {
-  order: SupplierOrder;
-  waitingLabel: string;
-  urgent: boolean;
-  busy: boolean;
-  open: boolean;
-  onToggle: (open: boolean) => void;
-  onFulfill: (order: SupplierOrder, action: FulfillAction) => void;
-  onCancel: (order: SupplierOrder) => void;
-  onDecline: (order: SupplierOrder) => void;
-  onReturn: (order: SupplierOrder) => void;
-  onDecideCancellation: (order: SupplierOrder, approve: boolean) => void;
-}) {
-  const action = primaryAction(order);
-  const explanation = orderExplanation(order);
-  const hint = action ? null : headerHint(order);
-  const decisionRequest = hasRetailerCancellationRequest(order);
-  const units = order.items.reduce((sum, item) => sum + item.quantity, 0);
-  const ActionIcon = action ? ACTION_META[action].icon : null;
-
-  return (
-    <Collapsible
-      open={open}
-      onOpenChange={onToggle}
-      className="overflow-hidden rounded-xl border border-border/70 bg-card"
-    >
-      <div className="flex flex-col gap-3 p-4 lg:flex-row lg:items-center lg:justify-between lg:gap-4">
-        <CollapsibleTrigger asChild>
-          <button
-            type="button"
-            className="flex min-w-0 flex-1 cursor-pointer items-center gap-3 text-left"
-            aria-label={`${open ? "Hide" : "Show"} details for order #${shortId(order.id)}`}
-          >
-            <ChevronDown
-              aria-hidden="true"
-              className={cn(
-                "size-4 shrink-0 text-muted-foreground transition-transform",
-                open && "rotate-180",
-              )}
-            />
-            <span className="flex min-w-0 flex-col gap-1">
-              <span className="flex flex-wrap items-center gap-2">
-                <span className="font-medium">#{shortId(order.id)}</span>
-                <StatusBadge status={order.status} />
-                <span
-                  className={cn(
-                    "text-xs",
-                    urgent ? "font-medium text-destructive" : "text-muted-foreground",
-                  )}
-                >
-                  {waitingLabel}
-                </span>
-                {decisionRequest ? (
-                  <Badge variant="destructive">Cancellation requested</Badge>
-                ) : null}
-                {order.package_status === "declined" ? (
-                  <Badge variant="outline">Items declined</Badge>
-                ) : null}
-              </span>
-              <span className="truncate text-sm text-muted-foreground">
-                {order.retailer_name} · {units} {units === 1 ? "unit" : "units"} · placed{" "}
-                {formatDate(order.created_at)}
-              </span>
-            </span>
-          </button>
-        </CollapsibleTrigger>
-        <div className="flex flex-wrap items-center justify-between gap-2 lg:justify-end">
-          <span className="flex items-center gap-2">
-            <span className="font-semibold tabular-nums">{formatPrice(order.supplier_total)}</span>
-            <PaymentBadge
-              paymentStatus={order.payment_status}
-              paymentMethod={order.payment_method}
-            />
-          </span>
-          <span className="flex items-center gap-2">
-            {decisionRequest ? (
-              <>
-                <Button
-                  variant="outline"
-                  size="sm"
-                  type="button"
-                  disabled={busy}
-                  onClick={() => onDecideCancellation(order, false)}
-                >
-                  Reject
-                </Button>
-                <Button
-                  variant="destructive"
-                  size="sm"
-                  type="button"
-                  disabled={busy}
-                  onClick={() => onDecideCancellation(order, true)}
-                >
-                  Approve &amp; cancel
-                </Button>
-              </>
-            ) : order.cancel_requested ? (
-              <Button
-                variant="outline"
-                size="sm"
-                type="button"
-                disabled={busy}
-                onClick={() => onCancel(order)}
-              >
-                <Ban data-icon="inline-start" />
-                Cancel order
-              </Button>
-            ) : action && ActionIcon ? (
-              <Button
-                size="sm"
-                type="button"
-                disabled={busy}
-                onClick={() => onFulfill(order, action)}
-              >
-                {busy ? (
-                  <Spinner data-icon="inline-start" />
-                ) : (
-                  <ActionIcon data-icon="inline-start" />
-                )}
-                {deliveryActionLabel(action)}
-              </Button>
-            ) : hint ? (
-              <span className="text-sm text-muted-foreground">{hint}</span>
-            ) : null}
-          </span>
-        </div>
-      </div>
-      <CollapsibleContent>
-        <div className="flex flex-col gap-4 border-t border-border/70 bg-muted/40 p-4">
-          {explanation ? <p className="text-sm text-muted-foreground">{explanation}</p> : null}
-          <div className="flex flex-col gap-2">
-            {order.items.map((item) => (
-              <div className="flex items-center justify-between gap-4 text-sm" key={item.id}>
-                <span className="min-w-0 truncate font-medium">{item.product_name}</span>
-                <span className="shrink-0 text-muted-foreground">
-                  {item.quantity} × {formatPrice(item.unit_price)}
-                </span>
-                <span className="shrink-0 font-medium">{formatPrice(item.line_total)}</span>
-              </div>
-            ))}
-            <div className="flex justify-between gap-4 border-t pt-2 text-sm">
-              <span className="font-medium">Your total</span>
-              <span className="font-semibold">{formatPrice(order.supplier_total)}</span>
-            </div>
-          </div>
-          <DeliveryDetails
-            phone={order.delivery_phone}
-            address={order.delivery_address}
-            city={order.delivery_city}
-            postcode={order.delivery_postcode}
-          />
-          {order.notes ? (
-            <p className="text-sm">
-              <span className="font-medium">Notes: </span>
-              {order.notes}
-            </p>
-          ) : null}
-          {order.cancellation_reason ? (
-            <p className="text-sm">
-              <span className="font-medium">Cancellation reason: </span>
-              {order.cancellation_reason}
-            </p>
-          ) : null}
-          <DeliveryStatusCard
-            status={order.status}
-            audience="supplier"
-            progress={deliveryProgress(order)}
-          />
-          <div className="flex flex-col gap-2">
-            <span className="text-xs font-medium tracking-wider text-muted-foreground uppercase">
-              Manage
-            </span>
-            <div className="flex flex-wrap items-center gap-2">
-              {canDeclineOrderItems(order) ? (
-                <Button
-                  variant="outline"
-                  size="sm"
-                  type="button"
-                  disabled={busy}
-                  onClick={() => onDecline(order)}
-                >
-                  Decline items
-                </Button>
-              ) : null}
-              {canOpenReturn(order) ? (
-                <Button
-                  variant="outline"
-                  size="sm"
-                  type="button"
-                  disabled={busy}
-                  onClick={() => onReturn(order)}
-                >
-                  Open return
-                </Button>
-              ) : null}
-              {canSupplierCancel(order) ? (
-                <Button
-                  variant="outline"
-                  size="sm"
-                  type="button"
-                  disabled={busy}
-                  onClick={() => onCancel(order)}
-                >
-                  <Ban data-icon="inline-start" />
-                  Cancel order
-                </Button>
-              ) : null}
-              {order.cancel_requested ? (
-                <Button size="sm" type="button" disabled={busy} onClick={() => onCancel(order)}>
-                  <Ban data-icon="inline-start" />
-                  Confirm cancellation
-                </Button>
-              ) : null}
-            </div>
-          </div>
-        </div>
-      </CollapsibleContent>
-    </Collapsible>
-  );
+function toRow(order: SupplierOrder, images: Map<string, string>): OrderTableRow {
+  const product = primaryProductName(order.items);
+  const firstId = order.items[0]?.product_id;
+  return {
+    id: order.id,
+    productName: product.name,
+    productImageUrl: firstId ? (images.get(firstId) ?? null) : null,
+    extraItemCount: product.extraCount,
+    customerName: order.retailer_name,
+    customerEmail: order.retailer_email,
+    type: orderTypeOf(order),
+    price: order.supplier_total,
+    date: order.created_at,
+    status: order.status,
+  };
 }
 
 export function SupplierOrders({ loadOrders = loadSupplierOrders }: SupplierOrdersProps) {
@@ -533,18 +200,24 @@ export function SupplierOrders({ loadOrders = loadSupplierOrders }: SupplierOrde
   const store = useSessionStore();
   const navigate = useNavigate({ from: "/supplier/orders" });
   const searchStr = useRouterState({ select: (routerState) => routerState.location.searchStr });
-  const filter = parseOrderFilter(searchParam(searchStr, "filter"));
+  const filterParam = searchParam(searchStr, "filter");
+  const focusOrderId = searchParam(searchStr, "order");
+  const tab = parseTab(filterParam);
   const [orders, setOrders] = useState<SupplierOrder[] | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [loadVersion, setLoadVersion] = useState(0);
   const [refreshing, setRefreshing] = useState(false);
-  const [updatedAt, setUpdatedAt] = useState<number | null>(null);
-  const [nowTick, setNowTick] = useState(() => Date.now());
   const [searchTerm, setSearchTerm] = useState("");
-  const [sort, setSort] = useState<OrderSort>("oldest");
   const [notice, setNotice] = useState<Notice>(null);
   const [busyId, setBusyId] = useState<string | null>(null);
-  const [openIds, setOpenIds] = useState<ReadonlySet<string>>(() => new Set());
+  const [openOrderId, setOpenOrderId] = useState<string | null>(focusOrderId);
+  const [needsActionOnly, setNeedsActionOnly] = useState(
+    () => filterParam === "action" || filterParam === "to-confirm",
+  );
+  const [awaitingPaymentOnly, setAwaitingPaymentOnly] = useState(
+    () => filterParam === "awaiting-payment",
+  );
+  const [images, setImages] = useState<Map<string, string>>(() => new Map());
   const [fulfillTarget, setFulfillTarget] = useState<{
     order: SupplierOrder;
     action: FulfillAction;
@@ -564,9 +237,8 @@ export function SupplierOrders({ loadOrders = loadSupplierOrders }: SupplierOrde
   const retry = useCallback(() => setLoadVersion((version) => version + 1), []);
 
   useEffect(() => {
-    const timer = window.setInterval(() => setNowTick(Date.now()), 30_000);
-    return () => window.clearInterval(timer);
-  }, []);
+    if (focusOrderId) setOpenOrderId(focusOrderId);
+  }, [focusOrderId]);
 
   useEffect(() => {
     if (!isSeller) return;
@@ -578,7 +250,6 @@ export function SupplierOrders({ loadOrders = loadSupplierOrders }: SupplierOrde
       .then((nextOrders) => {
         if (current) {
           setOrders(nextOrders);
-          setUpdatedAt(Date.now());
           setRefreshing(false);
         }
       })
@@ -601,16 +272,10 @@ export function SupplierOrders({ loadOrders = loadSupplierOrders }: SupplierOrde
     coalesceMs: 1500,
   });
 
-  const counts = useMemo(() => {
-    const list = orders ?? [];
-    return {
-      all: list.length,
-      action: list.filter(needsAction).length,
-      awaitingPayment: list.filter(isAwaitingPayment).length,
-      inProgress: list.filter(isInProgress).length,
-      delivered: list.filter((order) => order.status === "delivered").length,
-      cancelled: list.filter((order) => order.status === "cancelled").length,
-    };
+  useEffect(() => {
+    if (!orders?.length) return;
+    const ids = orders.flatMap((order) => order.items.map((item) => item.product_id));
+    void loadProductImageMap(ids).then(setImages);
   }, [orders]);
 
   const searched = useMemo(
@@ -619,12 +284,25 @@ export function SupplierOrders({ loadOrders = loadSupplierOrders }: SupplierOrde
   );
   const filtered = useMemo(
     () =>
-      sortOrders(
-        searched.filter((order) => matchesFilter(order, filter)),
-        sort,
-      ),
-    [searched, filter, sort],
+      searched.filter((order) => {
+        if (needsActionOnly && !needsAction(order)) return false;
+        if (awaitingPaymentOnly && !isAwaitingPayment(order)) return false;
+        if (tab === "cancelled") return order.status === "cancelled" || order.cancel_requested;
+        return matchesStatusTab(order.status, tab);
+      }),
+    [searched, needsActionOnly, awaitingPaymentOnly, tab],
   );
+  const counts = useMemo(() => {
+    const list = searched;
+    return {
+      all: list.length,
+      pending: list.filter((order) => statusTabOf(order.status) === "pending").length,
+      shipped: list.filter((order) => order.status === "shipped").length,
+      delivered: list.filter((order) => order.status === "delivered").length,
+      cancelled: list.filter((order) => order.status === "cancelled" || order.cancel_requested)
+        .length,
+    };
+  }, [searched]);
 
   if (state.status !== "seller") return null;
 
@@ -635,45 +313,13 @@ export function SupplierOrders({ loadOrders = loadSupplierOrders }: SupplierOrde
   };
   const userName = state.profile.name || state.profile.email;
 
-  const setFilter = (value: OrderFilter) => {
+  const setTab = (value: OrderStatusTab) => {
+    setNeedsActionOnly(false);
+    setAwaitingPaymentOnly(false);
     void navigate({
       to: "/supplier/orders",
-      search: value === "action" ? {} : { filter: value },
-    } as never);
-  };
-
-  const toggleOpen = useCallback((orderId: string, next: boolean) => {
-    setOpenIds((previous) => {
-      const nextSet = new Set(previous);
-      if (next) {
-        nextSet.add(orderId);
-      } else {
-        nextSet.delete(orderId);
-      }
-      return nextSet;
+      search: (value === "pending" ? {} : { filter: value }) as never,
     });
-  }, []);
-
-  const openFulfill = (order: SupplierOrder, action: FulfillAction) => {
-    setFulfillTarget({ order, action });
-  };
-  const openCancel = (order: SupplierOrder) => {
-    setCancelReason("");
-    setCancelInvalid(false);
-    setCancelTarget(order);
-  };
-  const openCancelDecision = (order: SupplierOrder, approve: boolean) => {
-    setCancelDecision({ order, approve });
-  };
-  const openDecline = (order: SupplierOrder) => {
-    setDeclineReason("");
-    setDeclineInvalid(false);
-    setDeclineTarget(order);
-  };
-  const openReturn = (order: SupplierOrder) => {
-    setReturnReason("");
-    setReturnInvalid(false);
-    setReturnTarget(order);
   };
 
   if (error) {
@@ -699,7 +345,7 @@ export function SupplierOrders({ loadOrders = loadSupplierOrders }: SupplierOrde
         setNotice({
           message:
             status === "confirmed"
-              ? `Order #${shortId(order.id)} is confirmed. Admin starts and handles the delivery process.`
+              ? `Order #${shortId(order.id)} is confirmed. Admin starts and handles delivery.`
               : `Order #${shortId(order.id)} was updated.`,
           state: "success",
         });
@@ -729,8 +375,8 @@ export function SupplierOrders({ loadOrders = loadSupplierOrders }: SupplierOrde
           setNotice({
             message:
               result.manualRefundStatus === "pending" && result.refundAmount > 0
-                ? `Order #${shortId(order.id)} was cancelled. A manual refund of ${formatPrice(result.refundAmount)} is queued for the admin team.`
-                : `Order #${shortId(order.id)} was cancelled. The retailer was notified.`,
+                ? `Order #${shortId(order.id)} was cancelled. A manual refund of ${formatPrice(result.refundAmount)} is queued.`
+                : `Order #${shortId(order.id)} was cancelled.`,
             state: "success",
           });
           retry();
@@ -750,7 +396,7 @@ export function SupplierOrders({ loadOrders = loadSupplierOrders }: SupplierOrde
     void rejectSupplierCancellation(order.id)
       .then(() => {
         setNotice({
-          message: `Cancellation request for order #${shortId(order.id)} was rejected. The order continues as normal.`,
+          message: `Cancellation request for order #${shortId(order.id)} was rejected.`,
           state: "info",
         });
         retry();
@@ -782,7 +428,7 @@ export function SupplierOrders({ loadOrders = loadSupplierOrders }: SupplierOrde
     void cancelSupplierOrder(order.id, reason)
       .then(() => {
         setNotice({
-          message: `Order #${shortId(order.id)} was cancelled. The retailer was notified and any advance-payment refund is queued for settlement.`,
+          message: `Order #${shortId(order.id)} was cancelled.`,
           state: "info",
         });
         retry();
@@ -814,7 +460,7 @@ export function SupplierOrders({ loadOrders = loadSupplierOrders }: SupplierOrde
     void declineSupplierItems(order.id, reason)
       .then(() => {
         setNotice({
-          message: `You declined your items on order #${shortId(order.id)}. The retailer was notified.`,
+          message: `You declined your items on order #${shortId(order.id)}.`,
           state: "info",
         });
         retry();
@@ -861,6 +507,10 @@ export function SupplierOrders({ loadOrders = loadSupplierOrders }: SupplierOrde
       .finally(() => setBusyId(null));
   };
 
+  const byId = new Map((orders ?? []).map((order) => [order.id, order]));
+  const rows = filtered.map((order) => toRow(order, images));
+  const openOrder = orders?.find((order) => order.id === openOrderId) ?? null;
+
   return (
     <SupplierWorkspaceShell
       section="orders"
@@ -869,26 +519,18 @@ export function SupplierOrders({ loadOrders = loadSupplierOrders }: SupplierOrde
       onLogout={onLogout}
     >
       <PageHeader
-        eyebrow="Fulfillment"
         title="Orders"
-        copy="Confirm orders you can fulfill or cancel them. The admin team handles the delivery process — you are notified of each step."
         actions={
           <>
-            {updatedAt ? (
-              <span className="text-sm text-muted-foreground" aria-live="polite">
-                {refreshing ? "Refreshing…" : formatUpdatedAt(updatedAt, nowTick)}
-              </span>
-            ) : null}
             <Button
               type="button"
               variant="ghost"
               size="icon"
               aria-label="Refresh"
-              title="Refresh"
               disabled={refreshing}
               onClick={retry}
             >
-              {refreshing ? <Spinner /> : <RefreshCw aria-hidden="true" />}
+              {refreshing ? <Spinner /> : <RefreshCw />}
             </Button>
             <Button
               type="button"
@@ -897,117 +539,239 @@ export function SupplierOrders({ loadOrders = loadSupplierOrders }: SupplierOrde
               onClick={() => exportOrdersCsv(filtered)}
             >
               <Download data-icon="inline-start" />
-              Export CSV
+              Export
             </Button>
           </>
         }
       />
       <InlineNotice message={notice?.message} state={notice?.state} />
       {orders ? (
-        orders.length ? (
-          <div className="flex flex-col gap-4">
-            <Card size="sm">
-              <CardContent className="flex flex-col gap-3 lg:flex-row lg:items-center">
-                <div className="flex w-full flex-col gap-1 lg:w-64">
-                  <span className="text-xs text-muted-foreground">Show</span>
-                  <Select
-                    value={filter}
-                    onValueChange={(value) => setFilter(parseOrderFilter(value))}
-                  >
-                    <SelectTrigger size="sm" aria-label="Filter orders">
-                      <SelectValue />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectGroup>
-                        <SelectItem value="action">Needs action ({counts.action})</SelectItem>
-                        <SelectItem value="awaiting-payment">
-                          Awaiting payment ({counts.awaitingPayment})
-                        </SelectItem>
-                        <SelectItem value="in-progress">
-                          In progress ({counts.inProgress})
-                        </SelectItem>
-                        <SelectItem value="delivered">Delivered ({counts.delivered})</SelectItem>
-                        <SelectItem value="cancelled">Cancelled ({counts.cancelled})</SelectItem>
-                        <SelectItem value="all">All orders ({counts.all})</SelectItem>
-                      </SelectGroup>
-                    </SelectContent>
-                  </Select>
-                </div>
-                <div className="min-w-0 flex-1">
-                  <SearchToolbar
-                    label="Search orders"
-                    placeholder="Search orders"
-                    value={searchTerm}
-                    onChange={(event) => setSearchTerm(event.target.value)}
-                    result={`${filtered.length} of ${orders.length} orders`}
-                  />
-                </div>
-                <div className="flex w-full flex-col gap-1 lg:w-44">
-                  <span className="text-xs text-muted-foreground">Sort</span>
-                  <Select value={sort} onValueChange={(value) => setSort(value as OrderSort)}>
-                    <SelectTrigger size="sm" aria-label="Sort orders">
-                      <SelectValue />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectGroup>
-                        <SelectItem value="oldest">Oldest waiting</SelectItem>
-                        <SelectItem value="newest">Newest</SelectItem>
-                        <SelectItem value="value">Highest value</SelectItem>
-                        <SelectItem value="city">Delivery city</SelectItem>
-                      </SelectGroup>
-                    </SelectContent>
-                  </Select>
-                </div>
-              </CardContent>
-            </Card>
-            {filtered.length ? (
-              <div className="flex flex-col gap-3">
-                {filtered.map((order) => (
-                  <OrderCard
-                    key={order.id}
-                    order={order}
-                    waitingLabel={formatWaitingLabel(order.created_at, nowTick)}
-                    urgent={needsAction(order) && waitingHours(order.created_at, nowTick) >= 48}
-                    busy={busyId === order.id}
-                    open={openIds.has(order.id)}
-                    onToggle={(next) => toggleOpen(order.id, next)}
-                    onFulfill={openFulfill}
-                    onCancel={openCancel}
-                    onDecline={openDecline}
-                    onReturn={openReturn}
-                    onDecideCancellation={openCancelDecision}
-                  />
-                ))}
-              </div>
-            ) : (
-              <EmptyState
-                icon={Search}
-                title={searchTerm ? "No matching orders" : "Nothing waiting here"}
-                copy={
-                  searchTerm
-                    ? "Try a different order number, retailer, or product."
-                    : "Orders appear in this view as their status changes."
-                }
-                action={
-                  searchTerm ? undefined : (
-                    <Button variant="outline" type="button" onClick={() => setFilter("all")}>
-                      Show all orders
-                    </Button>
-                  )
-                }
-              />
-            )}
-          </div>
-        ) : (
-          <EmptyState
-            icon={Package}
-            title="No orders yet"
-            copy="Orders that include your products will show up here."
-          />
-        )
+        <OrdersDataTable
+          rows={rows}
+          tab={tab}
+          onTabChange={setTab}
+          counts={counts}
+          showColumns={false}
+          search={searchTerm}
+          onSearchChange={setSearchTerm}
+          activeFilterCount={(needsActionOnly ? 1 : 0) + (awaitingPaymentOnly ? 1 : 0)}
+          extraFilters={
+            <>
+              <Field orientation="horizontal">
+                <Checkbox
+                  id="supplier-needs-action"
+                  checked={needsActionOnly}
+                  onCheckedChange={(checked) => setNeedsActionOnly(checked === true)}
+                />
+                <FieldLabel htmlFor="supplier-needs-action">Needs action</FieldLabel>
+              </Field>
+              <Field orientation="horizontal">
+                <Checkbox
+                  id="supplier-awaiting-payment"
+                  checked={awaitingPaymentOnly}
+                  onCheckedChange={(checked) => setAwaitingPaymentOnly(checked === true)}
+                />
+                <FieldLabel htmlFor="supplier-awaiting-payment">Awaiting payment</FieldLabel>
+              </Field>
+            </>
+          }
+          onRowOpen={setOpenOrderId}
+          onExportSelected={(ids) => {
+            const selected = ids
+              .map((id) => byId.get(id))
+              .filter((order): order is SupplierOrder => Boolean(order));
+            if (selected.length) exportOrdersCsv(selected);
+          }}
+          rowMenuItems={(row) => {
+            const order = byId.get(row.id);
+            const items: OrderMenuItem[] = [
+              { label: "View details", onSelect: () => setOpenOrderId(row.id) },
+            ];
+            if (!order) return items;
+            if (hasRetailerCancellationRequest(order)) {
+              items.push({
+                label: "Approve cancellation",
+                destructive: true,
+                onSelect: () => setCancelDecision({ order, approve: true }),
+              });
+              items.push({
+                label: "Reject request",
+                onSelect: () => setCancelDecision({ order, approve: false }),
+              });
+              return items;
+            }
+            if (canConfirmOrder(order)) {
+              items.push({
+                label: deliveryActionLabel("confirmed") ?? "Confirm order",
+                onSelect: () => setFulfillTarget({ order, action: "confirmed" }),
+              });
+            }
+            if (canDeclineOrderItems(order)) {
+              items.push({
+                label: "Decline items",
+                onSelect: () => {
+                  setDeclineReason("");
+                  setDeclineInvalid(false);
+                  setDeclineTarget(order);
+                },
+              });
+            }
+            if (canOpenReturn(order)) {
+              items.push({
+                label: "Open return",
+                onSelect: () => {
+                  setReturnReason("");
+                  setReturnInvalid(false);
+                  setReturnTarget(order);
+                },
+              });
+            }
+            if (canSupplierCancel(order) || order.cancel_requested) {
+              items.push({
+                label: "Cancel order",
+                destructive: true,
+                onSelect: () => {
+                  setCancelReason("");
+                  setCancelInvalid(false);
+                  setCancelTarget(order);
+                },
+              });
+            }
+            return items;
+          }}
+          emptyTitle={searchTerm ? "No matching orders" : "Nothing in this tab"}
+          emptyCopy={
+            searchTerm
+              ? "Try a different order number, retailer, or product."
+              : "Orders appear here as their status changes."
+          }
+          emptyAction={
+            tab !== "all" ? (
+              <Button variant="outline" type="button" onClick={() => setTab("all")}>
+                Show all orders
+              </Button>
+            ) : undefined
+          }
+        />
       ) : (
         <LoadingState title="Loading your orders…" />
       )}
+
+      <OrderDetailSheet
+        open={openOrder !== null}
+        onOpenChange={(open) => {
+          if (!open) setOpenOrderId(null);
+        }}
+        title={openOrder ? `Order #${shortId(openOrder.id)}` : "Order"}
+        description={
+          openOrder
+            ? `${openOrder.retailer_name} · ${formatPrice(openOrder.supplier_total)}`
+            : undefined
+        }
+        footer={
+          openOrder ? (
+            <>
+              {hasRetailerCancellationRequest(openOrder) ? (
+                <>
+                  <Button
+                    type="button"
+                    variant="outline"
+                    disabled={busyId === openOrder.id}
+                    onClick={() => setCancelDecision({ order: openOrder, approve: false })}
+                  >
+                    Reject
+                  </Button>
+                  <Button
+                    type="button"
+                    variant="destructive"
+                    disabled={busyId === openOrder.id}
+                    onClick={() => setCancelDecision({ order: openOrder, approve: true })}
+                  >
+                    Approve &amp; cancel
+                  </Button>
+                </>
+              ) : null}
+              {canConfirmOrder(openOrder) ? (
+                <Button
+                  type="button"
+                  disabled={busyId === openOrder.id}
+                  onClick={() => setFulfillTarget({ order: openOrder, action: "confirmed" })}
+                >
+                  {busyId === openOrder.id ? <Spinner data-icon="inline-start" /> : null}
+                  {deliveryActionLabel("confirmed")}
+                </Button>
+              ) : null}
+              {canDeclineOrderItems(openOrder) ? (
+                <Button
+                  type="button"
+                  variant="outline"
+                  disabled={busyId === openOrder.id}
+                  onClick={() => {
+                    setDeclineReason("");
+                    setDeclineInvalid(false);
+                    setDeclineTarget(openOrder);
+                  }}
+                >
+                  Decline items
+                </Button>
+              ) : null}
+              {canOpenReturn(openOrder) ? (
+                <Button
+                  type="button"
+                  variant="outline"
+                  disabled={busyId === openOrder.id}
+                  onClick={() => {
+                    setReturnReason("");
+                    setReturnInvalid(false);
+                    setReturnTarget(openOrder);
+                  }}
+                >
+                  Open return
+                </Button>
+              ) : null}
+              {canSupplierCancel(openOrder) || openOrder.cancel_requested ? (
+                <Button
+                  type="button"
+                  variant="outline"
+                  disabled={busyId === openOrder.id}
+                  onClick={() => {
+                    setCancelReason("");
+                    setCancelInvalid(false);
+                    setCancelTarget(openOrder);
+                  }}
+                >
+                  <Ban data-icon="inline-start" />
+                  Cancel order
+                </Button>
+              ) : null}
+            </>
+          ) : null
+        }
+      >
+        {openOrder ? (
+          <div className="flex flex-col gap-4 pb-4">
+            {orderExplanation(openOrder) ? (
+              <p className="text-sm text-muted-foreground">{orderExplanation(openOrder)}</p>
+            ) : null}
+            <ul className="flex flex-col gap-2">
+              {openOrder.items.map((item) => (
+                <li className="flex items-center justify-between gap-3 text-sm" key={item.id}>
+                  <span className="min-w-0 truncate font-medium">{item.product_name}</span>
+                  <span className="shrink-0 text-muted-foreground">
+                    {item.quantity} × {formatPrice(item.unit_price)}
+                  </span>
+                </li>
+              ))}
+            </ul>
+            <DeliveryDetails
+              phone={openOrder.delivery_phone}
+              address={openOrder.delivery_address}
+              city={openOrder.delivery_city}
+              postcode={openOrder.delivery_postcode}
+            />
+          </div>
+        ) : null}
+      </OrderDetailSheet>
 
       <AlertDialog
         open={fulfillTarget !== null}
@@ -1026,7 +790,7 @@ export function SupplierOrders({ loadOrders = loadSupplierOrders }: SupplierOrde
             </AlertDialogTitle>
             <AlertDialogDescription>
               {fulfillTarget?.action === "confirmed"
-                ? "Confirm that you can fulfill this order. The admin team then starts and handles the whole delivery process."
+                ? "Confirm that you can fulfill this order. The admin team then starts and handles delivery."
                 : ""}
             </AlertDialogDescription>
           </AlertDialogHeader>
@@ -1058,7 +822,7 @@ export function SupplierOrders({ loadOrders = loadSupplierOrders }: SupplierOrde
             </AlertDialogTitle>
             <AlertDialogDescription>
               {cancelDecision?.approve
-                ? "The whole order is cancelled. Online orders are refunded in full (merchandise + delivery); COD orders get the prepaid delivery charge back — settled by the admin team."
+                ? "The whole order is cancelled. Online orders are refunded in full; COD orders get the prepaid delivery charge back."
                 : "The order continues as normal and the retailer is notified."}
             </AlertDialogDescription>
           </AlertDialogHeader>
@@ -1144,9 +908,7 @@ export function SupplierOrders({ loadOrders = loadSupplierOrders }: SupplierOrde
               Cancel order{cancelTarget ? ` #${shortId(cancelTarget.id)}` : ""}
             </DialogTitle>
             <DialogDescription>
-              This cancels the order immediately. Online orders are refunded in full (merchandise +
-              prepaid delivery); COD orders get the prepaid delivery charge back — settled by the
-              admin team. Use this when you cannot fulfill the order.
+              This cancels the order immediately. Use this when you cannot fulfill it.
             </DialogDescription>
           </DialogHeader>
           <FieldGroup>
@@ -1200,7 +962,6 @@ export function SupplierOrders({ loadOrders = loadSupplierOrders }: SupplierOrde
             </DialogTitle>
             <DialogDescription>
               The retailer is notified immediately. Other suppliers on this order are not affected.
-              Prepaid merchandise for these items can be refunded.
             </DialogDescription>
           </DialogHeader>
           <FieldGroup>

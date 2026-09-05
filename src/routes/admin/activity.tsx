@@ -1,6 +1,10 @@
-import { createFileRoute } from "@tanstack/react-router";
-import { AdminActivity } from "../../features/admin/AdminActivity.tsx";
+import { createFileRoute, redirect } from "@tanstack/react-router";
 
 export const Route = createFileRoute("/admin/activity")({
-  component: AdminActivity,
+  beforeLoad: ({ location }) => {
+    throw redirect({
+      href: `/admin/order${location.searchStr}${location.hash}`,
+      replace: true,
+    });
+  },
 });

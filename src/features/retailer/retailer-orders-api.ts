@@ -13,6 +13,7 @@ export type RetailerOrderItem = {
   quantity: number;
   unit_price: number;
   product_name: string;
+  image_url: string | null;
   seller_id: string | null;
 };
 
@@ -70,7 +71,9 @@ export type RetailerOrder = {
 };
 
 const ORDERS_SELECT =
-  "id, status, cancel_requested, cancellation_initiator, payment_status, payment_method, tran_id, notes, created_at, delivery_verified_at, delivery_initiated_at, delivery_phone, delivery_address, delivery_city, delivery_postcode, delivery_payment_status, delivery_paid_at, manual_refund_status, refund_amount, platform_charge, delivery_charge, order_items(id, product_id, quantity, unit_price, seller_id, products(name)), order_supplier_acceptances(supplier_id, status, decline_reason), order_shipments(id, seller_id, carrier, tracking_number, tracking_url, status, notes, shipped_at, shipment_events(id, event_type, message, occurred_at))";
+  "id, status, cancel_requested, cancellation_initiator, payment_status, payment_method, tran_id, notes, created_at, delivery_verified_at, delivery_initiated_at, delivery_phone, delivery_address, delivery_city, delivery_postcode, delivery_payment_status, delivery_paid_at, manual_refund_status, refund_amount, platform_charge, delivery_charge, order_items(id, product_id, quantity, unit_price, seller_id, products(name, image_url)), order_supplier_acceptances(supplier_id, status, decline_reason), order_shipments(id, seller_id, carrier, tracking_number, tracking_url, status, notes, shipped_at, shipment_events(id, event_type, message, occurred_at))";
+
+type ProductRef = { name: string; image_url?: string | null };
 
 type OrderItemRow = {
   id: string;
@@ -78,7 +81,7 @@ type OrderItemRow = {
   quantity: number;
   unit_price: number | string;
   seller_id?: string | null;
-  products: { name: string } | { name: string }[] | null;
+  products: ProductRef | ProductRef[] | null;
 };
 
 type PackageRow = {
@@ -138,6 +141,11 @@ function productName(relation: OrderItemRow["products"]): string {
   return relation?.name ?? "Unknown product";
 }
 
+function productImage(relation: OrderItemRow["products"]): string | null {
+  if (Array.isArray(relation)) return relation[0]?.image_url ?? null;
+  return relation?.image_url ?? null;
+}
+
 function normalizeShipment(row: ShipmentRow): RetailerShipment {
   const events = (row.shipment_events ?? []).map((event) => ({
     id: event.id,
@@ -189,6 +197,7 @@ function normalizeOrder(row: OrderRow): RetailerOrder {
       quantity: item.quantity,
       unit_price: Number(item.unit_price),
       product_name: productName(item.products),
+      image_url: productImage(item.products),
       seller_id: item.seller_id ?? null,
     })),
     packages: (row.order_supplier_acceptances ?? []).map((pkg) => ({
@@ -279,6 +288,20 @@ export async function loadRetailerOrders(retailerId: string): Promise<RetailerOr
     .order("created_at", { ascending: false });
   if (error) throw new Error(error.message);
   return ((data ?? []) as OrderRow[]).map(normalizeOrder);
+}
+
+export async function loadRetailerOrder(
+  retailerId: string,
+  orderId: string,
+): Promise<RetailerOrder | null> {
+  const { data, error } = await supabase
+    .from("orders")
+    .select(ORDERS_SELECT)
+    .eq("retailer_id", retailerId)
+    .eq("id", orderId)
+    .maybeSingle();
+  if (error) throw new Error(error.message);
+  return data ? normalizeOrder(data as OrderRow) : null;
 }
 
 /** Distinct products in the retailer's cart — badges count products, not units. */

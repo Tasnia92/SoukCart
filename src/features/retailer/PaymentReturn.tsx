@@ -194,10 +194,10 @@ export function PaymentReturn() {
 }
 
 function resultAction(outcome: Outcome): { href: string; label: string } {
-  const { state, orderId, hasSession, merchandisePaid } = outcome;
+  const { state, orderId, hasSession } = outcome;
   if (state === "paid" && hasSession) {
-    if (merchandisePaid && orderId) {
-      return { href: `/retailer/orders/${orderId}/invoice`, label: "View invoice" };
+    if (orderId) {
+      return { href: `/retailer/orders/${orderId}`, label: "View order" };
     }
     return { href: "/retailer/orders", label: "View orders" };
   }

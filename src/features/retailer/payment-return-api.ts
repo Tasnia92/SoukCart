@@ -32,8 +32,8 @@ export function isGatewayPaymentSettled(payload: Record<string, unknown> | null)
 export function paymentSuccessPath(
   settlement: Pick<PaymentSettlement, "orderId" | "merchandisePaid">,
 ): string {
-  if (settlement.merchandisePaid && settlement.orderId) {
-    return `/retailer/orders/${settlement.orderId}/invoice`;
+  if (settlement.orderId) {
+    return `/retailer/orders/${settlement.orderId}`;
   }
   return "/retailer/orders";
 }

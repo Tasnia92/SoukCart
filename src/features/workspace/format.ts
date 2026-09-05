@@ -29,6 +29,21 @@ export function formatDateTime(value: string): string {
   });
 }
 
+/** Timestamp used on the retailer order tracker, e.g. "Dec 14, 2024 at 2:30 PM". */
+export function formatTrackStamp(value: string): string {
+  const date = new Date(value);
+  const day = date.toLocaleDateString(undefined, {
+    month: "short",
+    day: "numeric",
+    year: "numeric",
+  });
+  const time = date.toLocaleTimeString(undefined, {
+    hour: "numeric",
+    minute: "2-digit",
+  });
+  return `${day} at ${time}`;
+}
+
 export function firstName(value: string): string {
   return value.trim().split(/\s+/)[0] ?? "there";
 }

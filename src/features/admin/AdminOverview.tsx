@@ -214,7 +214,7 @@ function AdminOverviewBody({ dashboard }: { dashboard: AdminDashboard }) {
           delta={summary.orderValueDelta}
           hint="Total of non-cancelled orders in this window. This is not settled revenue."
           context={`Paid ${formatPrice(summary.paidOrderValue)} · ${summary.orders} orders placed`}
-          to="/admin/activity"
+          to="/admin/order"
           linkLabel="Open orders"
         />
         <MetricCard
@@ -224,7 +224,7 @@ function AdminOverviewBody({ dashboard }: { dashboard: AdminDashboard }) {
           period={period}
           hint="Payment captured minus refunds paid. A payment joins this when it is captured, and leaves it the moment a refund is paid out."
           context={`${formatPrice(summary.settledRevenue)} settled on delivered orders · ${formatPrice(summary.refundedTotal)} refunded`}
-          to="/admin/activity"
+          to="/admin/order"
           linkLabel="Open orders"
         />
         <Card
@@ -320,7 +320,7 @@ function AdminOverviewBody({ dashboard }: { dashboard: AdminDashboard }) {
             },
           ]}
           summary={`${formatPrice(summary.orderValue)} order value across ${summary.orders} orders in the last ${dashboard.windowDays} days. Paid ${formatPrice(summary.paidOrderValue)}. ${summary.orderValueDelta.label}.`}
-          action={<DashboardLink to="/admin/activity">All orders</DashboardLink>}
+          action={<DashboardLink to="/admin/order">All orders</DashboardLink>}
           emptyCopy="No orders were placed in this window, so there is no trend to read yet."
         />
       </DashboardRow>

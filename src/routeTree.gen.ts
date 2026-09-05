@@ -22,6 +22,7 @@ import { Route as AdminActivityRouteImport } from "./routes/admin/activity"
 import { Route as AdminCategoriesRouteImport } from "./routes/admin/categories"
 import { Route as AdminComplaintsRouteImport } from "./routes/admin/complaints"
 import { Route as AdminInboxRouteImport } from "./routes/admin/inbox"
+import { Route as AdminOrderRouteImport } from "./routes/admin/order"
 import { Route as AdminPayoutsRouteImport } from "./routes/admin/payouts"
 import { Route as AdminProductsRouteImport } from "./routes/admin/products"
 import { Route as AdminUsersRouteImport } from "./routes/admin/users"
@@ -52,6 +53,7 @@ import { Route as AdminVerificationsUserIdRouteImport } from "./routes/admin/ver
 import { Route as RetailerCheckoutCancelledRouteImport } from "./routes/retailer/checkout.cancelled"
 import { Route as RetailerCheckoutFailedRouteImport } from "./routes/retailer/checkout.failed"
 import { Route as RetailerCheckoutSuccessRouteImport } from "./routes/retailer/checkout.success"
+import { Route as RetailerOrdersOrderIdRouteImport } from "./routes/retailer/orders.$orderId"
 import { Route as RetailerProductsProductIdRouteImport } from "./routes/retailer/products.$productId"
 import { Route as SupplierProductsNewRouteImport } from "./routes/supplier/products.new"
 import { Route as RetailerOrdersOrderIdInvoiceRouteImport } from "./routes/retailer/orders.$orderId.invoice"
@@ -120,6 +122,11 @@ const AdminComplaintsRoute = AdminComplaintsRouteImport.update({
 const AdminInboxRoute = AdminInboxRouteImport.update({
   id: "/inbox",
   path: "/inbox",
+  getParentRoute: () => AdminRoute,
+} as any)
+const AdminOrderRoute = AdminOrderRouteImport.update({
+  id: "/order",
+  path: "/order",
   getParentRoute: () => AdminRoute,
 } as any)
 const AdminPayoutsRoute = AdminPayoutsRouteImport.update({
@@ -274,6 +281,11 @@ const RetailerCheckoutSuccessRoute = RetailerCheckoutSuccessRouteImport.update({
   path: "/success",
   getParentRoute: () => RetailerCheckoutRoute,
 } as any)
+const RetailerOrdersOrderIdRoute = RetailerOrdersOrderIdRouteImport.update({
+  id: "/$orderId",
+  path: "/$orderId",
+  getParentRoute: () => RetailerOrdersRoute,
+} as any)
 const RetailerProductsProductIdRoute =
   RetailerProductsProductIdRouteImport.update({
     id: "/products/$productId",
@@ -287,9 +299,9 @@ const SupplierProductsNewRoute = SupplierProductsNewRouteImport.update({
 } as any)
 const RetailerOrdersOrderIdInvoiceRoute =
   RetailerOrdersOrderIdInvoiceRouteImport.update({
-    id: "/$orderId/invoice",
-    path: "/$orderId/invoice",
-    getParentRoute: () => RetailerOrdersRoute,
+    id: "/invoice",
+    path: "/invoice",
+    getParentRoute: () => RetailerOrdersOrderIdRoute,
   } as any)
 const SupplierProductsProductIdEditRoute =
   SupplierProductsProductIdEditRouteImport.update({
@@ -311,6 +323,7 @@ export interface FileRoutesByFullPath {
   "/admin/categories": typeof AdminCategoriesRoute
   "/admin/complaints": typeof AdminComplaintsRoute
   "/admin/inbox": typeof AdminInboxRouteWithChildren
+  "/admin/order": typeof AdminOrderRoute
   "/admin/payouts": typeof AdminPayoutsRoute
   "/admin/products": typeof AdminProductsRoute
   "/admin/users": typeof AdminUsersRoute
@@ -342,6 +355,7 @@ export interface FileRoutesByFullPath {
   "/retailer/checkout/cancelled": typeof RetailerCheckoutCancelledRoute
   "/retailer/checkout/failed": typeof RetailerCheckoutFailedRoute
   "/retailer/checkout/success": typeof RetailerCheckoutSuccessRoute
+  "/retailer/orders/$orderId": typeof RetailerOrdersOrderIdRouteWithChildren
   "/retailer/products/$productId": typeof RetailerProductsProductIdRoute
   "/supplier/products/new": typeof SupplierProductsNewRoute
   "/retailer/orders/$orderId/invoice": typeof RetailerOrdersOrderIdInvoiceRoute
@@ -357,6 +371,7 @@ export interface FileRoutesByTo {
   "/admin/categories": typeof AdminCategoriesRoute
   "/admin/complaints": typeof AdminComplaintsRoute
   "/admin/inbox": typeof AdminInboxRouteWithChildren
+  "/admin/order": typeof AdminOrderRoute
   "/admin/payouts": typeof AdminPayoutsRoute
   "/admin/products": typeof AdminProductsRoute
   "/admin/users": typeof AdminUsersRoute
@@ -388,6 +403,7 @@ export interface FileRoutesByTo {
   "/retailer/checkout/cancelled": typeof RetailerCheckoutCancelledRoute
   "/retailer/checkout/failed": typeof RetailerCheckoutFailedRoute
   "/retailer/checkout/success": typeof RetailerCheckoutSuccessRoute
+  "/retailer/orders/$orderId": typeof RetailerOrdersOrderIdRouteWithChildren
   "/retailer/products/$productId": typeof RetailerProductsProductIdRoute
   "/supplier/products/new": typeof SupplierProductsNewRoute
   "/retailer/orders/$orderId/invoice": typeof RetailerOrdersOrderIdInvoiceRoute
@@ -407,6 +423,7 @@ export interface FileRoutesById {
   "/admin/categories": typeof AdminCategoriesRoute
   "/admin/complaints": typeof AdminComplaintsRoute
   "/admin/inbox": typeof AdminInboxRouteWithChildren
+  "/admin/order": typeof AdminOrderRoute
   "/admin/payouts": typeof AdminPayoutsRoute
   "/admin/products": typeof AdminProductsRoute
   "/admin/users": typeof AdminUsersRoute
@@ -438,6 +455,7 @@ export interface FileRoutesById {
   "/retailer/checkout/cancelled": typeof RetailerCheckoutCancelledRoute
   "/retailer/checkout/failed": typeof RetailerCheckoutFailedRoute
   "/retailer/checkout/success": typeof RetailerCheckoutSuccessRoute
+  "/retailer/orders/$orderId": typeof RetailerOrdersOrderIdRouteWithChildren
   "/retailer/products/$productId": typeof RetailerProductsProductIdRoute
   "/supplier/products/new": typeof SupplierProductsNewRoute
   "/retailer/orders/$orderId/invoice": typeof RetailerOrdersOrderIdInvoiceRoute
@@ -458,6 +476,7 @@ export interface FileRouteTypes {
     | "/admin/categories"
     | "/admin/complaints"
     | "/admin/inbox"
+    | "/admin/order"
     | "/admin/payouts"
     | "/admin/products"
     | "/admin/users"
@@ -489,6 +508,7 @@ export interface FileRouteTypes {
     | "/retailer/checkout/cancelled"
     | "/retailer/checkout/failed"
     | "/retailer/checkout/success"
+    | "/retailer/orders/$orderId"
     | "/retailer/products/$productId"
     | "/supplier/products/new"
     | "/retailer/orders/$orderId/invoice"
@@ -504,6 +524,7 @@ export interface FileRouteTypes {
     | "/admin/categories"
     | "/admin/complaints"
     | "/admin/inbox"
+    | "/admin/order"
     | "/admin/payouts"
     | "/admin/products"
     | "/admin/users"
@@ -535,6 +556,7 @@ export interface FileRouteTypes {
     | "/retailer/checkout/cancelled"
     | "/retailer/checkout/failed"
     | "/retailer/checkout/success"
+    | "/retailer/orders/$orderId"
     | "/retailer/products/$productId"
     | "/supplier/products/new"
     | "/retailer/orders/$orderId/invoice"
@@ -553,6 +575,7 @@ export interface FileRouteTypes {
     | "/admin/categories"
     | "/admin/complaints"
     | "/admin/inbox"
+    | "/admin/order"
     | "/admin/payouts"
     | "/admin/products"
     | "/admin/users"
@@ -584,6 +607,7 @@ export interface FileRouteTypes {
     | "/retailer/checkout/cancelled"
     | "/retailer/checkout/failed"
     | "/retailer/checkout/success"
+    | "/retailer/orders/$orderId"
     | "/retailer/products/$productId"
     | "/supplier/products/new"
     | "/retailer/orders/$orderId/invoice"
@@ -691,6 +715,13 @@ declare module "@tanstack/react-router" {
       path: "/inbox"
       fullPath: "/admin/inbox"
       preLoaderRoute: typeof AdminInboxRouteImport
+      parentRoute: typeof AdminRoute
+    }
+    "/admin/order": {
+      id: "/admin/order"
+      path: "/order"
+      fullPath: "/admin/order"
+      preLoaderRoute: typeof AdminOrderRouteImport
       parentRoute: typeof AdminRoute
     }
     "/admin/payouts": {
@@ -903,6 +934,13 @@ declare module "@tanstack/react-router" {
       preLoaderRoute: typeof RetailerCheckoutSuccessRouteImport
       parentRoute: typeof RetailerCheckoutRoute
     }
+    "/retailer/orders/$orderId": {
+      id: "/retailer/orders/$orderId"
+      path: "/$orderId"
+      fullPath: "/retailer/orders/$orderId"
+      preLoaderRoute: typeof RetailerOrdersOrderIdRouteImport
+      parentRoute: typeof RetailerOrdersRoute
+    }
     "/retailer/products/$productId": {
       id: "/retailer/products/$productId"
       path: "/products/$productId"
@@ -919,10 +957,10 @@ declare module "@tanstack/react-router" {
     }
     "/retailer/orders/$orderId/invoice": {
       id: "/retailer/orders/$orderId/invoice"
-      path: "/$orderId/invoice"
+      path: "/invoice"
       fullPath: "/retailer/orders/$orderId/invoice"
       preLoaderRoute: typeof RetailerOrdersOrderIdInvoiceRouteImport
-      parentRoute: typeof RetailerOrdersRoute
+      parentRoute: typeof RetailerOrdersOrderIdRoute
     }
     "/supplier/products/$productId/edit": {
       id: "/supplier/products/$productId/edit"
@@ -965,6 +1003,7 @@ interface AdminRouteChildren {
   AdminCategoriesRoute: typeof AdminCategoriesRoute
   AdminComplaintsRoute: typeof AdminComplaintsRoute
   AdminInboxRoute: typeof AdminInboxRouteWithChildren
+  AdminOrderRoute: typeof AdminOrderRoute
   AdminPayoutsRoute: typeof AdminPayoutsRoute
   AdminProductsRoute: typeof AdminProductsRoute
   AdminUsersRoute: typeof AdminUsersRoute
@@ -978,6 +1017,7 @@ const AdminRouteChildren: AdminRouteChildren = {
   AdminCategoriesRoute: AdminCategoriesRoute,
   AdminComplaintsRoute: AdminComplaintsRoute,
   AdminInboxRoute: AdminInboxRouteWithChildren,
+  AdminOrderRoute: AdminOrderRoute,
   AdminPayoutsRoute: AdminPayoutsRoute,
   AdminProductsRoute: AdminProductsRoute,
   AdminUsersRoute: AdminUsersRoute,
@@ -1002,12 +1042,25 @@ const RetailerCheckoutRouteChildren: RetailerCheckoutRouteChildren = {
 const RetailerCheckoutRouteWithChildren =
   RetailerCheckoutRoute._addFileChildren(RetailerCheckoutRouteChildren)
 
-interface RetailerOrdersRouteChildren {
+interface RetailerOrdersOrderIdRouteChildren {
   RetailerOrdersOrderIdInvoiceRoute: typeof RetailerOrdersOrderIdInvoiceRoute
 }
 
-const RetailerOrdersRouteChildren: RetailerOrdersRouteChildren = {
+const RetailerOrdersOrderIdRouteChildren: RetailerOrdersOrderIdRouteChildren = {
   RetailerOrdersOrderIdInvoiceRoute: RetailerOrdersOrderIdInvoiceRoute,
+}
+
+const RetailerOrdersOrderIdRouteWithChildren =
+  RetailerOrdersOrderIdRoute._addFileChildren(
+    RetailerOrdersOrderIdRouteChildren,
+  )
+
+interface RetailerOrdersRouteChildren {
+  RetailerOrdersOrderIdRoute: typeof RetailerOrdersOrderIdRouteWithChildren
+}
+
+const RetailerOrdersRouteChildren: RetailerOrdersRouteChildren = {
+  RetailerOrdersOrderIdRoute: RetailerOrdersOrderIdRouteWithChildren,
 }
 
 const RetailerOrdersRouteWithChildren = RetailerOrdersRoute._addFileChildren(

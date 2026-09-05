@@ -135,7 +135,10 @@ function ActionBanner({ action }: { action: RetailerNextAction }) {
         variant={destructive ? "destructive" : "default"}
         className="shrink-0 self-start sm:self-center"
       >
-        <RouterLink to={action.to} search={action.orderId ? { order: action.orderId } : undefined}>
+        <RouterLink
+          to={action.orderId ? "/retailer/orders/$orderId" : action.to}
+          params={action.orderId ? { orderId: action.orderId } : undefined}
+        >
           {action.actionLabel}
           <ArrowRight data-icon="inline-end" />
         </RouterLink>

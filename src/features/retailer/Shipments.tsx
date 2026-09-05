@@ -220,7 +220,7 @@ export function ShipmentStripCard({ card }: { card: RetailerShipmentCard }) {
       </CardContent>
       <CardFooter className="justify-end">
         <Button asChild variant="outline" size="sm">
-          <RouterLink to="/retailer/orders" search={{ order: card.orderId }}>
+          <RouterLink to="/retailer/orders/$orderId" params={{ orderId: card.orderId }}>
             Track
             <ArrowRight data-icon="inline-end" />
           </RouterLink>

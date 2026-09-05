@@ -1,10 +1,14 @@
 import { useId, useState, type ReactNode } from "react";
-import { Minus, Plus } from "lucide-react";
+import { Minus, Plus, ShoppingBag } from "lucide-react";
 import { Badge } from "../../components/ui/badge";
 import { Button } from "../../components/ui/button";
 import { TableCell, TableRow } from "../../components/ui/table";
 
 export type OrderStatus = "pending" | "confirmed" | "shipped" | "delivered" | "cancelled";
+
+export const ORDER_STATUS_TABS = ["all", "pending", "shipped", "delivered", "cancelled"] as const;
+
+export type OrderStatusTab = (typeof ORDER_STATUS_TABS)[number];
 
 export function statusLabel(status: string): string {
   switch (status) {
@@ -13,7 +17,7 @@ export function statusLabel(status: string): string {
     case "confirmed":
       return "Confirmed";
     case "shipped":
-      return "Dispatched";
+      return "Shipped";
     case "delivered":
       return "Delivered";
     case "cancelled":
@@ -23,27 +27,112 @@ export function statusLabel(status: string): string {
   }
 }
 
+/** Pending tab includes confirmed orders that have not shipped yet. */
+export function statusTabOf(status: string): Exclude<OrderStatusTab, "all"> {
+  if (status === "shipped") return "shipped";
+  if (status === "delivered") return "delivered";
+  if (status === "cancelled") return "cancelled";
+  return "pending";
+}
+
+export function matchesStatusTab(status: string, tab: OrderStatusTab): boolean {
+  if (tab === "all") return true;
+  return statusTabOf(status) === tab;
+}
+
+export function orderTypeOf(order: {
+  status: string;
+  refund_amount?: number;
+  manual_refund_status?: string | null;
+}): "sale" | "refund" {
+  if (order.status === "cancelled") return "refund";
+  if ((order.refund_amount ?? 0) > 0) return "refund";
+  if (order.manual_refund_status && order.manual_refund_status !== "not_required") return "refund";
+  return "sale";
+}
+
 export function shortId(value: string): string {
   return value.replaceAll("-", "").slice(0, 8).toUpperCase();
 }
 
-type BadgeVariant = "default" | "secondary" | "destructive" | "outline";
-
-function statusVariant(status: string): BadgeVariant {
-  switch (status) {
-    case "delivered":
-      return "default";
-    case "cancelled":
-      return "destructive";
-    case "pending":
-      return "secondary";
-    default:
-      return "outline";
-  }
-}
+const STATUS_TONE: Record<string, string> = {
+  pending: "border-status-pending/35 bg-status-pending/10 text-status-pending",
+  confirmed: "border-status-pending/35 bg-status-pending/10 text-status-pending",
+  shipped: "border-status-shipped/35 bg-status-shipped/10 text-status-shipped",
+  delivered: "border-status-delivered/35 bg-status-delivered/10 text-status-delivered",
+  cancelled: "border-status-cancelled/35 bg-status-cancelled/10 text-status-cancelled",
+};
 
 export function StatusBadge({ status }: { status: string }) {
-  return <Badge variant={statusVariant(status)}>{statusLabel(status)}</Badge>;
+  return (
+    <Badge variant="outline" className={STATUS_TONE[status]}>
+      {statusLabel(status)}
+    </Badge>
+  );
+}
+
+export function OrderProductThumb({ src }: { src?: string | null }) {
+  const [broken, setBroken] = useState(false);
+  const showImage = Boolean(src) && !broken;
+
+  return (
+    <div className="relative size-10 shrink-0 overflow-hidden rounded-lg bg-muted">
+      {showImage ? (
+        <img
+          src={src ?? undefined}
+          alt=""
+          className="size-full object-cover"
+          onError={() => setBroken(true)}
+        />
+      ) : (
+        <span className="flex size-full items-center justify-center text-muted-foreground [&_svg]:size-4">
+          <ShoppingBag />
+        </span>
+      )}
+    </div>
+  );
+}
+
+export function OrderProductCell({
+  name,
+  imageUrl,
+  extraCount = 0,
+}: {
+  name: string;
+  imageUrl?: string | null;
+  extraCount?: number;
+}) {
+  return (
+    <div className="flex min-w-0 items-center gap-3">
+      <OrderProductThumb src={imageUrl} />
+      <div className="min-w-0">
+        <p className="truncate font-medium">{name}</p>
+        {extraCount > 0 ? (
+          <p className="text-xs text-muted-foreground">+{extraCount} more</p>
+        ) : null}
+      </div>
+    </div>
+  );
+}
+
+export function OrderCustomerCell({ name, email }: { name: string; email?: string | null }) {
+  return (
+    <div className="min-w-0">
+      <p className="truncate font-medium">{name}</p>
+      {email ? <p className="truncate text-xs text-muted-foreground">{email}</p> : null}
+    </div>
+  );
+}
+
+export function primaryProductName(
+  items: readonly { product_name: string }[],
+  fallback = "Order",
+): { name: string; extraCount: number } {
+  const first = items[0];
+  return {
+    name: first?.product_name ?? fallback,
+    extraCount: Math.max(items.length - 1, 0),
+  };
 }
 
 export function DeliveryDetails({

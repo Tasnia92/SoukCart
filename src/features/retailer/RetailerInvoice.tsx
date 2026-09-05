@@ -144,6 +144,17 @@ export function RetailerInvoice({
               </Button>
             }
           />
+        ) : result.kind === "cancelled" ? (
+          <EmptyState
+            icon={ShoppingBag}
+            title="No invoice for cancelled orders"
+            copy="Cancelled orders do not have a retailer invoice."
+            action={
+              <Button asChild>
+                <RouterLink to="/retailer/orders">Back to orders</RouterLink>
+              </Button>
+            }
+          />
         ) : result.kind === "unpaid" ? (
           <EmptyState
             icon={Clock}

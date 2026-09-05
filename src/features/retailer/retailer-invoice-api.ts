@@ -27,6 +27,7 @@ export type InvoiceOrder = {
 export type InvoiceResult =
   | { kind: "not-found" }
   | { kind: "unpaid" }
+  | { kind: "cancelled" }
   | { kind: "paid"; order: InvoiceOrder };
 
 const INVOICE_SELECT =
@@ -42,6 +43,7 @@ type InvoiceItemRow = {
 
 type InvoiceRow = {
   id: string;
+  status: string | null;
   payment_status: string | null;
   payment_method: string | null;
   created_at: string;
@@ -57,6 +59,10 @@ type InvoiceRow = {
   order_items: InvoiceItemRow[] | null;
 };
 
+export function invoiceIsAvailable(order: { status: string; payment_status: string }): boolean {
+  return order.status !== "cancelled" && order.payment_status === "paid";
+}
+
 function productName(relation: InvoiceItemRow["products"]): string {
   if (Array.isArray(relation)) return relation[0]?.name ?? "Unknown product";
   return relation?.name ?? "Unknown product";
@@ -70,6 +76,7 @@ export async function loadInvoice(orderId: string): Promise<InvoiceResult> {
     .single();
   const row = data as InvoiceRow | null;
   if (error || !row) return { kind: "not-found" };
+  if (row.status === "cancelled") return { kind: "cancelled" };
   if (row.payment_status !== "paid") return { kind: "unpaid" };
 
   const items: InvoiceItem[] = (row.order_items ?? []).map((item) => ({

@@ -1,18 +1,7 @@
 import { useNavigate, useRouterState } from "@tanstack/react-router";
 import { useEffect, useMemo, useState } from "react";
 import { PackageSearch, Truck } from "lucide-react";
-import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import {
-  Card,
-  CardAction,
-  CardContent,
-  CardDescription,
-  CardFooter,
-  CardHeader,
-  CardTitle,
-} from "@/components/ui/card";
-import { cn } from "@/lib/utils";
 import {
   EmptyState,
   LoadingState,
@@ -21,29 +10,18 @@ import {
 } from "../../components/ui/Workspace.tsx";
 import { RouterLink } from "../../components/ui/RouterLink.tsx";
 import { useSessionSnapshot, useSessionStore } from "../../session.tsx";
-import { StatusBadge, shortId } from "../orders/order-presentation.tsx";
 import { searchParam } from "../workspace/search.ts";
-import {
-  deliveryAgeDays,
-  loadCartCount,
-  loadRetailerOrders,
-  type RetailerOrder,
-} from "./retailer-orders-api.ts";
+import { loadCartCount, loadRetailerOrders, type RetailerOrder } from "./retailer-orders-api.ts";
 import { buildShipmentCards } from "./retailer-dashboard-api.ts";
-import { ShipmentTracker, placedAgoLabel } from "./Shipments.tsx";
 import { useRetailerOrderChanges } from "./retailer-realtime.ts";
 import { RetailerWorkspaceShell } from "./retailer-shared.tsx";
+import { RetailerOrderStatusView } from "./RetailerOrderTracker.tsx";
 
 type RetailerTrackingProps = {
   loadOrders?: (retailerId: string) => Promise<RetailerOrder[]>;
   loadCart?: (userId: string) => Promise<number>;
 };
 
-/**
- * Live tracking for everything still on its way: one full tracker per active
- * order — package stepper, carrier tracking details, and the carrier's event
- * history. Delivered and cancelled orders stay in the Orders list.
- */
 export function RetailerTracking({
   loadOrders = loadRetailerOrders,
   loadCart = loadCartCount,
@@ -88,7 +66,6 @@ export function RetailerTracking({
     };
   }, [loadCart, loadOrders, loadVersion, retailerId]);
 
-  /** Active orders oldest first — the parcel landing soonest leads the page. */
   const inTransit = useMemo(() => {
     const byId = new Map((orders ?? []).map((order) => [order.id, order]));
     return buildShipmentCards(orders ?? [])
@@ -97,10 +74,12 @@ export function RetailerTracking({
   }, [orders]);
 
   useEffect(() => {
-    if (!focusOrderId || !orders) return;
-    const el = document.getElementById(`track-${focusOrderId}`);
-    if (el) el.scrollIntoView({ behavior: "smooth", block: "center" });
-  }, [focusOrderId, orders]);
+    if (!focusOrderId) return;
+    void navigate({
+      to: "/retailer/orders/$orderId",
+      params: { orderId: focusOrderId },
+    });
+  }, [focusOrderId, navigate]);
 
   if (state.status !== "retailer") return null;
 
@@ -134,9 +113,7 @@ export function RetailerTracking({
       onLogout={onLogout}
     >
       <PageHeader
-        eyebrow="Ordering & delivery"
-        title="Tracking."
-        copy="Live status for every parcel on its way to you — carrier events update here as they happen."
+        title="Tracking"
         actions={
           <Button asChild variant="outline">
             <RouterLink to="/retailer/orders">
@@ -149,46 +126,27 @@ export function RetailerTracking({
 
       {orders ? (
         inTransit.length ? (
-          <div className="grid gap-4 xl:grid-cols-2">
+          <div className="flex flex-col gap-10">
             {inTransit.map((order) => (
-              <Card
-                key={order.id}
-                id={`track-${order.id}`}
-                data-state={focusOrderId === order.id ? "selected" : undefined}
-                className={cn(
-                  "scroll-mt-24",
-                  focusOrderId === order.id && "border-primary ring-2 ring-primary/30",
-                )}
-              >
-                <CardHeader>
-                  <CardTitle className="text-sm font-medium">#{shortId(order.id)}</CardTitle>
-                  <CardDescription>
-                    {placedAgoLabel(deliveryAgeDays(order))}
-                    {order.packages.length > 1 ? ` · ${order.packages.length} packages` : ""}
-                  </CardDescription>
-                  <CardAction>
-                    <StatusBadge status={order.status} />
-                  </CardAction>
-                </CardHeader>
-                <CardContent>
-                  <ShipmentTracker order={order} />
-                </CardContent>
-                <CardFooter className="justify-between">
-                  <Badge variant="secondary">{statusCountLabel(order)}</Badge>
-                  <Button asChild variant="ghost" size="sm">
-                    <RouterLink to="/retailer/orders" search={{ order: order.id }}>
-                      View order
-                    </RouterLink>
-                  </Button>
-                </CardFooter>
-              </Card>
+              <div className="flex flex-col gap-4" key={order.id} id={`track-${order.id}`}>
+                <RetailerOrderStatusView
+                  order={order}
+                  actions={
+                    <Button asChild variant="outline">
+                      <RouterLink to="/retailer/orders/$orderId" params={{ orderId: order.id }}>
+                        View order
+                      </RouterLink>
+                    </Button>
+                  }
+                />
+              </div>
             ))}
           </div>
         ) : (
           <EmptyState
             icon={Truck}
             title="Nothing in transit"
-            copy="When a supplier ships an order, its carrier tracking shows up here."
+            copy="When a supplier ships an order, tracking shows up here."
             action={
               <Button asChild>
                 <RouterLink to="/retailer">Place order</RouterLink>
@@ -201,11 +159,4 @@ export function RetailerTracking({
       )}
     </RetailerWorkspaceShell>
   );
-}
-
-/** One-line summary of how many parcels are still moving on this order. */
-function statusCountLabel(order: RetailerOrder): string {
-  const moving = order.packages.filter((pkg) => pkg.status !== "declined").length;
-  if (moving <= 1) return "1 package on the way";
-  return `${moving} packages on the way`;
 }
