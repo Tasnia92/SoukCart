@@ -143,7 +143,7 @@ export function RetailerWorkspaceShell({
 
   return (
     <div className="flex min-h-svh flex-col bg-background text-foreground">
-      <RetailerHeader nav={nav} search={search} onLogout={onLogout} />
+      <RetailerHeader nav={nav} cartCount={cartCount} search={search} onLogout={onLogout} />
       <main className="mx-auto flex w-full max-w-7xl flex-1 flex-col gap-6 px-4 py-6 sm:px-6 lg:px-8 print:max-w-none print:p-0">
         {children}
       </main>
@@ -253,6 +253,25 @@ function RetailerMobileMenu({ nav, onLogout }: { nav: RetailerNav; onLogout: () 
   );
 }
 
+/** Labeled cart icon (top-right) with the live item count. */
+function CartButton({ count }: { count: number }) {
+  return (
+    <RouterLink
+      to="/retailer/cart"
+      aria-label={count ? `Cart, ${count} items` : "Cart"}
+      className="relative flex flex-col items-center gap-0.5 rounded-md px-2 py-1 text-[10px] font-medium text-foreground/70 transition-colors hover:text-foreground"
+    >
+      <ShoppingCart className="size-5" aria-hidden="true" />
+      Cart
+      {count ? (
+        <span className="absolute top-0 right-0 flex min-w-4 items-center justify-center rounded-full bg-primary px-1 text-[10px] font-semibold leading-4 text-primary-foreground">
+          {count}
+        </span>
+      ) : null}
+    </RouterLink>
+  );
+}
+
 function BarNavLink({ item }: { item: RetailerNavItem }) {
   return (
     <RouterLink
@@ -278,10 +297,12 @@ function BarNavLink({ item }: { item: RetailerNavItem }) {
 
 function RetailerHeader({
   nav,
+  cartCount,
   search,
   onLogout,
 }: {
   nav: RetailerNav;
+  cartCount: number;
   search?: ReactNode;
   onLogout: () => void;
 }) {
@@ -306,8 +327,9 @@ function RetailerHeader({
           </div>
         ) : null}
 
-        <div className="ml-auto flex shrink-0 items-center">
+        <div className="ml-auto flex shrink-0 items-center gap-1">
           <NotificationsBell viewAllTo="/retailer/notifications" />
+          <CartButton count={cartCount} />
         </div>
       </div>
 
