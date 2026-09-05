@@ -147,10 +147,10 @@ function cancelHint(order: RetailerOrder): string {
   const prepaidDelivery =
     order.payment_method === "cod" && order.delivery_payment_status === "paid";
   if (paidOnline) {
-    return "If the suppliers approve, the full advance payment — merchandise plus the delivery charge — is refunded by the admin team.";
+    return "The full advance payment — merchandise plus the delivery charge — is refunded manually by the admin team.";
   }
   if (prepaidDelivery) {
-    return "If the suppliers approve, the prepaid delivery charge is refunded by the admin team.";
+    return "The prepaid delivery charge is refunded manually by the admin team.";
   }
   return "";
 }
@@ -269,7 +269,7 @@ function CancelAction({
           onClick={() => onCancel(order)}
         >
           <Trash2 data-icon="inline-start" />
-          Request cancellation
+          Cancel order
         </Button>
       ) : null}
     </>
@@ -478,14 +478,20 @@ export function RetailerOrders({
   const runCancel = (order: RetailerOrder) => {
     setBusyId(order.id);
     void requestOrderCancellation(order.id)
-      .then(() => {
+      .then((result) => {
         updateOrder(order.id, {
-          cancel_requested: true,
+          status: "cancelled",
+          cancel_requested: false,
           cancellation_initiator: "retailer",
+          manual_refund_status: result.manualRefundStatus,
+          refund_amount: result.refundAmount,
         });
         setNotice({
-          message: `Cancellation of order #${shortId(order.id)} was requested. The suppliers were notified and will approve or reject it.`,
-          state: "info",
+          message:
+            result.manualRefundStatus === "pending"
+              ? `Order #${shortId(order.id)} was cancelled. A refund of ${formatPrice(result.refundAmount)} is pending with the admin team.`
+              : `Order #${shortId(order.id)} was cancelled. No refund is required.`,
+          state: "success",
         });
       })
       .catch((cancelError: unknown) => {
@@ -493,7 +499,7 @@ export function RetailerOrders({
           message:
             cancelError instanceof Error
               ? cancelError.message
-              : "The cancellation request could not be submitted.",
+              : "The order could not be cancelled.",
           state: "error",
         });
       })
@@ -640,17 +646,17 @@ export function RetailerOrders({
               <>
                 <AlertDialogHeader>
                   <AlertDialogTitle>
-                    Request cancellation of order #{shortId(confirmAction.order.id)}?
+                    Cancel order #{shortId(confirmAction.order.id)}?
                   </AlertDialogTitle>
                   <AlertDialogDescription>
-                    {cancelHint(confirmAction.order)} The suppliers on the order review every
-                    cancellation before anything is cancelled.
+                    {cancelHint(confirmAction.order)} The order is cancelled immediately — no
+                    supplier approval is needed.
                   </AlertDialogDescription>
                 </AlertDialogHeader>
                 <AlertDialogFooter>
                   <AlertDialogCancel>Keep order</AlertDialogCancel>
                   <AlertDialogAction variant="destructive" onClick={onConfirmDialog}>
-                    Request cancellation
+                    Cancel order
                   </AlertDialogAction>
                 </AlertDialogFooter>
               </>
