@@ -11,6 +11,7 @@ import type {
   AuthMode,
   AuthRole,
   LoginCredentials,
+  LoginRole,
   RegistrationDetails,
 } from "./types.ts";
 
@@ -19,9 +20,9 @@ function useAuthCallbacks() {
   return {
     login: async (
       { email, password }: LoginCredentials,
-      _role: AuthRole,
+      role: LoginRole,
     ): Promise<AuthFeedback | undefined> => {
-      const result = await store.signIn(email, password);
+      const result = await store.signIn(email, password, role);
       return result.error ? { message: result.error, state: "error" } : undefined;
     },
     register: async (

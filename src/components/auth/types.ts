@@ -7,6 +7,7 @@ export type AuthShellVariant = "public" | "admin";
  * "Supplier" in copy).
  */
 export type AuthRole = "retailer" | "seller";
+export type LoginRole = AuthRole | "admin";
 export type AuthFeedbackState = "error" | "info" | "success";
 
 export type AuthFeedback = {
@@ -28,9 +29,9 @@ export type RegistrationDetails = {
 
 export type AuthCallback<T> = (values: T) => AuthFeedback | void | Promise<AuthFeedback | void>;
 
-export type AuthCallbackWithRole<T> = (
+export type AuthCallbackWithRole<T, R = AuthRole> = (
   values: T,
-  role: AuthRole,
+  role: R,
 ) => AuthFeedback | void | Promise<AuthFeedback | void>;
 
 export type AuthFormSubmitHandler<T> = (values: T) => void | Promise<void>;

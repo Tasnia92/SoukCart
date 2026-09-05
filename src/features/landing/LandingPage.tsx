@@ -89,18 +89,11 @@ function LandingHeader() {
             </a>
           ))}
         </nav>
-        <div className="flex items-center gap-2 sm:gap-4">
-          <Button asChild variant="ghost" className="text-foreground/75 hover:text-foreground">
-            <Link to="/login" search={{ role: "retailer" }}>
-              Log in
-            </Link>
-          </Button>
-          <Button asChild className="px-4">
-            <Link to="/register" search={{ role: "retailer" }}>
-              Get Started
-            </Link>
-          </Button>
-        </div>
+        <Button asChild className="px-4">
+          <Link to="/login" search={{ role: "retailer" }}>
+            Log in
+          </Link>
+        </Button>
       </div>
     </header>
   );
@@ -412,7 +405,7 @@ function LandingFooter() {
       <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
         <Separator />
         <div className="flex flex-col gap-3 py-6 text-sm text-muted-foreground sm:flex-row sm:items-center sm:justify-between">
-          <small>© 2025 Soukcart. All rights reserved.</small>
+          <small>© {new Date().getFullYear()} Soukcart. All rights reserved.</small>
           <button
             type="button"
             className="inline-flex items-center gap-2 rounded-lg px-1 py-1 transition-colors hover:text-foreground focus-visible:outline-none focus-visible:ring-[3px] focus-visible:ring-ring/50"

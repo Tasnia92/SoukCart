@@ -8,6 +8,7 @@ import type {
   AuthRole,
   AuthShellVariant,
   LoginCredentials,
+  LoginRole,
   RegistrationDetails,
 } from "./types.ts";
 
@@ -25,7 +26,7 @@ export type AuthScreenProps = {
   initialFeedback?: AuthFeedback | null;
   initialMode?: AuthMode;
   initialRole?: AuthRole;
-  onLogin: AuthCallbackWithRole<LoginCredentials>;
+  onLogin: AuthCallbackWithRole<LoginCredentials, LoginRole>;
   onRegister: AuthCallbackWithRole<RegistrationDetails>;
   /** When set (route-driven pages), mode changes navigate instead of local state. */
   onModeChange?: (mode: AuthMode) => void;
@@ -122,7 +123,11 @@ export function AuthScreen({
       mode={routeDriven ? initialMode : mode}
       onForgotPassword={() => setFeedback(FORGOT_PASSWORD_FEEDBACK)}
       onLogin={(values) =>
-        runAuthCallback((entry) => onLogin(entry, routeDriven ? initialRole : role), values)
+        runAuthCallback(
+          (entry) =>
+            onLogin(entry, variant === "admin" ? "admin" : routeDriven ? initialRole : role),
+          values,
+        )
       }
       onRegister={(values) =>
         runAuthCallback((entry) => onRegister(entry, routeDriven ? initialRole : role), values)

@@ -40,6 +40,24 @@ export type SessionGateway = {
 };
 
 export type AccountRole = "retailer" | "seller";
+export type LoginRole = "admin" | AccountRole;
+
+export function loginRoleMismatchMessage(state: SessionState, expected: LoginRole): string {
+  if (expected === "admin") {
+    return "This account is not an admin.";
+  }
+  if (state.status === "admin") {
+    return "This is an admin account. Sign in at /admin.";
+  }
+  if (expected === "retailer" && state.status === "seller") {
+    return "This account is a supplier. Switch to Supplier to sign in.";
+  }
+  if (expected === "seller" && state.status === "retailer") {
+    return "This account is a retailer. Switch to Retailer to sign in.";
+  }
+  const expectedLabel = expected === "seller" ? "supplier" : "retailer";
+  return `This account cannot sign in as a ${expectedLabel}.`;
+}
 
 export const supabaseSessionGateway: SessionGateway = {
   async getSession() {
@@ -119,6 +137,9 @@ export class SessionStore {
   private startCount = 0;
   private unsubscribeAuth: (() => void) | null = null;
   private adminDenialPromise: Promise<void> | null = null;
+  private authEpoch = 0;
+  private loginGateRole: LoginRole | null = null;
+  private loginGateError: string | null = null;
   private readonly gateway: SessionGateway;
 
   constructor(gateway: SessionGateway = supabaseSessionGateway) {
@@ -137,8 +158,10 @@ export class SessionStore {
     if (this.startCount === 1) {
       let unsubscribeAuth: () => void;
       unsubscribeAuth = this.gateway.subscribe((session) => {
+        const epoch = this.authEpoch;
         queueMicrotask(() => {
-          if (this.unsubscribeAuth === unsubscribeAuth) void this.refresh(session);
+          if (this.unsubscribeAuth !== unsubscribeAuth || this.authEpoch !== epoch) return;
+          void this.refresh(session);
         });
       });
       this.unsubscribeAuth = unsubscribeAuth;
@@ -196,6 +219,7 @@ export class SessionStore {
 
   async denyAdminAccess(): Promise<void> {
     if (this.adminDenialPromise) return this.adminDenialPromise;
+    this.authEpoch += 1;
     this.setSnapshot({ ...this.snapshot, adminError: "This account is not an admin." });
     this.adminDenialPromise = this.gateway
       .signOut()
@@ -207,11 +231,27 @@ export class SessionStore {
     return this.adminDenialPromise;
   }
 
-  async signIn(email: string, password: string): Promise<GatewayResult> {
+  async signIn(email: string, password: string, expectedRole: LoginRole): Promise<GatewayResult> {
     this.clearAdminError();
-    const result = await this.gateway.signIn(email, password);
-    if (!result.error) await this.refresh();
-    return result;
+    this.authEpoch += 1;
+    this.loginGateRole = expectedRole;
+    this.loginGateError = null;
+    try {
+      const result = await this.gateway.signIn(email, password);
+      if (result.error) return result;
+      const state = await this.refresh();
+      if (this.loginGateError) return { error: this.loginGateError };
+      if (state.status !== expectedRole) {
+        this.loginGateError = loginRoleMismatchMessage(state, expectedRole);
+        this.authEpoch += 1;
+        await this.gateway.signOut();
+        await this.refresh(null);
+        return { error: this.loginGateError };
+      }
+      return result;
+    } finally {
+      this.loginGateRole = null;
+    }
   }
 
   async register(
@@ -271,7 +311,18 @@ export class SessionStore {
     }
     if (!session) return { status: "signed-out" };
     const { profile, error } = await this.gateway.getProfile(session.user.id);
-    return classifySession(session, profile, error);
+    return this.enforceLoginGate(classifySession(session, profile, error));
+  }
+
+  private async enforceLoginGate(classified: SessionState): Promise<SessionState> {
+    const expected = this.loginGateRole;
+    if (!expected || classified.status === "signed-out" || classified.status === expected) {
+      return classified;
+    }
+    this.loginGateError = loginRoleMismatchMessage(classified, expected);
+    this.authEpoch += 1;
+    await this.gateway.signOut();
+    return { status: "signed-out" };
   }
 
   private setSnapshot(snapshot: SessionSnapshot): void {

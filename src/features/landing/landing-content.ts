@@ -37,8 +37,6 @@ export const NAV_LINKS = [
   { label: "How It Works", href: `#${SECTION_IDS.howItWorks}` },
   { label: "For Suppliers", href: `#${SECTION_IDS.forSuppliers}` },
   { label: "For Retailers", href: `#${SECTION_IDS.forRetailers}` },
-  { label: "Benefits", href: `#${SECTION_IDS.join}` },
-  { label: "Pricing", href: `#${SECTION_IDS.join}` },
 ] as const;
 
 export const HERO_POINTS: {
