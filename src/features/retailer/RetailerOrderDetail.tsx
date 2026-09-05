@@ -65,10 +65,10 @@ function cancelHint(order: RetailerOrder): string {
   const prepaidDelivery =
     order.payment_method === "cod" && order.delivery_payment_status === "paid";
   if (paidOnline) {
-    return "If the suppliers approve, the full advance payment is refunded by the admin team.";
+    return "The full advance payment — merchandise plus the delivery charge — is refunded manually by the admin team.";
   }
   if (prepaidDelivery) {
-    return "If the suppliers approve, the prepaid delivery charge is refunded by the admin team.";
+    return "The prepaid delivery charge is refunded manually by the admin team.";
   }
   return "";
 }
@@ -198,15 +198,20 @@ export function RetailerOrderDetail({ orderId }: { orderId: string }) {
   const runCancel = (target: RetailerOrder) => {
     setBusy(true);
     void requestOrderCancellation(target.id)
-      .then(() => {
+      .then((result) => {
         setOrder({
           ...target,
-          cancel_requested: true,
-          cancellation_initiator: "retailer",
+          status: "cancelled",
+          cancel_requested: false,
+          manual_refund_status: result.manualRefundStatus,
+          refund_amount: result.refundAmount,
         });
         setNotice({
-          message: `Cancellation of order #${shortId(target.id)} was requested.`,
-          state: "info",
+          message:
+            result.manualRefundStatus === "pending"
+              ? `Order #${shortId(target.id)} was cancelled. A refund of ${formatPrice(result.refundAmount)} is pending with the admin team.`
+              : `Order #${shortId(target.id)} was cancelled. No refund is required.`,
+          state: "success",
         });
       })
       .catch((cancelError: unknown) => {
@@ -214,7 +219,7 @@ export function RetailerOrderDetail({ orderId }: { orderId: string }) {
           message:
             cancelError instanceof Error
               ? cancelError.message
-              : "The cancellation request could not be submitted.",
+              : "The order could not be cancelled.",
           state: "error",
         });
       })
@@ -307,7 +312,7 @@ export function RetailerOrderDetail({ orderId }: { orderId: string }) {
             onClick={() => setConfirmAction({ kind: "cancel", order })}
           >
             <Trash2 data-icon="inline-start" />
-            Request cancellation
+            Cancel order
           </Button>
         ) : null}
         {canRequestCodDeliveryRefund(order) ? (
@@ -437,11 +442,11 @@ export function RetailerOrderDetail({ orderId }: { orderId: string }) {
               <>
                 <AlertDialogHeader>
                   <AlertDialogTitle>
-                    Request cancellation of order #{shortId(confirmAction.order.id)}?
+                    Cancel order #{shortId(confirmAction.order.id)}?
                   </AlertDialogTitle>
                   <AlertDialogDescription>
-                    {cancelHint(confirmAction.order)} The suppliers review every cancellation before
-                    anything is cancelled.
+                    {cancelHint(confirmAction.order)} The order is cancelled immediately — no
+                    supplier approval is needed.
                   </AlertDialogDescription>
                 </AlertDialogHeader>
                 <AlertDialogFooter>

@@ -309,7 +309,7 @@ export function RetailerOrders({
             }
             if (order && canCancelOrder(order)) {
               items.push({
-                label: "Request cancellation",
+                label: "Cancel order",
                 to: "/retailer/orders/$orderId",
                 params: { orderId: row.id },
               });

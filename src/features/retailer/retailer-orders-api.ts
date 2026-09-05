@@ -339,21 +339,30 @@ export async function clearCart(userId: string): Promise<void> {
   await supabase.from("cart_items").delete().eq("user_id", userId);
 }
 
-export type CancellationRequestResult = {
-  status: "requested";
-  initiator: "retailer";
-  refundPolicy: "manual_full" | "delivery_full" | "not_required";
+/** Result of a direct retailer cancellation (no supplier approval step). */
+export type CancellationResult = {
+  id: string;
+  status: "cancelled";
+  cancellationInitiator: "retailer";
+  manualRefundStatus: "not_required" | "pending";
+  refundAmount: number;
+  deliveryCharge: number;
 };
 
-export async function requestOrderCancellation(
-  orderId: string,
-): Promise<CancellationRequestResult> {
+export async function requestOrderCancellation(orderId: string): Promise<CancellationResult> {
   const { data, error } = await supabase.rpc("request_order_cancellation", { p_order_id: orderId });
-  if (error) throw new Error(error.message || "The cancellation request could not be submitted.");
-  if (!isRecord(data) || data.status !== "requested" || data.initiator !== "retailer") {
-    throw new Error("The cancellation request was not confirmed.");
+  if (error) throw new Error(error.message || "The order could not be cancelled.");
+  if (!isRecord(data) || data.status !== "cancelled" || data.cancellationInitiator !== "retailer") {
+    throw new Error("The cancellation was not confirmed.");
   }
-  return data as CancellationRequestResult;
+  return {
+    id: typeof data.id === "string" ? data.id : orderId,
+    status: "cancelled",
+    cancellationInitiator: "retailer",
+    manualRefundStatus: data.manualRefundStatus === "pending" ? "pending" : "not_required",
+    refundAmount: Number(data.refundAmount ?? 0),
+    deliveryCharge: Number(data.deliveryCharge ?? 0),
+  };
 }
 
 export async function confirmOrderDelivery(orderId: string): Promise<string> {
@@ -395,9 +404,9 @@ export function orderTotal(order: RetailerOrder): number {
 }
 
 /**
- * The retailer may ask to cancel (and get a refund) only while suppliers are
- * still confirming — never after admin started the delivery process, and never
- * after the order was marked delivered.
+ * The retailer may cancel directly (with a refund where applicable) only
+ * before admin started the delivery process — never after, and never once the
+ * order was marked delivered. No supplier approval is involved.
  */
 export function canCancelOrder(order: RetailerOrder): boolean {
   return (
