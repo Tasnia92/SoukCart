@@ -1,7 +1,9 @@
 import { supabase } from "../../supabase.ts";
 import {
+  loadActiveProducts,
   loadCartQuantities,
   loadRetailerProducts,
+  upsertCartItem,
   type RetailerProduct,
 } from "./retailer-catalog-api.ts";
 
@@ -61,8 +63,9 @@ export async function loadCartLines(
     .filter((line): line is CartLine => Boolean(line.product) && line.quantity > 0);
 }
 
+/** Distinct products in the cart — badges count products, not units. */
 export function cartItemCount(lines: readonly CartLine[]): number {
-  return lines.reduce((sum, line) => sum + line.quantity, 0);
+  return lines.filter((line) => line.quantity > 0).length;
 }
 
 export function cartSubtotal(lines: readonly CartLine[]): number {
@@ -101,6 +104,57 @@ export async function removeCartLine(userId: string, productId: string): Promise
     .eq("user_id", userId)
     .eq("product_id", productId);
   if (error) throw new Error(error.message);
+}
+
+export type ReorderItem = { product_id: string; quantity: number };
+
+export type ReorderOutcome = {
+  /** Cart lines that could be restocked. */
+  lines: number;
+  /** Total units written to the cart. */
+  units: number;
+  /** Lines from the order that are no longer orderable. */
+  unavailable: number;
+};
+
+/**
+ * Maps a previous order's items onto the live catalog: clamp to current stock,
+ * respect the minimum order quantity, and drop anything no longer orderable.
+ */
+export function reorderPlan(
+  items: readonly ReorderItem[],
+  products: readonly RetailerProduct[],
+): CartLine[] {
+  const plan: CartLine[] = [];
+  for (const item of items) {
+    const product = products.find((candidate) => candidate.id === item.product_id);
+    if (!product || product.stock <= 0) continue;
+    const minQty = Math.max(1, product.min_order_qty || 1);
+    plan.push({ product, quantity: Math.min(Math.max(minQty, item.quantity), product.stock) });
+  }
+  return plan;
+}
+
+/** One-click reorder: rebuilds the cart from a past order's items. */
+export async function reorderOrderItems(
+  userId: string,
+  items: readonly ReorderItem[],
+  deps: {
+    products?: () => Promise<RetailerProduct[]>;
+    upsert?: (userId: string, productId: string, quantity: number) => Promise<void>;
+  } = {},
+): Promise<ReorderOutcome> {
+  const products = await (deps.products ?? loadActiveProducts)();
+  const plan = reorderPlan(items, products);
+  const upsert = deps.upsert ?? upsertCartItem;
+  for (const line of plan) {
+    await upsert(userId, line.product.id, line.quantity);
+  }
+  return {
+    lines: plan.length,
+    units: plan.reduce((sum, line) => sum + line.quantity, 0),
+    unavailable: items.length - plan.length,
+  };
 }
 
 // Mirrors the pre-checkout stock guard: pending order items are checked against stock.

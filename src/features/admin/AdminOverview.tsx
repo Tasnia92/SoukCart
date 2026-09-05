@@ -233,8 +233,8 @@ function AdminOverviewBody({ dashboard }: { dashboard: AdminDashboard }) {
           </CardHeader>
           <CardContent className="flex flex-col gap-2">
             <p className="text-xs text-muted-foreground">
-              {summary.pendingOrders} confirmations · {summary.cancellationRequests} cancellations ·{" "}
-              {summary.refundsToComplete} refunds
+              {summary.pendingOrders} waiting on suppliers · {summary.cancellationRequests}{" "}
+              cancellations · {summary.refundsToComplete} refunds
             </p>
             <DashboardLink to="/admin/inbox">Open needs attention</DashboardLink>
           </CardContent>

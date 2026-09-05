@@ -427,7 +427,9 @@ export function RetailerCheckout({
                   </Field>
                 </CardContent>
               </Card>
+            </section>
 
+            <aside className="flex flex-col gap-6 xl:sticky xl:top-4">
               <Card>
                 <CardHeader>
                   <CardTitle>Payment method</CardTitle>
@@ -472,9 +474,6 @@ export function RetailerCheckout({
                   </FieldSet>
                 </CardContent>
               </Card>
-            </section>
-
-            <aside aria-label="Order summary" className="xl:sticky xl:top-4">
               <Card>
                 <CardHeader>
                   <CardTitle>Order summary</CardTitle>
@@ -535,7 +534,7 @@ export function RetailerCheckout({
             copy="Add products before checking out."
             action={
               <Button asChild>
-                <RouterLink to="/retailer/catalog">
+                <RouterLink to="/retailer">
                   <ShoppingBag data-icon="inline-start" />
                   Browse catalog
                 </RouterLink>

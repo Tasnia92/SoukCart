@@ -19,6 +19,7 @@ import { Route as SupplierRouteImport } from "./routes/supplier"
 import { Route as AdminIndexRouteImport } from "./routes/admin/index"
 import { Route as AdminSplatRouteImport } from "./routes/admin/$"
 import { Route as AdminActivityRouteImport } from "./routes/admin/activity"
+import { Route as AdminCategoriesRouteImport } from "./routes/admin/categories"
 import { Route as AdminComplaintsRouteImport } from "./routes/admin/complaints"
 import { Route as AdminInboxRouteImport } from "./routes/admin/inbox"
 import { Route as AdminPayoutsRouteImport } from "./routes/admin/payouts"
@@ -34,6 +35,7 @@ import { Route as RetailerComplaintsRouteImport } from "./routes/retailer/compla
 import { Route as RetailerNotificationsRouteImport } from "./routes/retailer/notifications"
 import { Route as RetailerOrdersRouteImport } from "./routes/retailer/orders"
 import { Route as RetailerSettingsRouteImport } from "./routes/retailer/settings"
+import { Route as RetailerTrackingRouteImport } from "./routes/retailer/tracking"
 import { Route as SupplierIndexRouteImport } from "./routes/supplier/index"
 import { Route as SupplierSplatRouteImport } from "./routes/supplier/$"
 import { Route as SupplierCustomersRouteImport } from "./routes/supplier/customers"
@@ -50,6 +52,7 @@ import { Route as AdminVerificationsUserIdRouteImport } from "./routes/admin/ver
 import { Route as RetailerCheckoutCancelledRouteImport } from "./routes/retailer/checkout.cancelled"
 import { Route as RetailerCheckoutFailedRouteImport } from "./routes/retailer/checkout.failed"
 import { Route as RetailerCheckoutSuccessRouteImport } from "./routes/retailer/checkout.success"
+import { Route as RetailerProductsProductIdRouteImport } from "./routes/retailer/products.$productId"
 import { Route as SupplierProductsNewRouteImport } from "./routes/supplier/products.new"
 import { Route as RetailerOrdersOrderIdInvoiceRouteImport } from "./routes/retailer/orders.$orderId.invoice"
 import { Route as SupplierProductsProductIdEditRouteImport } from "./routes/supplier/products.$productId.edit"
@@ -102,6 +105,11 @@ const AdminSplatRoute = AdminSplatRouteImport.update({
 const AdminActivityRoute = AdminActivityRouteImport.update({
   id: "/activity",
   path: "/activity",
+  getParentRoute: () => AdminRoute,
+} as any)
+const AdminCategoriesRoute = AdminCategoriesRouteImport.update({
+  id: "/categories",
+  path: "/categories",
   getParentRoute: () => AdminRoute,
 } as any)
 const AdminComplaintsRoute = AdminComplaintsRouteImport.update({
@@ -177,6 +185,11 @@ const RetailerOrdersRoute = RetailerOrdersRouteImport.update({
 const RetailerSettingsRoute = RetailerSettingsRouteImport.update({
   id: "/settings",
   path: "/settings",
+  getParentRoute: () => RetailerRoute,
+} as any)
+const RetailerTrackingRoute = RetailerTrackingRouteImport.update({
+  id: "/tracking",
+  path: "/tracking",
   getParentRoute: () => RetailerRoute,
 } as any)
 const SupplierIndexRoute = SupplierIndexRouteImport.update({
@@ -261,6 +274,12 @@ const RetailerCheckoutSuccessRoute = RetailerCheckoutSuccessRouteImport.update({
   path: "/success",
   getParentRoute: () => RetailerCheckoutRoute,
 } as any)
+const RetailerProductsProductIdRoute =
+  RetailerProductsProductIdRouteImport.update({
+    id: "/products/$productId",
+    path: "/products/$productId",
+    getParentRoute: () => RetailerRoute,
+  } as any)
 const SupplierProductsNewRoute = SupplierProductsNewRouteImport.update({
   id: "/new",
   path: "/new",
@@ -289,6 +308,7 @@ export interface FileRoutesByFullPath {
   "/supplier": typeof SupplierRouteWithChildren
   "/admin/$": typeof AdminSplatRoute
   "/admin/activity": typeof AdminActivityRoute
+  "/admin/categories": typeof AdminCategoriesRoute
   "/admin/complaints": typeof AdminComplaintsRoute
   "/admin/inbox": typeof AdminInboxRouteWithChildren
   "/admin/payouts": typeof AdminPayoutsRoute
@@ -303,6 +323,7 @@ export interface FileRoutesByFullPath {
   "/retailer/notifications": typeof RetailerNotificationsRoute
   "/retailer/orders": typeof RetailerOrdersRouteWithChildren
   "/retailer/settings": typeof RetailerSettingsRoute
+  "/retailer/tracking": typeof RetailerTrackingRoute
   "/supplier/$": typeof SupplierSplatRoute
   "/supplier/customers": typeof SupplierCustomersRoute
   "/supplier/earnings": typeof SupplierEarningsRoute
@@ -321,6 +342,7 @@ export interface FileRoutesByFullPath {
   "/retailer/checkout/cancelled": typeof RetailerCheckoutCancelledRoute
   "/retailer/checkout/failed": typeof RetailerCheckoutFailedRoute
   "/retailer/checkout/success": typeof RetailerCheckoutSuccessRoute
+  "/retailer/products/$productId": typeof RetailerProductsProductIdRoute
   "/supplier/products/new": typeof SupplierProductsNewRoute
   "/retailer/orders/$orderId/invoice": typeof RetailerOrdersOrderIdInvoiceRoute
   "/supplier/products/$productId/edit": typeof SupplierProductsProductIdEditRoute
@@ -332,6 +354,7 @@ export interface FileRoutesByTo {
   "/register": typeof RegisterRoute
   "/admin/$": typeof AdminSplatRoute
   "/admin/activity": typeof AdminActivityRoute
+  "/admin/categories": typeof AdminCategoriesRoute
   "/admin/complaints": typeof AdminComplaintsRoute
   "/admin/inbox": typeof AdminInboxRouteWithChildren
   "/admin/payouts": typeof AdminPayoutsRoute
@@ -346,6 +369,7 @@ export interface FileRoutesByTo {
   "/retailer/notifications": typeof RetailerNotificationsRoute
   "/retailer/orders": typeof RetailerOrdersRouteWithChildren
   "/retailer/settings": typeof RetailerSettingsRoute
+  "/retailer/tracking": typeof RetailerTrackingRoute
   "/supplier/$": typeof SupplierSplatRoute
   "/supplier/customers": typeof SupplierCustomersRoute
   "/supplier/earnings": typeof SupplierEarningsRoute
@@ -364,6 +388,7 @@ export interface FileRoutesByTo {
   "/retailer/checkout/cancelled": typeof RetailerCheckoutCancelledRoute
   "/retailer/checkout/failed": typeof RetailerCheckoutFailedRoute
   "/retailer/checkout/success": typeof RetailerCheckoutSuccessRoute
+  "/retailer/products/$productId": typeof RetailerProductsProductIdRoute
   "/supplier/products/new": typeof SupplierProductsNewRoute
   "/retailer/orders/$orderId/invoice": typeof RetailerOrdersOrderIdInvoiceRoute
   "/supplier/products/$productId/edit": typeof SupplierProductsProductIdEditRoute
@@ -379,6 +404,7 @@ export interface FileRoutesById {
   "/supplier": typeof SupplierRouteWithChildren
   "/admin/$": typeof AdminSplatRoute
   "/admin/activity": typeof AdminActivityRoute
+  "/admin/categories": typeof AdminCategoriesRoute
   "/admin/complaints": typeof AdminComplaintsRoute
   "/admin/inbox": typeof AdminInboxRouteWithChildren
   "/admin/payouts": typeof AdminPayoutsRoute
@@ -393,6 +419,7 @@ export interface FileRoutesById {
   "/retailer/notifications": typeof RetailerNotificationsRoute
   "/retailer/orders": typeof RetailerOrdersRouteWithChildren
   "/retailer/settings": typeof RetailerSettingsRoute
+  "/retailer/tracking": typeof RetailerTrackingRoute
   "/supplier/$": typeof SupplierSplatRoute
   "/supplier/customers": typeof SupplierCustomersRoute
   "/supplier/earnings": typeof SupplierEarningsRoute
@@ -411,6 +438,7 @@ export interface FileRoutesById {
   "/retailer/checkout/cancelled": typeof RetailerCheckoutCancelledRoute
   "/retailer/checkout/failed": typeof RetailerCheckoutFailedRoute
   "/retailer/checkout/success": typeof RetailerCheckoutSuccessRoute
+  "/retailer/products/$productId": typeof RetailerProductsProductIdRoute
   "/supplier/products/new": typeof SupplierProductsNewRoute
   "/retailer/orders/$orderId/invoice": typeof RetailerOrdersOrderIdInvoiceRoute
   "/supplier/products/$productId/edit": typeof SupplierProductsProductIdEditRoute
@@ -427,6 +455,7 @@ export interface FileRouteTypes {
     | "/supplier"
     | "/admin/$"
     | "/admin/activity"
+    | "/admin/categories"
     | "/admin/complaints"
     | "/admin/inbox"
     | "/admin/payouts"
@@ -441,6 +470,7 @@ export interface FileRouteTypes {
     | "/retailer/notifications"
     | "/retailer/orders"
     | "/retailer/settings"
+    | "/retailer/tracking"
     | "/supplier/$"
     | "/supplier/customers"
     | "/supplier/earnings"
@@ -459,6 +489,7 @@ export interface FileRouteTypes {
     | "/retailer/checkout/cancelled"
     | "/retailer/checkout/failed"
     | "/retailer/checkout/success"
+    | "/retailer/products/$productId"
     | "/supplier/products/new"
     | "/retailer/orders/$orderId/invoice"
     | "/supplier/products/$productId/edit"
@@ -470,6 +501,7 @@ export interface FileRouteTypes {
     | "/register"
     | "/admin/$"
     | "/admin/activity"
+    | "/admin/categories"
     | "/admin/complaints"
     | "/admin/inbox"
     | "/admin/payouts"
@@ -484,6 +516,7 @@ export interface FileRouteTypes {
     | "/retailer/notifications"
     | "/retailer/orders"
     | "/retailer/settings"
+    | "/retailer/tracking"
     | "/supplier/$"
     | "/supplier/customers"
     | "/supplier/earnings"
@@ -502,6 +535,7 @@ export interface FileRouteTypes {
     | "/retailer/checkout/cancelled"
     | "/retailer/checkout/failed"
     | "/retailer/checkout/success"
+    | "/retailer/products/$productId"
     | "/supplier/products/new"
     | "/retailer/orders/$orderId/invoice"
     | "/supplier/products/$productId/edit"
@@ -516,6 +550,7 @@ export interface FileRouteTypes {
     | "/supplier"
     | "/admin/$"
     | "/admin/activity"
+    | "/admin/categories"
     | "/admin/complaints"
     | "/admin/inbox"
     | "/admin/payouts"
@@ -530,6 +565,7 @@ export interface FileRouteTypes {
     | "/retailer/notifications"
     | "/retailer/orders"
     | "/retailer/settings"
+    | "/retailer/tracking"
     | "/supplier/$"
     | "/supplier/customers"
     | "/supplier/earnings"
@@ -548,6 +584,7 @@ export interface FileRouteTypes {
     | "/retailer/checkout/cancelled"
     | "/retailer/checkout/failed"
     | "/retailer/checkout/success"
+    | "/retailer/products/$productId"
     | "/supplier/products/new"
     | "/retailer/orders/$orderId/invoice"
     | "/supplier/products/$productId/edit"
@@ -633,6 +670,13 @@ declare module "@tanstack/react-router" {
       path: "/activity"
       fullPath: "/admin/activity"
       preLoaderRoute: typeof AdminActivityRouteImport
+      parentRoute: typeof AdminRoute
+    }
+    "/admin/categories": {
+      id: "/admin/categories"
+      path: "/categories"
+      fullPath: "/admin/categories"
+      preLoaderRoute: typeof AdminCategoriesRouteImport
       parentRoute: typeof AdminRoute
     }
     "/admin/complaints": {
@@ -738,6 +782,13 @@ declare module "@tanstack/react-router" {
       path: "/settings"
       fullPath: "/retailer/settings"
       preLoaderRoute: typeof RetailerSettingsRouteImport
+      parentRoute: typeof RetailerRoute
+    }
+    "/retailer/tracking": {
+      id: "/retailer/tracking"
+      path: "/tracking"
+      fullPath: "/retailer/tracking"
+      preLoaderRoute: typeof RetailerTrackingRouteImport
       parentRoute: typeof RetailerRoute
     }
     "/supplier/": {
@@ -852,6 +903,13 @@ declare module "@tanstack/react-router" {
       preLoaderRoute: typeof RetailerCheckoutSuccessRouteImport
       parentRoute: typeof RetailerCheckoutRoute
     }
+    "/retailer/products/$productId": {
+      id: "/retailer/products/$productId"
+      path: "/products/$productId"
+      fullPath: "/retailer/products/$productId"
+      preLoaderRoute: typeof RetailerProductsProductIdRouteImport
+      parentRoute: typeof RetailerRoute
+    }
     "/supplier/products/new": {
       id: "/supplier/products/new"
       path: "/new"
@@ -904,6 +962,7 @@ const AdminVerificationsRouteWithChildren =
 interface AdminRouteChildren {
   AdminSplatRoute: typeof AdminSplatRoute
   AdminActivityRoute: typeof AdminActivityRoute
+  AdminCategoriesRoute: typeof AdminCategoriesRoute
   AdminComplaintsRoute: typeof AdminComplaintsRoute
   AdminInboxRoute: typeof AdminInboxRouteWithChildren
   AdminPayoutsRoute: typeof AdminPayoutsRoute
@@ -916,6 +975,7 @@ interface AdminRouteChildren {
 const AdminRouteChildren: AdminRouteChildren = {
   AdminSplatRoute: AdminSplatRoute,
   AdminActivityRoute: AdminActivityRoute,
+  AdminCategoriesRoute: AdminCategoriesRoute,
   AdminComplaintsRoute: AdminComplaintsRoute,
   AdminInboxRoute: AdminInboxRouteWithChildren,
   AdminPayoutsRoute: AdminPayoutsRoute,
@@ -963,7 +1023,9 @@ interface RetailerRouteChildren {
   RetailerNotificationsRoute: typeof RetailerNotificationsRoute
   RetailerOrdersRoute: typeof RetailerOrdersRouteWithChildren
   RetailerSettingsRoute: typeof RetailerSettingsRoute
+  RetailerTrackingRoute: typeof RetailerTrackingRoute
   RetailerIndexRoute: typeof RetailerIndexRoute
+  RetailerProductsProductIdRoute: typeof RetailerProductsProductIdRoute
 }
 
 const RetailerRouteChildren: RetailerRouteChildren = {
@@ -975,7 +1037,9 @@ const RetailerRouteChildren: RetailerRouteChildren = {
   RetailerNotificationsRoute: RetailerNotificationsRoute,
   RetailerOrdersRoute: RetailerOrdersRouteWithChildren,
   RetailerSettingsRoute: RetailerSettingsRoute,
+  RetailerTrackingRoute: RetailerTrackingRoute,
   RetailerIndexRoute: RetailerIndexRoute,
+  RetailerProductsProductIdRoute: RetailerProductsProductIdRoute,
 }
 
 const RetailerRouteWithChildren = RetailerRoute._addFileChildren(

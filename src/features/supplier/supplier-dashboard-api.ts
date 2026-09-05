@@ -271,7 +271,7 @@ function isEarning(order: SupplierOrder): boolean {
 /** Pending or confirmed orders the supplier still has to confirm or ship. */
 export function awaitsFulfillment(order: SupplierOrder): boolean {
   return (
-    (order.status === "pending" || order.status === "confirmed") &&
+    (order.package_status === "pending" || order.package_status === "confirmed") &&
     !order.cancel_requested &&
     (order.payment_method === "cod" || order.payment_status === "paid")
   );
@@ -318,13 +318,13 @@ export function buildSupplierDashboard(
 
   const toConfirm = orders.filter(
     (order) =>
-      order.status === "pending" &&
+      order.package_status === "pending" &&
       !order.cancel_requested &&
       (order.payment_method === "cod" || order.payment_status === "paid"),
   );
   const toShip = orders.filter(
     (order) =>
-      order.status === "confirmed" &&
+      order.package_status === "confirmed" &&
       !order.cancel_requested &&
       (order.payment_method === "cod" || order.payment_status === "paid"),
   );

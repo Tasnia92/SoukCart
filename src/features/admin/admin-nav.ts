@@ -5,17 +5,17 @@ import {
   Home,
   ListChecks,
   MessageSquare,
-  Package,
+  PackageCheck,
   ShieldAlert,
   ShieldCheck,
+  Tags,
   Truck,
   Users,
-  Wallet,
   AlertTriangle,
   Banknote,
   type LucideIcon,
 } from "lucide-react";
-import type { WorkspaceNavItem } from "../workspace/WorkspaceShell.tsx";
+import type { WorkspaceNavMenuChoice, WorkspaceNavItem } from "../workspace/WorkspaceShell.tsx";
 import type { AdminOrderView } from "./admin-activity-api.ts";
 
 export type AdminOrderViewMeta = {
@@ -29,36 +29,28 @@ export type AdminOrderViewMeta = {
 
 export const ADMIN_ORDER_VIEWS: readonly AdminOrderViewMeta[] = [
   {
-    id: "all",
-    label: "All orders",
-    icon: ClipboardList,
-    title: "All orders",
-    copy: "Browse every order. Update delivery status, cancel, refund, or collect COD from here.",
-    search: {},
-  },
-  {
-    id: "pending",
-    label: "Awaiting confirmation",
+    id: "new",
+    label: "New orders",
     icon: Clock3,
-    title: "Awaiting confirmation",
-    copy: "Paid online and cash-on-delivery orders that still need to be confirmed.",
-    search: { view: "pending" },
+    title: "New orders",
+    copy: "Fresh orders waiting to be dispatched to the courier.",
+    search: { view: "new" },
   },
   {
-    id: "confirmed",
-    label: "To ship",
-    icon: Package,
-    title: "To ship",
-    copy: "Confirmed orders waiting for you to mark shipped.",
-    search: { view: "confirmed" },
-  },
-  {
-    id: "shipped",
-    label: "In transit",
+    id: "dispatched",
+    label: "Dispatched",
     icon: Truck,
-    title: "In transit",
-    copy: "Shipped orders waiting for you to mark delivered.",
-    search: { view: "shipped" },
+    title: "Dispatched",
+    copy: "Orders on the way. Mark them delivered once they arrive.",
+    search: { view: "dispatched" },
+  },
+  {
+    id: "delivered",
+    label: "Delivered",
+    icon: PackageCheck,
+    title: "Delivered",
+    copy: "Completed orders that arrived at the retailer.",
+    search: { view: "delivered" },
   },
   {
     id: "cancellations",
@@ -77,12 +69,12 @@ export const ADMIN_ORDER_VIEWS: readonly AdminOrderViewMeta[] = [
     search: { view: "refunds" },
   },
   {
-    id: "cod",
-    label: "COD to collect",
-    icon: Wallet,
-    title: "COD to collect",
-    copy: "Cash-on-delivery orders waiting for collection to be recorded.",
-    search: { view: "cod" },
+    id: "all",
+    label: "All orders",
+    icon: ClipboardList,
+    title: "All orders",
+    copy: "Browse every order. Update delivery status, cancel, refund, or collect COD from here.",
+    search: {},
   },
 ];
 
@@ -90,8 +82,12 @@ export function adminOrderViewMeta(view: AdminOrderView): AdminOrderViewMeta {
   return ADMIN_ORDER_VIEWS.find((item) => item.id === view) ?? ADMIN_ORDER_VIEWS[0];
 }
 
-/** Shared admin sidebar navigation — flat list, no nested menus. */
-export function adminNavItems(activePath: string): WorkspaceNavItem[] {
+/** Shared admin sidebar navigation — order views collapse under "Order management". */
+export function adminNavItems(
+  activePath: string,
+  orderView: AdminOrderView = "all",
+): WorkspaceNavItem[] {
+  const onOrders = activePath.startsWith("/admin/activity");
   return [
     {
       to: "/admin",
@@ -108,8 +104,18 @@ export function adminNavItems(activePath: string): WorkspaceNavItem[] {
     {
       to: "/admin/activity",
       icon: ClipboardList,
-      label: "Orders",
-      active: activePath.startsWith("/admin/activity"),
+      label: "Order management",
+      active: onOrders,
+      menu: ADMIN_ORDER_VIEWS.map(
+        (view): WorkspaceNavMenuChoice => ({
+          id: view.id,
+          label: view.label,
+          icon: view.icon,
+          to: "/admin/activity",
+          search: view.search,
+          active: onOrders && view.id === orderView,
+        }),
+      ),
     },
     {
       to: "/admin/payouts",
@@ -128,6 +134,12 @@ export function adminNavItems(activePath: string): WorkspaceNavItem[] {
       icon: ShieldAlert,
       label: "Products",
       active: activePath.startsWith("/admin/products"),
+    },
+    {
+      to: "/admin/categories",
+      icon: Tags,
+      label: "Categories",
+      active: activePath.startsWith("/admin/categories"),
     },
     {
       to: "/admin/verifications",

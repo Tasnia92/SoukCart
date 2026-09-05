@@ -1,7 +1,6 @@
 import { useNavigate } from "@tanstack/react-router";
 import { useCallback, useEffect, useRef, useState } from "react";
 import {
-  Activity,
   ArrowRight,
   Check,
   CircleAlert,
@@ -10,7 +9,6 @@ import {
   Package,
   Plus,
   RefreshCw,
-  Store,
   Truck,
   Wallet,
 } from "lucide-react";
@@ -18,7 +16,6 @@ import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Spinner } from "@/components/ui/spinner";
-import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group";
 import {
   ActionQueue,
   DashboardCard,
@@ -28,33 +25,27 @@ import {
   DashboardTable,
   HealthWidget,
   MetricCard,
-  MetricRow,
   SectionEmpty,
   type ActionQueueEntry,
   type DashboardColumn,
   type HealthItem,
 } from "../../components/dashboard/Dashboard.tsx";
-import { RankedBarCard, TrendChartCard } from "../../components/dashboard/DashboardCharts.tsx";
-import type {
-  DashboardBucket,
-  DashboardSeverity,
-} from "../../components/dashboard/dashboard-model.ts";
+import { TrendChartCard } from "../../components/dashboard/DashboardCharts.tsx";
+import type { DashboardBucket } from "../../components/dashboard/dashboard-model.ts";
 import { InlineNotice, PageHeader, WorkspaceError } from "../../components/ui/Workspace.tsx";
 import { useProductChanges } from "../../product-realtime.ts";
 import { useSessionSnapshot, useSessionStore } from "../../session.tsx";
 import { useTableChanges } from "../../workspace-realtime.ts";
 import { PaymentBadge, shortId, StatusBadge } from "../orders/order-presentation.tsx";
-import { firstName, formatDate, formatPrice, formatUpdatedAt } from "../workspace/format.ts";
+import { firstName, formatPrice, formatUpdatedAt } from "../workspace/format.ts";
 import { RouterLink } from "../workspace/WorkspaceShell.tsx";
 import {
   loadSupplierDashboard,
   LOW_STOCK_THRESHOLD,
-  SUPPLIER_WINDOW_OPTIONS,
   type SupplierDashboard,
   type SupplierQueueOrder,
-  type SupplierWindowDays,
 } from "./supplier-dashboard-api.ts";
-import { consumeSupplierNotice, ProductThumb, SupplierWorkspaceShell } from "./supplier-shared.tsx";
+import { consumeSupplierNotice, SupplierWorkspaceShell } from "./supplier-shared.tsx";
 
 type SupplierOverviewProps = {
   loadDashboard?: (sellerId: string, windowDays: number) => Promise<SupplierDashboard>;
@@ -65,6 +56,9 @@ type Freshness = "current" | "refreshing" | "stale";
 /** Stock and product edits can fire several row events; batch them into one reload. */
 const REALTIME_COALESCE_MS = 400;
 const ORDER_LIVE_TABLES = ["orders", "seller_payouts"] as const;
+
+/** Fixed reporting window for the chart and summary; realtime keeps it current. */
+const OVERVIEW_WINDOW_DAYS = 30;
 
 /**
  * Stable module-level default. An inline default parameter recreates a new function
@@ -80,11 +74,6 @@ function seriesRange(series: readonly DashboardBucket[]): string {
   const last = series[series.length - 1];
   if (!first || !last) return "No period";
   return `${first.label} – ${last.label} · daily`;
-}
-
-function severityFor(count: number, escalated = false): DashboardSeverity {
-  if (count === 0) return "neutral";
-  return escalated ? "critical" : "attention";
 }
 
 function ageLabel(days: number): string {
@@ -269,7 +258,6 @@ export function SupplierOverview({ loadDashboard = defaultLoadDashboard }: Suppl
   const [refreshError, setRefreshError] = useState<string | null>(null);
   const [updatedAt, setUpdatedAt] = useState<number | null>(null);
   const [nowTick, setNowTick] = useState(() => Date.now());
-  const [windowDays, setWindowDays] = useState<SupplierWindowDays>(30);
   const [notice] = useState(consumeSupplierNotice);
   const dashboardRef = useRef<SupplierDashboard | null>(null);
   dashboardRef.current = dashboard;
@@ -306,7 +294,7 @@ export function SupplierOverview({ loadDashboard = defaultLoadDashboard }: Suppl
       setError(null);
     }
 
-    void loadDashboard(sellerId, windowDays)
+    void loadDashboard(sellerId, OVERVIEW_WINDOW_DAYS)
       .then((next) => {
         if (!current) return;
         setDashboard(next);
@@ -329,7 +317,7 @@ export function SupplierOverview({ loadDashboard = defaultLoadDashboard }: Suppl
     return () => {
       current = false;
     };
-  }, [loadDashboard, loadVersion, sellerId, windowDays]);
+  }, [loadDashboard, loadVersion, sellerId]);
 
   if (state.status !== "seller") return null;
 
@@ -353,7 +341,6 @@ export function SupplierOverview({ loadDashboard = defaultLoadDashboard }: Suppl
   }
 
   const summary = dashboard?.summary;
-  const period = `Last ${dashboard?.windowDays ?? windowDays} days`;
   const priorities = dashboard ? focusItems(dashboard) : [];
   const loading = freshness === "refreshing";
 
@@ -370,49 +357,21 @@ export function SupplierOverview({ loadDashboard = defaultLoadDashboard }: Suppl
         copy="See what needs attention first, then track sales, payouts, and inventory performance."
         actions={
           <div className="flex flex-wrap items-center gap-2">
-            <ToggleGroup
-              type="single"
-              value={String(windowDays)}
-              onValueChange={(value) => {
-                if (!value) return;
-                const next = Number(value) as SupplierWindowDays;
-                if ((SUPPLIER_WINDOW_OPTIONS as readonly number[]).includes(next)) {
-                  setWindowDays(next);
-                }
-              }}
-              variant="outline"
-              size="sm"
-              aria-label="Reporting window"
-            >
-              {SUPPLIER_WINDOW_OPTIONS.map((days) => (
-                <ToggleGroupItem key={days} value={String(days)}>
-                  {days}d
-                </ToggleGroupItem>
-              ))}
-            </ToggleGroup>
             {updatedAt ? (
               <span className="text-sm text-muted-foreground" aria-live="polite">
-                {freshness === "refreshing"
-                  ? "Refreshing"
-                  : freshness === "stale"
-                    ? "Couldn’t refresh—showing older data"
-                    : formatUpdatedAt(updatedAt, nowTick)}
+                {freshness === "refreshing" ? "Refreshing…" : formatUpdatedAt(updatedAt, nowTick)}
               </span>
             ) : null}
-            {freshness === "current" ? <Badge variant="secondary">Up to date</Badge> : null}
-            {freshness === "refreshing" ? <Badge variant="outline">Refreshing</Badge> : null}
             <Button
               type="button"
               variant="ghost"
+              size="icon"
+              aria-label="Refresh"
+              title="Refresh"
               disabled={loading && !dashboard}
               onClick={invalidate}
             >
-              {loading && dashboard ? (
-                <Spinner data-icon="inline-start" />
-              ) : (
-                <RefreshCw data-icon="inline-start" />
-              )}
-              Refresh
+              {loading && dashboard ? <Spinner /> : <RefreshCw aria-hidden="true" />}
             </Button>
             <Button asChild variant="outline">
               <RouterLink to="/supplier/products/new">
@@ -479,49 +438,6 @@ export function SupplierOverview({ loadDashboard = defaultLoadDashboard }: Suppl
               linkLabel="Open earnings"
             />
           </DashboardRow>
-
-          <MetricRow label="Store performance and inventory health">
-            <MetricCard
-              icon={Activity}
-              label="Gross sales"
-              value={formatPrice(summary.sales)}
-              period={period}
-              delta={summary.salesDelta}
-              context={`${summary.orders} paid order${summary.orders === 1 ? "" : "s"} included your products`}
-              to="/supplier/orders"
-              search={{ filter: "all" }}
-              linkLabel="View sales orders"
-            />
-            <MetricCard
-              icon={Wallet}
-              label="Net earnings"
-              value={formatPrice(summary.netEarnings)}
-              period="Available + paid"
-              context={`${formatPrice(dashboard.earnings.commission)} commission withheld`}
-              to="/supplier/earnings"
-              linkLabel="Open earnings ledger"
-            />
-            <MetricCard
-              icon={Package}
-              label="Orders completed"
-              value={summary.ordersCompleted}
-              period={period}
-              context="Delivered orders in this window"
-              to="/supplier/orders"
-              search={{ filter: "delivered" }}
-              linkLabel="Open delivered"
-            />
-            <MetricCard
-              icon={Layers}
-              label="Stock at risk"
-              value={summary.stockAtRisk}
-              period="Active listings"
-              context={`${summary.outOfStock} out of stock · ${summary.lowStock} at or below ${LOW_STOCK_THRESHOLD} units`}
-              severity={severityFor(summary.stockAtRisk, summary.outOfStock > 0)}
-              to="/supplier/stock"
-              linkLabel="Manage inventory"
-            />
-          </MetricRow>
 
           <DashboardRow split="8-4">
             <TrendChartCard
@@ -596,72 +512,6 @@ export function SupplierOverview({ loadDashboard = defaultLoadDashboard }: Suppl
                   icon={Check}
                   title="Nothing waiting on you"
                   copy="Every current order has completed its required seller step."
-                />
-              )}
-            </DashboardCard>
-          </DashboardRow>
-
-          <DashboardRow split="8-4">
-            <RankedBarCard
-              eyebrow="Product performance"
-              title="Top products"
-              rangeLabel={`${period} · by gross sales`}
-              items={dashboard.topProducts.map((product) => ({
-                id: product.id,
-                label: product.name,
-                value: product.value,
-                meta: `${product.units} units sold`,
-              }))}
-              format={formatPrice}
-              valueLabel="gross sales"
-              action={<DashboardLink to="/supplier/products">View products</DashboardLink>}
-              emptyCopy="Once orders come through, your best sellers will rank here."
-            />
-
-            <DashboardCard
-              eyebrow="Catalog"
-              title="Recent products"
-              meta={`${dashboard.recentListings.length} newest listings`}
-              action={<DashboardLink to="/supplier/products">All products</DashboardLink>}
-            >
-              {dashboard.recentListings.length ? (
-                <ul className="flex flex-col divide-y">
-                  {dashboard.recentListings.map((product) => (
-                    <li
-                      className="flex items-center gap-3 py-3 first:pt-0 last:pb-0"
-                      key={product.id}
-                    >
-                      <span className="flex size-12 shrink-0 items-center justify-center overflow-hidden rounded-md bg-muted text-muted-foreground">
-                        <ProductThumb product={product} />
-                      </span>
-                      <span className="flex min-w-0 flex-1 flex-col gap-1">
-                        <strong className="truncate">{product.name}</strong>
-                        <span className="truncate text-xs text-muted-foreground">
-                          {formatPrice(product.price)} per {product.unit} ·{" "}
-                          {formatDate(product.created_at)}
-                        </span>
-                      </span>
-                      <RouterLink
-                        className="inline-flex shrink-0 items-center gap-1 text-sm font-medium"
-                        to="/supplier/products/$productId/edit"
-                        params={{ productId: product.id }}
-                      >
-                        <span>{product.stock} left</span>
-                        <ArrowRight aria-hidden="true" />
-                      </RouterLink>
-                    </li>
-                  ))}
-                </ul>
-              ) : (
-                <SectionEmpty
-                  icon={Store}
-                  title="No products yet"
-                  copy="Add your first product and retailers will see it in the catalog."
-                  action={
-                    <Button asChild>
-                      <RouterLink to="/supplier/products/new">Add product</RouterLink>
-                    </Button>
-                  }
                 />
               )}
             </DashboardCard>

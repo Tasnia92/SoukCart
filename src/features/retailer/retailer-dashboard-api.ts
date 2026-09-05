@@ -1,43 +1,25 @@
 /* -----------------------------------------------------------------------------
- * Retailer dashboard contract — ordering and delivery in one response: the single
- * `nextAction`, a `summary` of the trailing window, a `series` for spend, the
- * fulfillment `stages`, a short `recent` list and the help-ticket counts.
- * -----------------------------------------------------------------------------
- * `buildRetailerDashboard` is pure. `loadRetailerDashboard` fetches orders, cart and
- * tickets; payment reconciliation runs separately, after first paint.
+ * Retailer dashboard contract — the "buy & track" cockpit: one next action, a
+ * quiet stat line, the active-shipments strip and a one-click reorder target.
+ * `buildRetailerDashboard` is pure. `loadRetailerDashboardInput` fetches orders
+ * and the cart; payment reconciliation runs separately, after first paint.
  * -------------------------------------------------------------------------- */
 
-import { Check, RefreshCw, ShoppingBag, ShoppingCart, Truck, type LucideIcon } from "lucide-react";
+import { Check, RefreshCw, ShoppingBag, type LucideIcon } from "lucide-react";
 import {
   DEFAULT_WINDOW_DAYS,
   ageInDays,
-  dailySeries,
   isWithinWindow,
-  optionalSection,
-  periodDelta,
-  sumPreviousWindow,
   sumWindow,
-  type DashboardBucket,
   type DashboardSeverity,
-  type MetricDelta,
-  type SectionFailure,
 } from "../../components/dashboard/dashboard-model.ts";
-import { loadRetailerComplaints, type RetailerComplaint } from "./retailer-complaints-api.ts";
-import { orderTotal, type RetailerOrder } from "./retailer-orders-api.ts";
+import { orderTotal, primaryShipment, type RetailerOrder } from "./retailer-orders-api.ts";
 import { loadRetailerOverview } from "./retailer-overview-api.ts";
-
-export const RETAILER_HELP_SECTION = "Help Center";
-export const RETAILER_RECENT_LIMIT = 5;
 
 /** The statuses a retailer still has something to wait on. */
 export const ACTIVE_STATUSES = ["pending", "confirmed", "shipped"] as const;
 
-export type RetailerNextActionKind =
-  | "checkout"
-  | "retry-payment"
-  | "confirm-delivery"
-  | "track"
-  | "browse";
+export type RetailerNextActionKind = "retry-payment" | "confirm-delivery" | "browse";
 
 export type RetailerNextAction = {
   kind: RetailerNextActionKind;
@@ -52,52 +34,44 @@ export type RetailerNextAction = {
   orderId?: string;
 };
 
+export type RetailerShipmentCard = {
+  orderId: string;
+  /** Whole-order fulfillment status. */
+  status: string;
+  /** Whole days since the order was placed. */
+  ageDays: number;
+  /** Supplier packages on the order (at least one). */
+  packageCount: number;
+  /** Set once at least one parcel has been handed to a carrier. */
+  shipment: {
+    carrier: string;
+    trackingNumber: string;
+    trackingUrl: string;
+    status: string;
+  } | null;
+};
+
 export type RetailerSummary = {
   spend: number;
-  spendDelta: MetricDelta;
   activeOrders: number;
   delivered: number;
-  cartUnits: number;
+  cartItems: number;
   orders: number;
-};
-
-export type RetailerStage = {
-  key: string;
-  label: string;
-  count: number;
-  severity: DashboardSeverity;
-};
-
-export type RetailerRecentOrder = {
-  id: string;
-  createdAt: string;
-  units: number;
-  total: number;
-  status: string;
-  paymentStatus: string;
-  paymentMethod: string;
-  cancelRequested: boolean;
-  /** Delivered but not yet confirmed by the retailer, so the row still needs an action. */
-  needsDeliveryConfirmation: boolean;
 };
 
 export type RetailerDashboard = {
   nextAction: RetailerNextAction;
   summary: RetailerSummary;
-  /** One point per day: `value` is spend, `count` is orders placed. */
-  series: DashboardBucket[];
-  stages: RetailerStage[];
-  recent: RetailerRecentOrder[];
-  help: { open: number; resolved: number; total: number };
+  /** Active orders oldest first — the one that lands soonest leads the strip. */
+  shipments: RetailerShipmentCard[];
+  /** The most recent delivered order, for one-click reorder. */
+  reorderOrderId: string | null;
   windowDays: number;
-  failures: SectionFailure[];
 };
 
 export type RetailerDashboardInput = {
   orders: readonly RetailerOrder[];
-  cartUnits: number;
-  complaints: readonly RetailerComplaint[];
-  failures?: readonly SectionFailure[];
+  cartItems: number;
 };
 
 function isActive(order: RetailerOrder): boolean {
@@ -119,37 +93,19 @@ export function hasFailedPayment(order: RetailerOrder): boolean {
   );
 }
 
-function units(order: RetailerOrder): number {
-  return order.items.reduce((sum, item) => sum + item.quantity, 0);
-}
-
 function newestFirst(left: RetailerOrder, right: RetailerOrder): number {
   return Date.parse(right.created_at) - Date.parse(left.created_at);
 }
 
 /**
  * Picks the one thing worth doing next, in order of what costs the retailer most to
- * leave alone: an unpaid basket, a broken payment, an unconfirmed delivery, then a
- * shipment to watch. With none of those, the useful move is to browse.
+ * leave alone: a broken payment, an unconfirmed delivery. An open basket never
+ * claims the slot — the cart button and sidebar badge already count it, so adding
+ * to the cart stays quiet. With nothing to fix, the useful move is to browse —
+ * active parcels already have the shipments strip, so tracking never needs to
+ * compete for the hero slot.
  */
-export function pickNextAction(
-  orders: readonly RetailerOrder[],
-  cartUnits: number,
-  now = Date.now(),
-): RetailerNextAction {
-  if (cartUnits > 0) {
-    return {
-      kind: "checkout",
-      eyebrow: "Next step",
-      title: `Check out ${cartUnits} ${cartUnits === 1 ? "item" : "items"} in your cart`,
-      copy: "Your basket is still open. Place the order to lock in current stock and pricing.",
-      icon: ShoppingCart,
-      severity: "attention",
-      to: "/retailer/cart",
-      actionLabel: "Go to cart",
-    };
-  }
-
+export function pickNextAction(orders: readonly RetailerOrder[]): RetailerNextAction {
   const failed = [...orders].filter(hasFailedPayment).sort(newestFirst)[0];
   if (failed) {
     return {
@@ -180,23 +136,6 @@ export function pickNextAction(
     };
   }
 
-  // The nearest active delivery is the oldest one still moving; it lands first.
-  const tracking = [...orders].filter(isActive).sort((left, right) => -newestFirst(left, right))[0];
-  if (tracking) {
-    const age = ageInDays(tracking.created_at, now);
-    return {
-      kind: "track",
-      eyebrow: "In progress",
-      title: "Track your nearest delivery",
-      copy: `Placed ${age === 0 ? "today" : `${age} ${age === 1 ? "day" : "days"} ago`}, currently ${tracking.status}.`,
-      icon: Truck,
-      severity: "neutral",
-      to: "/retailer/orders",
-      actionLabel: "Track order",
-      orderId: tracking.id,
-    };
-  }
-
   return {
     kind: "browse",
     eyebrow: "Next step",
@@ -204,135 +143,92 @@ export function pickNextAction(
     copy: "Nothing needs your attention. Browse supplier catalogs and start a new order.",
     icon: ShoppingBag,
     severity: "neutral",
-    to: "/retailer/catalog",
-    actionLabel: "Browse catalog",
+    to: "/retailer",
+    actionLabel: "Browse products",
   };
 }
 
-/** Aggregates the retailer overview. Spend windows exclude cancelled orders. */
+/** Aggregates the cockpit. Spend windows exclude cancelled orders. */
 export function buildRetailerDashboard(
-  { orders, cartUnits, complaints, failures = [] }: RetailerDashboardInput,
+  { orders, cartItems }: RetailerDashboardInput,
   now = Date.now(),
   windowDays = DEFAULT_WINDOW_DAYS,
 ): RetailerDashboard {
   const spending = orders.filter(isSpend);
-  const spendItems = spending.map((order) => ({
-    at: order.created_at,
-    value: orderTotal(order),
-  }));
-  const spend = sumWindow(spendItems, now, windowDays);
-  const previousSpend = sumPreviousWindow(spendItems, now, windowDays);
+  const spend = sumWindow(
+    spending.map((order) => ({ at: order.created_at, value: orderTotal(order) })),
+    now,
+    windowDays,
+  );
 
-  const countByStatus = (status: string) =>
-    orders.filter((order) => order.status === status).length;
-
-  const recent: RetailerRecentOrder[] = [...orders]
-    .sort(newestFirst)
-    .slice(0, RETAILER_RECENT_LIMIT)
-    .map((order) => ({
-      id: order.id,
-      createdAt: order.created_at,
-      units: units(order),
-      total: orderTotal(order),
-      status: order.status,
-      paymentStatus: order.payment_status,
-      paymentMethod: order.payment_method,
-      cancelRequested: order.cancel_requested,
-      needsDeliveryConfirmation: needsDeliveryConfirmation(order),
-    }));
-
-  const openTickets = complaints.filter((complaint) => complaint.status === "open").length;
+  const activeOrders = orders.filter(isActive);
+  const reorder = [...orders].filter((order) => order.status === "delivered").sort(newestFirst)[0];
 
   return {
-    nextAction: pickNextAction(orders, cartUnits, now),
+    nextAction: pickNextAction(orders),
     summary: {
       spend,
-      spendDelta: periodDelta(spend, previousSpend, windowDays),
-      activeOrders: orders.filter(isActive).length,
+      activeOrders: activeOrders.length,
       delivered: orders.filter(
         (order) =>
           order.status === "delivered" && isWithinWindow(order.created_at, now, windowDays),
       ).length,
-      cartUnits,
+      cartItems,
       orders: spending.filter((order) => isWithinWindow(order.created_at, now, windowDays)).length,
     },
-    series: dailySeries(spendItems, now, windowDays),
-    stages: [
-      {
-        key: "pending",
-        label: "Awaiting confirmation",
-        count: countByStatus("pending"),
-        severity: "attention",
-      },
-      {
-        key: "confirmed",
-        label: "Confirmed",
-        count: countByStatus("confirmed"),
-        severity: "neutral",
-      },
-      {
-        key: "shipped",
-        label: "On the way",
-        count: countByStatus("shipped"),
-        severity: "attention",
-      },
-      {
-        key: "delivered",
-        label: "Delivered",
-        count: countByStatus("delivered"),
-        severity: "positive",
-      },
-      {
-        key: "cancelled",
-        label: "Cancelled",
-        count: countByStatus("cancelled"),
-        severity: "critical",
-      },
-    ],
-    recent,
-    help: {
-      open: openTickets,
-      resolved: complaints.length - openTickets,
-      total: complaints.length,
-    },
+    shipments: buildShipmentCards(orders, now),
+    reorderOrderId: reorder?.id ?? null,
     windowDays,
-    failures: [...failures],
   };
+}
+
+/**
+ * The active-parcels strip: one card per pending/confirmed/shipped order,
+ * oldest first — the one that lands soonest leads.
+ */
+export function buildShipmentCards(
+  orders: readonly RetailerOrder[],
+  now = Date.now(),
+): RetailerShipmentCard[] {
+  return orders
+    .filter(isActive)
+    .sort((left, right) => Date.parse(left.created_at) - Date.parse(right.created_at))
+    .map((order) => {
+      const shipment = primaryShipment(order);
+      return {
+        orderId: order.id,
+        status: order.status,
+        ageDays: ageInDays(order.created_at, now),
+        packageCount: Math.max(order.packages.length, 1),
+        shipment: shipment
+          ? {
+              carrier: shipment.carrier,
+              trackingNumber: shipment.tracking_number,
+              trackingUrl: shipment.tracking_url,
+              status: shipment.status,
+            }
+          : null,
+      };
+    });
 }
 
 export type RetailerDashboardDeps = {
   loadOverview: typeof loadRetailerOverview;
-  loadTickets: (retailerId: string) => Promise<RetailerComplaint[]>;
 };
 
 const defaultDeps: RetailerDashboardDeps = {
   loadOverview: loadRetailerOverview,
-  loadTickets: loadRetailerComplaints,
 };
 
 /**
- * Loads everything the retailer dashboard aggregates. Returns the *input* rather than
- * the built dashboard so the page keeps the raw orders it needs for payment
+ * Loads everything the cockpit aggregates. Returns the *input* rather than the
+ * built dashboard so the page keeps the raw orders it needs for payment
  * reconciliation and can rebuild locally without another round trip.
- *
- * Orders and cart are required; help tickets are supplemental, so a Help Center
- * failure degrades that one widget instead of the page.
  */
 export async function loadRetailerDashboardInput(
   retailerId: string,
   deps: RetailerDashboardDeps = defaultDeps,
-): Promise<RetailerDashboardInput & { orders: RetailerOrder[] }> {
-  const [overview, tickets] = await Promise.all([
-    deps.loadOverview(retailerId),
-    optionalSection(RETAILER_HELP_SECTION, [] as RetailerComplaint[], () =>
-      deps.loadTickets(retailerId),
-    ),
-  ]);
-
-  return {
-    orders: overview.orders,
-    cartUnits: overview.cartCount,
-    complaints: tickets.value,
-    failures: tickets.failure ? [tickets.failure] : [],
-  };
+): Promise<RetailerDashboardInput> {
+  const overview = await deps.loadOverview(retailerId);
+  return { orders: overview.orders, cartItems: overview.cartCount };
 }

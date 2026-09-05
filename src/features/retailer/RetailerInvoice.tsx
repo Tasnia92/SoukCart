@@ -35,6 +35,7 @@ import { formatDate, formatDateTime, formatPrice } from "../workspace/format.ts"
 import { RouterLink } from "../workspace/WorkspaceShell.tsx";
 import { loadCartCount } from "./retailer-orders-api.ts";
 import {
+  invoiceMerchandiseTotal,
   invoiceTotal,
   loadInvoice,
   type InvoiceOrder,
@@ -108,65 +109,63 @@ export function RetailerInvoice({
   }
 
   return (
-    <div className="print:[&_[data-slot=sidebar]]:hidden print:[&_[data-slot=sidebar-gap]]:hidden print:[&_[data-slot=sidebar-inset]>header]:hidden print:[&_[data-slot=sidebar-inset]]:block print:[&_[data-slot=sidebar-inset]>main]:block print:[&_[data-slot=sidebar-inset]>main]:max-w-none print:[&_[data-slot=sidebar-inset]>main]:p-0">
-      <RetailerWorkspaceShell
-        section="orders"
-        userName={userName}
-        userEmail={state.profile.email}
-        cartCount={cartCount}
-        onLogout={onLogout}
-      >
-        <div className="print:hidden">
-          <PageHeader
-            eyebrow="Invoice"
-            title={`Order ${shortId(orderId)}.`}
-            copy="Download a copy of this invoice for your records."
-            actions={
-              <Button asChild variant="ghost">
-                <RouterLink to="/retailer/orders">
-                  <Package data-icon="inline-start" />
-                  Back to orders
-                </RouterLink>
+    <RetailerWorkspaceShell
+      section="orders"
+      userName={userName}
+      userEmail={state.profile.email}
+      cartCount={cartCount}
+      onLogout={onLogout}
+    >
+      <div className="print:hidden">
+        <PageHeader
+          eyebrow="Invoice"
+          title={`Order ${shortId(orderId)}.`}
+          copy="Download a copy of this invoice for your records."
+          actions={
+            <Button asChild variant="ghost">
+              <RouterLink to="/retailer/orders">
+                <Package data-icon="inline-start" />
+                Back to orders
+              </RouterLink>
+            </Button>
+          }
+        />
+        <InlineNotice />
+      </div>
+      {result ? (
+        result.kind === "not-found" ? (
+          <EmptyState
+            icon={ShoppingBag}
+            title="Invoice not found"
+            copy="This order could not be loaded."
+            action={
+              <Button asChild>
+                <RouterLink to="/retailer/orders">Back to orders</RouterLink>
               </Button>
             }
           />
-          <InlineNotice />
-        </div>
-        {result ? (
-          result.kind === "not-found" ? (
-            <EmptyState
-              icon={ShoppingBag}
-              title="Invoice not found"
-              copy="This order could not be loaded."
-              action={
-                <Button asChild>
-                  <RouterLink to="/retailer/orders">Back to orders</RouterLink>
-                </Button>
-              }
-            />
-          ) : result.kind === "unpaid" ? (
-            <EmptyState
-              icon={Clock}
-              title="Invoice not available yet"
-              copy="The invoice appears once the order has been paid, or cash on delivery has been collected."
-              action={
-                <Button asChild>
-                  <RouterLink to="/retailer/orders">Back to orders</RouterLink>
-                </Button>
-              }
-            />
-          ) : (
-            <InvoiceCard
-              order={result.order}
-              billToName={state.profile.name || "Retailer"}
-              billToEmail={state.profile.email}
-            />
-          )
+        ) : result.kind === "unpaid" ? (
+          <EmptyState
+            icon={Clock}
+            title="Invoice not available yet"
+            copy="The invoice appears once the order has been paid, or cash on delivery has been collected."
+            action={
+              <Button asChild>
+                <RouterLink to="/retailer/orders">Back to orders</RouterLink>
+              </Button>
+            }
+          />
         ) : (
-          <LoadingState title="Loading the invoice…" />
-        )}
-      </RetailerWorkspaceShell>
-    </div>
+          <InvoiceCard
+            order={result.order}
+            billToName={state.profile.name || "Retailer"}
+            billToEmail={state.profile.email}
+          />
+        )
+      ) : (
+        <LoadingState title="Loading the invoice…" />
+      )}
+    </RetailerWorkspaceShell>
   );
 }
 
@@ -179,6 +178,7 @@ function InvoiceCard({
   billToName: string;
   billToEmail: string;
 }) {
+  const subtotal = invoiceMerchandiseTotal(order);
   const total = invoiceTotal(order);
 
   return (
@@ -257,6 +257,10 @@ function InvoiceCard({
         <Separator />
         <dl className="grid grid-cols-[1fr_auto] gap-3 text-sm">
           <dt className="text-muted-foreground">Subtotal</dt>
+          <dd className="text-right tabular-nums">{formatPrice(subtotal)}</dd>
+          <dt className="text-muted-foreground">Delivery</dt>
+          <dd className="text-right tabular-nums">{formatPrice(order.delivery_charge)}</dd>
+          <dt className="font-medium">Total</dt>
           <dd className="text-right text-lg font-semibold tabular-nums">{formatPrice(total)}</dd>
         </dl>
 

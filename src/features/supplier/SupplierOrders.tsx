@@ -1,15 +1,6 @@
 import { useNavigate, useRouterState } from "@tanstack/react-router";
 import { useCallback, useEffect, useMemo, useState } from "react";
-import {
-  Check,
-  CircleCheckBig,
-  Download,
-  Layers,
-  Package,
-  RefreshCw,
-  Search,
-  Truck,
-} from "lucide-react";
+import { Check, Download, Package, RefreshCw, Search } from "lucide-react";
 import {
   AlertDialog,
   AlertDialogAction,
@@ -23,7 +14,7 @@ import {
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { Card, CardContent } from "@/components/ui/card";
 import {
   Dialog,
   DialogContent,
@@ -41,6 +32,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
+import { Spinner } from "@/components/ui/spinner";
 import {
   Table,
   TableBody,
@@ -58,8 +50,6 @@ import {
   LoadingState,
   PageHeader,
   SearchToolbar,
-  StatCard,
-  StatGrid,
   WorkspaceError,
   type NoticeState,
 } from "../../components/ui/Workspace.tsx";
@@ -75,11 +65,12 @@ import {
 } from "../orders/order-presentation.tsx";
 import { formatDate, formatPrice, formatUpdatedAt, initials } from "../workspace/format.ts";
 import { searchParam } from "../workspace/search.ts";
-import { RouterLink } from "../workspace/WorkspaceShell.tsx";
 import { SupplierWorkspaceShell } from "./supplier-shared.tsx";
 import {
   canConfirmOrder,
+  canDeclineOrderItems,
   canSupplierCancel,
+  declineSupplierItems,
   filterSupplierOrders,
   loadSupplierOrders,
   requestSupplierCancellation,
@@ -96,11 +87,8 @@ type Notice = { message: string; state: NoticeState } | null;
 type OrderFilter =
   | "action"
   | "awaiting-payment"
-  | "to-confirm"
-  | "to-ship"
-  | "in-transit"
+  | "in-progress"
   | "delivered"
-  | "cancellation-requested"
   | "cancelled"
   | "all";
 type OrderSort = "oldest" | "newest" | "value" | "city";
@@ -109,24 +97,30 @@ type FulfillAction = "confirmed";
 const ORDER_FILTERS = new Set<OrderFilter>([
   "action",
   "awaiting-payment",
-  "to-confirm",
-  "to-ship",
-  "in-transit",
+  "in-progress",
   "delivered",
-  "cancellation-requested",
   "cancelled",
   "all",
 ]);
+
+/** Legacy filter values still used by deep links; canonicalize onto the six tabs. */
+const FILTER_ALIASES: Record<string, OrderFilter> = {
+  "to-confirm": "action",
+  "cancellation-requested": "action",
+  "to-ship": "in-progress",
+  "in-transit": "in-progress",
+};
 
 const ORDERS_LIVE_TABLES = ["orders"] as const;
 
 function parseOrderFilter(value: string | null): OrderFilter {
   if (value && ORDER_FILTERS.has(value as OrderFilter)) return value as OrderFilter;
+  if (value && value in FILTER_ALIASES) return FILTER_ALIASES[value];
   return "action";
 }
 
 function needsAction(order: SupplierOrder): boolean {
-  return canConfirmOrder(order) || order.cancel_requested;
+  return canConfirmOrder(order) || canDeclineOrderItems(order) || order.cancel_requested;
 }
 
 function isAwaitingPayment(order: SupplierOrder): boolean {
@@ -139,24 +133,30 @@ function canOpenReturn(order: SupplierOrder): boolean {
   return order.status === "delivered" && !order.cancel_requested;
 }
 
+/** Confirmed and waiting for admin to ship, or already on the way. */
+function isInProgress(order: SupplierOrder): boolean {
+  if (order.cancel_requested) return false;
+  if (order.status === "cancelled" || order.status === "delivered") return false;
+  return order.package_status === "confirmed" || order.status === "shipped";
+}
+
 function matchesFilter(order: SupplierOrder, filter: OrderFilter): boolean {
   if (filter === "all") return true;
   if (filter === "action") return needsAction(order);
   if (filter === "awaiting-payment") return isAwaitingPayment(order);
-  if (filter === "to-confirm") return canConfirmOrder(order);
-  if (filter === "to-ship") return order.status === "confirmed" && !order.cancel_requested;
-  if (filter === "in-transit") return order.status === "shipped" && !order.cancel_requested;
+  if (filter === "in-progress") return isInProgress(order);
   if (filter === "delivered") return order.status === "delivered";
-  if (filter === "cancellation-requested") {
-    return order.cancel_requested && order.status !== "cancelled";
-  }
   return order.status === "cancelled";
+}
+
+/** Hours elapsed since created_at, floored at zero to absorb clock skew. */
+function waitingHours(createdAt: string, now = Date.now()): number {
+  return Math.floor(Math.max(0, now - new Date(createdAt).getTime()) / 3_600_000);
 }
 
 /** Relative wait label from created_at: hours under 48h, otherwise days. */
 function formatWaitingLabel(createdAt: string, now = Date.now()): string {
-  const elapsedMs = Math.max(0, now - new Date(createdAt).getTime());
-  const hours = Math.floor(elapsedMs / 3_600_000);
+  const hours = waitingHours(createdAt, now);
   if (hours < 48) {
     if (hours < 1) return "Waiting under an hour";
     if (hours === 1) return "Waiting 1 hour";
@@ -212,29 +212,22 @@ function exportOrdersCsv(orders: readonly SupplierOrder[]): void {
   URL.revokeObjectURL(url);
 }
 
-function fulfillCopy(): {
-  title: string;
-  body: string;
-  confirm: string;
-} {
-  return {
-    title: "Confirm order",
-    body: "Confirm that you can fulfill this order. Admin will update delivery status after that.",
-    confirm: "Confirm order",
-  };
-}
-
 function OrderActions({
   order,
   disabled,
+  hidePrimary = false,
   onFulfill,
   onCancel,
+  onDecline,
   onReturn,
 }: {
   order: SupplierOrder;
   disabled: boolean;
+  /** Desktop rows render primary actions inline; the expanded detail then shows the rest. */
+  hidePrimary?: boolean;
   onFulfill: (order: SupplierOrder, action: FulfillAction) => void;
   onCancel: (order: SupplierOrder) => void;
+  onDecline: (order: SupplierOrder) => void;
   onReturn: (order: SupplierOrder) => void;
 }) {
   if (order.status === "cancelled") {
@@ -275,7 +268,7 @@ function OrderActions({
           Delivery verified · supplier cancellation is closed
         </p>
       ) : null}
-      {canConfirmOrder(order) ? (
+      {!hidePrimary && canConfirmOrder(order) ? (
         <Button
           size="sm"
           type="button"
@@ -302,6 +295,23 @@ function OrderActions({
           Waiting for online payment before fulfillment
         </p>
       ) : null}
+      {!hidePrimary && canDeclineOrderItems(order) ? (
+        <Button
+          variant="outline"
+          size="sm"
+          type="button"
+          disabled={disabled}
+          onClick={() => onDecline(order)}
+        >
+          Decline these items
+        </Button>
+      ) : null}
+      {order.package_status === "declined" ? (
+        <p className="text-sm text-muted-foreground">
+          You declined these items
+          {order.decline_reason ? ` · ${order.decline_reason}` : ""}
+        </p>
+      ) : null}
       {canSupplierCancel(order) ? (
         <Button
           variant="outline"
@@ -312,10 +322,47 @@ function OrderActions({
         >
           Request cancellation
         </Button>
-      ) : !order.supplier_can_cancel ? (
-        <p className="text-sm text-muted-foreground">
-          Multi-supplier order · contact admin to resolve your fulfillment
-        </p>
+      ) : null}
+    </div>
+  );
+}
+
+/** Primary actions shown inline on desktop summary rows — one click to act on the queue. */
+function OrderRowActions({
+  order,
+  disabled,
+  onFulfill,
+  onDecline,
+}: {
+  order: SupplierOrder;
+  disabled: boolean;
+  onFulfill: (order: SupplierOrder, action: FulfillAction) => void;
+  onDecline: (order: SupplierOrder) => void;
+}) {
+  if (!canConfirmOrder(order) && !canDeclineOrderItems(order)) return null;
+  return (
+    <div className="flex flex-wrap items-center gap-2">
+      {canConfirmOrder(order) ? (
+        <Button
+          size="sm"
+          type="button"
+          disabled={disabled}
+          onClick={() => onFulfill(order, "confirmed")}
+        >
+          <Check data-icon="inline-start" />
+          Confirm order
+        </Button>
+      ) : null}
+      {canDeclineOrderItems(order) ? (
+        <Button
+          size="sm"
+          variant="outline"
+          type="button"
+          disabled={disabled}
+          onClick={() => onDecline(order)}
+        >
+          Decline items
+        </Button>
       ) : null}
     </div>
   );
@@ -327,6 +374,7 @@ function OrderMobileCard({
   busy,
   onFulfill,
   onCancel,
+  onDecline,
   onReturn,
 }: {
   order: SupplierOrder;
@@ -334,6 +382,7 @@ function OrderMobileCard({
   busy: boolean;
   onFulfill: (order: SupplierOrder, action: FulfillAction) => void;
   onCancel: (order: SupplierOrder) => void;
+  onDecline: (order: SupplierOrder) => void;
   onReturn: (order: SupplierOrder) => void;
 }) {
   return (
@@ -363,6 +412,7 @@ function OrderMobileCard({
         disabled={busy}
         onFulfill={onFulfill}
         onCancel={onCancel}
+        onDecline={onDecline}
         onReturn={onReturn}
       />
     </div>
@@ -393,6 +443,9 @@ export function SupplierOrders({ loadOrders = loadSupplierOrders }: SupplierOrde
   const [cancelTarget, setCancelTarget] = useState<SupplierOrder | null>(null);
   const [cancelReason, setCancelReason] = useState("");
   const [cancelInvalid, setCancelInvalid] = useState(false);
+  const [declineTarget, setDeclineTarget] = useState<SupplierOrder | null>(null);
+  const [declineReason, setDeclineReason] = useState("");
+  const [declineInvalid, setDeclineInvalid] = useState(false);
   const [returnTarget, setReturnTarget] = useState<SupplierOrder | null>(null);
   const [returnReason, setReturnReason] = useState("");
   const [returnInvalid, setReturnInvalid] = useState(false);
@@ -444,15 +497,8 @@ export function SupplierOrders({ loadOrders = loadSupplierOrders }: SupplierOrde
       all: list.length,
       action: list.filter(needsAction).length,
       awaitingPayment: list.filter(isAwaitingPayment).length,
-      toConfirm: list.filter(canConfirmOrder).length,
-      toShip: list.filter((order) => order.status === "confirmed" && !order.cancel_requested)
-        .length,
-      inTransit: list.filter((order) => order.status === "shipped" && !order.cancel_requested)
-        .length,
+      inProgress: list.filter(isInProgress).length,
       delivered: list.filter((order) => order.status === "delivered").length,
-      cancellationRequested: list.filter(
-        (order) => order.cancel_requested && order.status !== "cancelled",
-      ).length,
       cancelled: list.filter((order) => order.status === "cancelled").length,
     };
   }, [orders]);
@@ -494,6 +540,11 @@ export function SupplierOrders({ loadOrders = loadSupplierOrders }: SupplierOrde
     setCancelInvalid(false);
     setCancelTarget(order);
   };
+  const openDecline = (order: SupplierOrder) => {
+    setDeclineReason("");
+    setDeclineInvalid(false);
+    setDeclineTarget(order);
+  };
   const openReturn = (order: SupplierOrder) => {
     setReturnReason("");
     setReturnInvalid(false);
@@ -532,6 +583,38 @@ export function SupplierOrders({ loadOrders = loadSupplierOrders }: SupplierOrde
             fulfillError instanceof Error
               ? fulfillError.message
               : "The order could not be updated.",
+          state: "error",
+        });
+      })
+      .finally(() => setBusyId(null));
+  };
+
+  const confirmDecline = () => {
+    const order = declineTarget;
+    if (!order) return;
+    if (!declineReason.trim()) {
+      setDeclineInvalid(true);
+      return;
+    }
+    const reason = declineReason.trim();
+    setDeclineTarget(null);
+    setDeclineReason("");
+    setDeclineInvalid(false);
+    setBusyId(order.id);
+    void declineSupplierItems(order.id, reason)
+      .then(() => {
+        setNotice({
+          message: `You declined your items on order #${shortId(order.id)}. The retailer was notified.`,
+          state: "info",
+        });
+        retry();
+      })
+      .catch((declineError: unknown) => {
+        setNotice({
+          message:
+            declineError instanceof Error
+              ? declineError.message
+              : "These items could not be declined.",
           state: "error",
         });
       })
@@ -618,12 +701,19 @@ export function SupplierOrders({ loadOrders = loadSupplierOrders }: SupplierOrde
           <>
             {updatedAt ? (
               <span className="text-sm text-muted-foreground" aria-live="polite">
-                {refreshing ? "Refreshing" : formatUpdatedAt(updatedAt, nowTick)}
+                {refreshing ? "Refreshing…" : formatUpdatedAt(updatedAt, nowTick)}
               </span>
             ) : null}
-            <Button type="button" variant="ghost" disabled={refreshing} onClick={retry}>
-              <RefreshCw data-icon="inline-start" />
-              {refreshing ? "Refreshing" : "Refresh"}
+            <Button
+              type="button"
+              variant="ghost"
+              size="icon"
+              aria-label="Refresh"
+              title="Refresh"
+              disabled={refreshing}
+              onClick={retry}
+            >
+              {refreshing ? <Spinner /> : <RefreshCw aria-hidden="true" />}
             </Button>
             <Button
               type="button"
@@ -634,61 +724,13 @@ export function SupplierOrders({ loadOrders = loadSupplierOrders }: SupplierOrde
               <Download data-icon="inline-start" />
               Export CSV
             </Button>
-            <Button asChild variant="outline">
-              <RouterLink to="/supplier/stock">
-                <Layers data-icon="inline-start" />
-                Inventory
-              </RouterLink>
-            </Button>
           </>
         }
       />
       <InlineNotice message={notice?.message} state={notice?.state} />
-      {orders?.length ? (
-        <StatGrid label="Order fulfillment summary">
-          <StatCard
-            label="Needs action"
-            value={counts.action}
-            detail="Confirm or review cancellations"
-          />
-          <StatCard
-            label="To confirm"
-            value={counts.toConfirm}
-            detail={
-              <span className="inline-flex items-center gap-1">
-                <Check aria-hidden="true" /> Ready to accept
-              </span>
-            }
-          />
-          <StatCard
-            label="Waiting on delivery"
-            value={counts.toShip}
-            detail={
-              <span className="inline-flex items-center gap-1">
-                <Truck aria-hidden="true" /> Confirmed, admin will ship
-              </span>
-            }
-          />
-          <StatCard
-            label="Delivered"
-            value={counts.delivered}
-            detail={
-              <span className="inline-flex items-center gap-1">
-                <CircleCheckBig aria-hidden="true" /> Completed fulfillment
-              </span>
-            }
-          />
-        </StatGrid>
-      ) : null}
       {orders ? (
         orders.length ? (
           <Card>
-            <CardHeader>
-              <CardTitle>Fulfillment queue</CardTitle>
-              <CardDescription>
-                Needs action is selected first so urgent seller work stays visible.
-              </CardDescription>
-            </CardHeader>
             <CardContent className="flex flex-col gap-4">
               <div className="overflow-x-auto">
                 <Tabs value={filter} onValueChange={(value) => setFilter(parseOrderFilter(value))}>
@@ -697,13 +739,8 @@ export function SupplierOrders({ loadOrders = loadSupplierOrders }: SupplierOrde
                     <TabsTrigger value="awaiting-payment">
                       Awaiting payment ({counts.awaitingPayment})
                     </TabsTrigger>
-                    <TabsTrigger value="to-confirm">To confirm ({counts.toConfirm})</TabsTrigger>
-                    <TabsTrigger value="to-ship">Waiting on delivery ({counts.toShip})</TabsTrigger>
-                    <TabsTrigger value="in-transit">In transit ({counts.inTransit})</TabsTrigger>
+                    <TabsTrigger value="in-progress">In progress ({counts.inProgress})</TabsTrigger>
                     <TabsTrigger value="delivered">Delivered ({counts.delivered})</TabsTrigger>
-                    <TabsTrigger value="cancellation-requested">
-                      Cancel requested ({counts.cancellationRequested})
-                    </TabsTrigger>
                     <TabsTrigger value="cancelled">Cancelled ({counts.cancelled})</TabsTrigger>
                     <TabsTrigger value="all">All ({counts.all})</TabsTrigger>
                   </TabsList>
@@ -745,6 +782,7 @@ export function SupplierOrders({ loadOrders = loadSupplierOrders }: SupplierOrde
                         busy={busyId === order.id}
                         onFulfill={openFulfill}
                         onCancel={openCancel}
+                        onDecline={openDecline}
                         onReturn={openReturn}
                       />
                     ))}
@@ -755,131 +793,154 @@ export function SupplierOrders({ loadOrders = loadSupplierOrders }: SupplierOrde
                       <TableRow>
                         <TableHead>Order</TableHead>
                         <TableHead>Placed</TableHead>
-                        <TableHead>Waiting</TableHead>
                         <TableHead>Retailer</TableHead>
                         <TableHead>Units</TableHead>
                         <TableHead>Total</TableHead>
                         <TableHead>Payment</TableHead>
                         <TableHead>Status</TableHead>
+                        <TableHead>Actions</TableHead>
                         <TableHead>
                           <span className="sr-only">Order lines</span>
                         </TableHead>
                       </TableRow>
                     </TableHeader>
                     <TableBody>
-                      {filtered.map((order) => (
-                        <OrderRow
-                          key={order.id}
-                          colSpan={9}
-                          toggleLabel={`Toggle lines for order #${shortId(order.id)}`}
-                          summaryCells={
-                            <>
-                              <TableCell>
-                                <span className="font-medium">#{shortId(order.id)}</span>
-                              </TableCell>
-                              <TableCell>{formatDate(order.created_at)}</TableCell>
-                              <TableCell>
-                                <span className="text-sm text-muted-foreground">
-                                  {formatWaitingLabel(order.created_at, nowTick)}
-                                </span>
-                              </TableCell>
-                              <TableCell>
-                                <div className="flex items-center gap-2">
-                                  <Avatar size="sm">
-                                    <AvatarFallback>{initials(order.retailer_name)}</AvatarFallback>
-                                  </Avatar>
-                                  <span className="flex min-w-0 flex-col">
-                                    <span className="truncate font-medium">
-                                      {order.retailer_name}
-                                    </span>
-                                    <span className="truncate text-xs text-muted-foreground">
-                                      {order.retailer_email}
-                                    </span>
-                                  </span>
-                                </div>
-                              </TableCell>
-                              <TableCell>
-                                {order.items.reduce((sum, item) => sum + item.quantity, 0)}
-                              </TableCell>
-                              <TableCell>
-                                <span className="font-medium">
-                                  {formatPrice(order.supplier_total)}
-                                </span>
-                              </TableCell>
-                              <TableCell>
-                                <PaymentBadge
-                                  paymentStatus={order.payment_status}
-                                  paymentMethod={order.payment_method}
-                                />
-                              </TableCell>
-                              <TableCell>
-                                <div className="flex flex-wrap items-center gap-1">
-                                  <StatusBadge status={order.status} />
-                                  {order.cancel_requested ? (
-                                    <Badge variant="destructive">
-                                      Cancel requested by {order.cancellation_initiator}
-                                    </Badge>
-                                  ) : null}
-                                </div>
-                              </TableCell>
-                            </>
-                          }
-                          detail={
-                            <div className="flex flex-col gap-4">
-                              <div className="flex flex-col gap-2">
-                                {order.items.map((item) => (
-                                  <div
-                                    className="flex items-center justify-between gap-4 text-sm"
-                                    key={item.id}
-                                  >
-                                    <span className="font-medium">{item.product_name}</span>
-                                    <span className="text-muted-foreground">
-                                      {item.quantity} × {formatPrice(item.unit_price)}
-                                    </span>
-                                    <span className="font-medium">
-                                      {formatPrice(item.line_total)}
+                      {filtered.map((order) => {
+                        const waiting = formatWaitingLabel(order.created_at, nowTick);
+                        const urgent =
+                          needsAction(order) && waitingHours(order.created_at, nowTick) >= 48;
+                        return (
+                          <OrderRow
+                            key={order.id}
+                            colSpan={9}
+                            toggleLabel={`Toggle lines for order #${shortId(order.id)}`}
+                            summaryCells={
+                              <>
+                                <TableCell>
+                                  <span className="font-medium">#{shortId(order.id)}</span>
+                                </TableCell>
+                                <TableCell>
+                                  <div className="flex flex-col">
+                                    {urgent ? <strong>{waiting}</strong> : <span>{waiting}</span>}
+                                    <span className="text-xs text-muted-foreground">
+                                      {formatDate(order.created_at)}
                                     </span>
                                   </div>
-                                ))}
+                                </TableCell>
+                                <TableCell>
+                                  <div className="flex items-center gap-2">
+                                    <Avatar size="sm">
+                                      <AvatarFallback>
+                                        {initials(order.retailer_name)}
+                                      </AvatarFallback>
+                                    </Avatar>
+                                    <span className="flex min-w-0 flex-col">
+                                      <span className="truncate font-medium">
+                                        {order.retailer_name}
+                                      </span>
+                                      <span className="truncate text-xs text-muted-foreground">
+                                        {order.retailer_email}
+                                      </span>
+                                    </span>
+                                  </div>
+                                </TableCell>
+                                <TableCell>
+                                  {order.items.reduce((sum, item) => sum + item.quantity, 0)}
+                                </TableCell>
+                                <TableCell>
+                                  <span className="font-medium">
+                                    {formatPrice(order.supplier_total)}
+                                  </span>
+                                </TableCell>
+                                <TableCell>
+                                  <PaymentBadge
+                                    paymentStatus={order.payment_status}
+                                    paymentMethod={order.payment_method}
+                                  />
+                                </TableCell>
+                                <TableCell>
+                                  <div className="flex flex-wrap items-center gap-1">
+                                    <StatusBadge status={order.status} />
+                                    {order.cancel_requested ? (
+                                      <Badge variant="destructive">
+                                        Cancel requested by {order.cancellation_initiator}
+                                      </Badge>
+                                    ) : null}
+                                  </div>
+                                </TableCell>
+                                <TableCell>
+                                  <OrderRowActions
+                                    order={order}
+                                    disabled={busyId === order.id}
+                                    onFulfill={openFulfill}
+                                    onDecline={openDecline}
+                                  />
+                                </TableCell>
+                              </>
+                            }
+                            detail={
+                              <div className="flex flex-col gap-4">
+                                <div className="flex flex-col gap-2">
+                                  {order.items.map((item) => (
+                                    <div
+                                      className="flex items-center justify-between gap-4 text-sm"
+                                      key={item.id}
+                                    >
+                                      <span className="font-medium">{item.product_name}</span>
+                                      <span className="text-muted-foreground">
+                                        {item.quantity} × {formatPrice(item.unit_price)}
+                                      </span>
+                                      <span className="font-medium">
+                                        {formatPrice(item.line_total)}
+                                      </span>
+                                    </div>
+                                  ))}
+                                </div>
+                                <DeliveryDetails
+                                  phone={order.delivery_phone}
+                                  address={order.delivery_address}
+                                  city={order.delivery_city}
+                                  postcode={order.delivery_postcode}
+                                />
+                                {order.notes ? (
+                                  <p className="text-sm">
+                                    <span className="font-medium">Notes: </span>
+                                    {order.notes}
+                                  </p>
+                                ) : null}
+                                {order.cancellation_reason ? (
+                                  <p className="text-sm">
+                                    <span className="font-medium">Cancellation reason: </span>
+                                    {order.cancellation_reason}
+                                  </p>
+                                ) : null}
+                                <DeliveryStatusCard status={order.status} audience="supplier" />
+                                <OrderActions
+                                  order={order}
+                                  disabled={busyId === order.id}
+                                  hidePrimary
+                                  onFulfill={openFulfill}
+                                  onCancel={openCancel}
+                                  onDecline={openDecline}
+                                  onReturn={openReturn}
+                                />
                               </div>
-                              <DeliveryDetails
-                                phone={order.delivery_phone}
-                                address={order.delivery_address}
-                                city={order.delivery_city}
-                                postcode={order.delivery_postcode}
-                              />
-                              {order.notes ? (
-                                <p className="text-sm">
-                                  <span className="font-medium">Notes: </span>
-                                  {order.notes}
-                                </p>
-                              ) : null}
-                              {order.cancellation_reason ? (
-                                <p className="text-sm">
-                                  <span className="font-medium">Cancellation reason: </span>
-                                  {order.cancellation_reason}
-                                </p>
-                              ) : null}
-                              <DeliveryStatusCard status={order.status} audience="supplier" />
-                              <OrderActions
-                                order={order}
-                                disabled={busyId === order.id}
-                                onFulfill={openFulfill}
-                                onCancel={openCancel}
-                                onReturn={openReturn}
-                              />
-                            </div>
-                          }
-                        />
-                      ))}
+                            }
+                          />
+                        );
+                      })}
                     </TableBody>
                   </Table>
                 )
               ) : (
                 <EmptyState
                   icon={Search}
-                  title="No matching orders"
-                  copy="Try a different order number, retailer, or product."
+                  title={searchTerm ? "No matching orders" : "Nothing waiting here"}
+                  copy={
+                    searchTerm
+                      ? "Try a different order number, retailer, or product."
+                      : "Orders appear in this view as their status changes."
+                  }
                 />
               )}
             </CardContent>
@@ -904,16 +965,16 @@ export function SupplierOrders({ loadOrders = loadSupplierOrders }: SupplierOrde
         <AlertDialogContent>
           <AlertDialogHeader>
             <AlertDialogTitle>
-              {fulfillTarget ? `${fulfillCopy().title} #${shortId(fulfillTarget.order.id)}?` : ""}
+              {fulfillTarget ? `Confirm order #${shortId(fulfillTarget.order.id)}?` : ""}
             </AlertDialogTitle>
             <AlertDialogDescription>
-              {fulfillTarget ? fulfillCopy().body : null}
+              Confirm that you can fulfill this order. Admin will update delivery status after that.
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
             <AlertDialogCancel type="button">Cancel</AlertDialogCancel>
             <AlertDialogAction type="button" onClick={confirmFulfill}>
-              {fulfillTarget ? fulfillCopy().confirm : "Confirm"}
+              Confirm order
             </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>
@@ -963,7 +1024,7 @@ export function SupplierOrders({ loadOrders = loadSupplierOrders }: SupplierOrde
                 setReturnInvalid(false);
               }}
             >
-              Back
+              Cancel
             </Button>
             <Button type="button" onClick={confirmReturn}>
               Open return
@@ -1017,10 +1078,64 @@ export function SupplierOrders({ loadOrders = loadSupplierOrders }: SupplierOrde
                 setCancelInvalid(false);
               }}
             >
-              Back
+              Cancel
             </Button>
             <Button type="button" onClick={confirmCancel}>
               Submit request
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      <Dialog
+        open={declineTarget !== null}
+        onOpenChange={(open) => {
+          if (!open) {
+            setDeclineTarget(null);
+            setDeclineReason("");
+            setDeclineInvalid(false);
+          }
+        }}
+      >
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>
+              Decline items{declineTarget ? ` on #${shortId(declineTarget.id)}` : ""}
+            </DialogTitle>
+            <DialogDescription>
+              The retailer is notified immediately. Other suppliers on this order are not affected.
+              Prepaid merchandise for these items can be refunded.
+            </DialogDescription>
+          </DialogHeader>
+          <FieldGroup>
+            <Field data-invalid={declineInvalid || undefined}>
+              <FieldLabel htmlFor="decline-reason">Reason</FieldLabel>
+              <Textarea
+                id="decline-reason"
+                value={declineReason}
+                aria-invalid={declineInvalid || undefined}
+                onChange={(event) => {
+                  setDeclineReason(event.target.value);
+                  if (event.target.value.trim()) setDeclineInvalid(false);
+                }}
+                placeholder="Why can you not fulfill these items?"
+              />
+            </Field>
+          </FieldGroup>
+          <DialogFooter>
+            <Button
+              variant="outline"
+              type="button"
+              onClick={() => {
+                setDeclineTarget(null);
+                setDeclineReason("");
+                setDeclineInvalid(false);
+              }}
+            >
+              Cancel
+            </Button>
+            <Button type="button" onClick={confirmDecline}>
+              Decline items
             </Button>
           </DialogFooter>
         </DialogContent>

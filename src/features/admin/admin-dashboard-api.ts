@@ -9,14 +9,7 @@
  * supplemental panels (disputes, verifications) instead of failing the page.
  * -------------------------------------------------------------------------- */
 
-import {
-  Clock3,
-  MessageSquare,
-  Package,
-  RefreshCw,
-  ShieldCheck,
-  type LucideIcon,
-} from "lucide-react";
+import { Clock3, MessageSquare, RefreshCw, ShieldCheck, type LucideIcon } from "lucide-react";
 import {
   DEFAULT_WINDOW_DAYS,
   ageInDays,
@@ -49,18 +42,12 @@ const HOUR_MS = 3_600_000;
 
 export type AdminSlaBucket = "overdue" | "due_today" | "due_soon";
 
-export type AdminQueueKind =
-  | "refund"
-  | "cancellation"
-  | "confirmation"
-  | "dispute"
-  | "verification";
+export type AdminQueueKind = "refund" | "cancellation" | "dispute" | "verification";
 
 /** Target hours before an item is overdue, by queue kind. */
 export const ADMIN_SLA_HOURS: Record<AdminQueueKind, number> = {
   refund: 24,
   cancellation: 24,
-  confirmation: 24,
   dispute: 48,
   verification: 48,
 };
@@ -100,7 +87,6 @@ export type AdminSlaSummary = {
   refundAmount: number;
   cancellationCount: number;
   cancellationAmount: number;
-  confirmationCount: number;
   disputeCount: number;
   verificationCount: number;
 };
@@ -268,28 +254,6 @@ function cancellationQueueItem(order: ActivityOrder, now: number): AdminQueueIte
   };
 }
 
-function confirmationQueueItem(order: ActivityOrder, now: number): AdminQueueItem {
-  return {
-    id: `confirmation-${order.id}`,
-    kind: "confirmation",
-    recordId: order.id,
-    icon: Package,
-    title: `Order #${shortId(order.id)} awaiting confirmation`,
-    detail: `${order.retailer_name} · ${formatPrice(order.total)}`,
-    severity: "attention",
-    marker: ageMarker(order.created_at, now),
-    sla: slaBucketFor(order.created_at, "confirmation", now),
-    at: order.created_at,
-    amount: order.total,
-    to: "/admin/activity",
-    search: { order: order.id },
-    hash: `order-${order.id}`,
-    actionLabel: "Confirm",
-    batchable: true,
-    order,
-  };
-}
-
 function disputeQueueItem(complaint: AdminComplaint, now: number): AdminQueueItem {
   return {
     id: `dispute-${complaint.id}`,
@@ -344,9 +308,8 @@ function verificationQueueItem(
 const QUEUE_RANK: Record<AdminQueueKind, number> = {
   refund: 0,
   cancellation: 1,
-  confirmation: 2,
-  dispute: 3,
-  verification: 4,
+  dispute: 2,
+  verification: 3,
 };
 
 const SLA_RANK: Record<AdminSlaBucket, number> = {
@@ -364,7 +327,6 @@ function summarizeSla(queue: readonly AdminQueueItem[]): AdminSlaSummary {
     refundAmount: 0,
     cancellationCount: 0,
     cancellationAmount: 0,
-    confirmationCount: 0,
     disputeCount: 0,
     verificationCount: 0,
   };
@@ -380,8 +342,7 @@ function summarizeSla(queue: readonly AdminQueueItem[]): AdminSlaSummary {
     } else if (item.kind === "cancellation") {
       sla.cancellationCount += 1;
       sla.cancellationAmount += item.amount ?? 0;
-    } else if (item.kind === "confirmation") sla.confirmationCount += 1;
-    else if (item.kind === "dispute") sla.disputeCount += 1;
+    } else if (item.kind === "dispute") sla.disputeCount += 1;
     else sla.verificationCount += 1;
   }
 
@@ -419,7 +380,6 @@ export function buildAdminDashboard(
   );
 
   const awaitingAction = new Set<string>([
-    ...pendingOrders.map((order) => order.id),
     ...cancellations.map((order) => order.id),
     ...refunds.map((order) => order.id),
   ]);
@@ -427,7 +387,6 @@ export function buildAdminDashboard(
   const queue = [
     ...refunds.map((order) => refundQueueItem(order, now)),
     ...cancellations.map((order) => cancellationQueueItem(order, now)),
-    ...pendingOrders.map((order) => confirmationQueueItem(order, now)),
     ...openDisputes.map((complaint) => disputeQueueItem(complaint, now)),
     ...pendingVerifications.map((verification) => verificationQueueItem(verification, now)),
   ].sort(

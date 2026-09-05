@@ -296,7 +296,7 @@ export function RetailerNotifications({
                 copy="Order and delivery alerts will show up here as you place orders."
                 action={
                   <Button asChild>
-                    <RouterLink to="/retailer/catalog">Browse catalog</RouterLink>
+                    <RouterLink to="/retailer">Browse catalog</RouterLink>
                   </Button>
                 }
               />

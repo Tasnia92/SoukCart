@@ -50,7 +50,10 @@ function notificationIcon(type: string): LucideIcon {
     case "cod_collected":
       return Wallet;
     case "order_confirmed":
+    case "order_needs_confirmation":
       return CircleCheckBig;
+    case "supplier_items_cancelled":
+      return CircleX;
     case "order_shipped":
       return Truck;
     case "order_delivered":

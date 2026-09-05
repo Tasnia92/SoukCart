@@ -32,7 +32,6 @@ const KIND_VALUES = new Set<QueueKindFilter>([
   "all",
   "refund",
   "cancellation",
-  "confirmation",
   "dispute",
   "verification",
 ]);
@@ -147,7 +146,7 @@ export function AdminInbox({ loadDashboard = loadAdminDashboard }: AdminInboxPro
       <PageHeader
         eyebrow="Needs attention"
         title="Work waiting on you."
-        copy="Overdue items are listed first. Confirm orders, finish refunds, resolve disputes, and open verifications from here."
+        copy="Overdue items are listed first. Finish refunds, resolve disputes, and open verifications from here."
         actions={
           <Button type="button" variant="ghost" disabled={loading} onClick={retry}>
             {loading ? (
