@@ -260,6 +260,7 @@ export function RetailerOrders({
           search={query}
           onSearchChange={setQuery}
           showCustomer={false}
+          showColumns={false}
           activeFilterCount={needsActionOnly ? 1 : 0}
           extraFilters={
             <Field orientation="horizontal">
