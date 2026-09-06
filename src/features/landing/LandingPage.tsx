@@ -263,7 +263,7 @@ function JoinBand() {
       <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
         <div className="relative overflow-hidden rounded-2xl bg-[#FAF3EE]">
           <img
-            src="/banner.png"
+            src="/banner.jpg"
             alt=""
             aria-hidden="true"
             className="absolute inset-y-0 right-0 h-full w-auto max-w-none"
