@@ -294,6 +294,10 @@ export class SessionStore {
     this.clearAdminError();
     const result = await this.gateway.signOut();
     await this.refresh(null);
+    // Every signed-out user lands on the public home screen. Imported lazily so
+    // session.tsx keeps no static dependency on router.tsx (which imports it).
+    const { router } = await import("./router.tsx");
+    void router.navigate({ to: "/" });
     return result;
   }
 
