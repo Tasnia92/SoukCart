@@ -1,5 +1,5 @@
 import type { ReactNode } from "react";
-import { Area, CartesianGrid, ComposedChart, Line, XAxis } from "recharts";
+import { Area, Bar, CartesianGrid, ComposedChart, Line, XAxis } from "recharts";
 import {
   ChartContainer,
   ChartLegend,
@@ -9,15 +9,6 @@ import {
   type ChartConfig,
 } from "@/components/ui/chart";
 import { Progress } from "@/components/ui/progress";
-import {
-  Table,
-  TableBody,
-  TableCaption,
-  TableCell,
-  TableHead,
-  TableHeader,
-  TableRow,
-} from "@/components/ui/table";
 import { Activity, Layers } from "lucide-react";
 import { barShare } from "./dashboard-model.ts";
 import { DashboardCard, SectionEmpty } from "./Dashboard.tsx";
@@ -27,7 +18,7 @@ export type TrendSeries = {
   label: string;
   values: readonly number[];
   format: (value: number) => string;
-  kind?: "area" | "line";
+  kind?: "area" | "line" | "bar";
 };
 
 function peakOf(series: TrendSeries, labels: readonly string[]): { label: string; value: number } {
@@ -71,6 +62,7 @@ export function TrendChartCard({
       { label: entry.label, color: `var(--chart-${(index % 5) + 1})` },
     ]),
   );
+  const barOnly = series.every((entry) => entry.kind === "bar");
 
   return (
     <DashboardCard eyebrow={eyebrow} title={title} meta={rangeLabel} action={action}>
@@ -97,10 +89,20 @@ export function TrendChartCard({
                 tickMargin={10}
                 minTickGap={24}
               />
-              <ChartTooltip content={<ChartTooltipContent indicator="line" />} />
+              <ChartTooltip
+                content={<ChartTooltipContent indicator={barOnly ? "dot" : "line"} />}
+              />
               <ChartLegend content={<ChartLegendContent />} />
               {series.map((entry) =>
-                entry.kind === "line" ? (
+                entry.kind === "bar" ? (
+                  <Bar
+                    key={entry.key}
+                    dataKey={entry.key}
+                    fill={`var(--color-${entry.key})`}
+                    radius={[4, 4, 0, 0]}
+                    maxBarSize={40}
+                  />
+                ) : entry.kind === "line" ? (
                   <Line
                     key={entry.key}
                     dataKey={entry.key}
@@ -126,38 +128,6 @@ export function TrendChartCard({
           <figcaption className="db-chart-summary text-sm text-muted-foreground">
             {summary}
           </figcaption>
-          <details className="rounded-xl border p-3">
-            <summary className="cursor-pointer text-sm font-medium">
-              View the {labels.length}-day figures
-            </summary>
-            <div className="mt-3 overflow-x-auto">
-              <Table>
-                <TableCaption className="sr-only">{rangeLabel}</TableCaption>
-                <TableHeader>
-                  <TableRow>
-                    <TableHead scope="col">Day</TableHead>
-                    {series.map((entry) => (
-                      <TableHead className="text-right" key={entry.key} scope="col">
-                        {entry.label}
-                      </TableHead>
-                    ))}
-                  </TableRow>
-                </TableHeader>
-                <TableBody>
-                  {labels.map((dayLabel, index) => (
-                    <TableRow key={`${dayLabel}-${index}`}>
-                      <TableCell>{dayLabel}</TableCell>
-                      {series.map((entry) => (
-                        <TableCell className="text-right tabular-nums" key={entry.key}>
-                          {entry.format(entry.values[index] ?? 0)}
-                        </TableCell>
-                      ))}
-                    </TableRow>
-                  ))}
-                </TableBody>
-              </Table>
-            </div>
-          </details>
         </figure>
       ) : (
         <SectionEmpty icon={Activity} title="No activity in this period" copy={emptyCopy} />

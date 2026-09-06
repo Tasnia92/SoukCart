@@ -3,7 +3,6 @@ import {
   isProductAtRisk,
   isProductLowStock,
   isProductOutOfStock,
-  productReorderThreshold,
 } from "./supplier-dashboard-api.ts";
 import {
   loadSupplierProducts,
@@ -14,7 +13,7 @@ import {
 
 export { loadSupplierProducts };
 export type { SupplierProduct };
-export { isProductAtRisk, isProductLowStock, isProductOutOfStock, productReorderThreshold };
+export { isProductAtRisk, isProductLowStock, isProductOutOfStock };
 
 export const PRODUCT_CATEGORIES = [
   "Rice & Grains",
@@ -179,27 +178,14 @@ export type StockAdjustmentInput = {
   mode: StockAdjustMode;
   value: number;
   expectedVersion: number;
-  reason?: string;
-  reorderThreshold?: number | null;
 };
 
 export type StockAdjustmentResult = {
   id: string;
   stock: number;
   stockVersion: number;
-  reorderThreshold: number;
   previousStock: number;
   delta: number;
-};
-
-export type StockAdjustmentHistoryRow = {
-  id: string;
-  product_id: string;
-  previous_stock: number;
-  new_stock: number;
-  delta: number;
-  reason: string;
-  created_at: string;
 };
 
 export type ProductSort = "newest" | "stock" | "price" | "name";
@@ -238,6 +224,9 @@ export function friendlyProductError(error: unknown): string {
   }
   if (lower.includes("only an administrator can moderate")) {
     return "Only an administrator can change moderation on this product.";
+  }
+  if (lower.includes("only an administrator can review")) {
+    return "Only an administrator can approve this product. Wait for the review to finish.";
   }
   if (lower.includes("violates row-level security") || lower.includes("permission denied")) {
     return "You do not have permission to change this product.";
@@ -398,14 +387,12 @@ export async function saveProductStock(
   productId: string,
   stock: number,
   expectedVersion = 0,
-  reason = "",
 ): Promise<StockAdjustmentResult> {
   return adjustProductStock({
     productId,
     mode: "absolute",
     value: stock,
     expectedVersion,
-    reason,
   });
 }
 
@@ -424,8 +411,6 @@ export async function adjustProductStock(
     p_mode: input.mode,
     p_value: input.value,
     p_expected_version: input.expectedVersion,
-    p_reason: input.reason ?? "",
-    p_reorder_threshold: input.reorderThreshold ?? null,
   });
   if (error) throw new Error(friendlyProductError(error));
   return normalizeStockAdjustmentResult(data);
@@ -440,10 +425,6 @@ export async function bulkAdjustProductStock(
     mode: item.mode,
     value: item.value,
     expectedVersion: item.expectedVersion,
-    reason: item.reason ?? "",
-    ...(item.reorderThreshold === undefined || item.reorderThreshold === null
-      ? {}
-      : { reorderThreshold: item.reorderThreshold }),
   }));
   const { data, error } = await supabase.rpc("seller_bulk_adjust_stock", {
     p_adjustments: payload,
@@ -460,33 +441,8 @@ function normalizeStockAdjustmentResult(value: unknown): StockAdjustmentResult {
     id: typeof row.id === "string" ? row.id : "",
     stock: Number(row.stock) || 0,
     stockVersion: Number(row.stockVersion) || 0,
-    reorderThreshold: Number(row.reorderThreshold) || 5,
     previousStock: Number(row.previousStock) || 0,
     delta: Number(row.delta) || 0,
-  };
-}
-
-export async function loadStockAdjustmentHistory(limit = 40): Promise<StockAdjustmentHistoryRow[]> {
-  const { data, error } = await supabase
-    .from("stock_adjustments")
-    .select("id, product_id, previous_stock, new_stock, delta, reason, created_at")
-    .order("created_at", { ascending: false })
-    .limit(limit);
-  if (error) throw new Error(friendlyProductError(error));
-  return (data ?? []) as StockAdjustmentHistoryRow[];
-}
-
-export async function duplicateSupplierProduct(
-  productId: string,
-): Promise<{ id: string; name: string }> {
-  const { data, error } = await supabase.rpc("seller_duplicate_product", {
-    p_product_id: productId,
-  });
-  if (error) throw new Error(friendlyProductError(error));
-  const row = (data ?? {}) as Record<string, unknown>;
-  return {
-    id: typeof row.id === "string" ? row.id : "",
-    name: typeof row.name === "string" ? row.name : "Copy",
   };
 }
 
@@ -553,23 +509,13 @@ function csvEscape(value: string): string {
 }
 
 export function buildInventoryCsv(products: readonly SupplierProduct[]): string {
-  const header = [
-    "product_id",
-    "name",
-    "unit",
-    "stock",
-    "reorder_threshold",
-    "is_active",
-    "category",
-    "stock_version",
-  ];
+  const header = ["product_id", "name", "unit", "stock", "is_active", "category", "stock_version"];
   const lines = products.map((product) =>
     [
       product.id,
       product.name,
       product.unit,
       String(product.stock),
-      String(product.reorder_threshold),
       product.is_active ? "true" : "false",
       product.category ?? "",
       String(product.stock_version),
@@ -583,8 +529,6 @@ export function buildInventoryCsv(products: readonly SupplierProduct[]): string 
 export type InventoryCsvRow = {
   productId: string;
   stock: number;
-  reorderThreshold?: number;
-  reason?: string;
 };
 
 /** Parse inventory CSV rows for absolute stock import. */
@@ -599,10 +543,6 @@ export function parseInventoryCsv(text: string): InventoryCsvRow[] {
   const header = splitCsvLine(lines[0]).map((cell) => cell.trim().toLowerCase());
   const idIdx = header.findIndex((cell) => cell === "product_id" || cell === "id");
   const stockIdx = header.findIndex((cell) => cell === "stock" || cell === "quantity");
-  const thresholdIdx = header.findIndex(
-    (cell) => cell === "reorder_threshold" || cell === "threshold",
-  );
-  const reasonIdx = header.findIndex((cell) => cell === "reason");
 
   if (idIdx < 0 || stockIdx < 0) {
     throw new Error("CSV must include product_id and stock columns.");
@@ -616,18 +556,7 @@ export function parseInventoryCsv(text: string): InventoryCsvRow[] {
     if (!Number.isInteger(stock) || stock < 0) {
       throw new Error(`Row ${index + 2}: stock must be a whole number of 0 or more.`);
     }
-    const row: InventoryCsvRow = { productId, stock };
-    if (thresholdIdx >= 0 && cells[thresholdIdx]?.trim()) {
-      const threshold = Number(cells[thresholdIdx].trim());
-      if (!Number.isInteger(threshold) || threshold < 0) {
-        throw new Error(`Row ${index + 2}: reorder_threshold must be 0 or more.`);
-      }
-      row.reorderThreshold = threshold;
-    }
-    if (reasonIdx >= 0 && cells[reasonIdx]?.trim()) {
-      row.reason = cells[reasonIdx].trim().slice(0, 200);
-    }
-    return row;
+    return { productId, stock };
   });
 }
 

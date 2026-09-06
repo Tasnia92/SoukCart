@@ -71,7 +71,7 @@ type ColumnId = (typeof COLUMN_IDS)[number];
 const COLUMN_LABELS: Record<ColumnId, string> = {
   order: "Order",
   product: "Product",
-  customer: "Customer",
+  customer: "Retailer",
   type: "Type",
   price: "Price",
   date: "Date",

@@ -22,6 +22,7 @@ type RequestBody = {
 };
 
 type ModerationStatus = "ok" | "hidden" | "removed";
+type ApprovalStatus = "pending" | "approved" | "rejected";
 
 type ProductRow = {
   id: string;
@@ -39,6 +40,9 @@ type ProductRow = {
   moderation_reason: string | null;
   moderated_by: string | null;
   moderated_at: string | null;
+  approval_status: ApprovalStatus;
+  approval_note: string | null;
+  approved_at: string | null;
   created_at: string;
 };
 
@@ -73,6 +77,10 @@ Deno.serve(async (request) => {
         return await moderate(body, caller, "removed");
       case "restore":
         return await restore(body, caller);
+      case "approve":
+        return await reviewListing(body, caller, "approved");
+      case "reject":
+        return await reviewListing(body, caller, "rejected");
       default:
         return json({ error: "Choose a valid product moderation action." }, 400);
     }
@@ -109,7 +117,7 @@ async function listProducts(): Promise<Response> {
   const { data, error } = await admin
     .from("products")
     .select(
-      "id, seller_id, name, description, price, unit, stock, min_order_qty, category, image_url, is_active, moderation_status, moderation_reason, moderated_by, moderated_at, created_at",
+      "id, seller_id, name, description, price, unit, stock, min_order_qty, category, image_url, is_active, moderation_status, moderation_reason, moderated_by, moderated_at, approval_status, approval_note, approved_at, created_at",
     )
     .order("created_at", { ascending: false })
     .limit(2000);
@@ -138,6 +146,9 @@ async function listProducts(): Promise<Response> {
       moderation_reason: row.moderation_reason,
       moderated_by: row.moderated_by,
       moderated_at: row.moderated_at,
+      approval_status: row.approval_status ?? "approved",
+      approval_note: row.approval_note,
+      approved_at: row.approved_at,
       created_at: row.created_at,
       seller_name: profile?.name ?? "Unknown seller",
       seller_email: profile?.email ?? "",
@@ -274,6 +285,59 @@ async function restore(body: RequestBody, caller: Caller): Promise<Response> {
   }
 
   return json({ productId, moderation_status: "ok", restoredBy: caller.id });
+}
+
+/**
+ * Approve or reject a listing that is waiting for review. The seller-facing
+ * notification is raised by the `products_notify_approval_change` database
+ * trigger, so the edge function only records the decision.
+ */
+async function reviewListing(
+  body: RequestBody,
+  caller: Caller,
+  status: "approved" | "rejected",
+): Promise<Response> {
+  const productId = readText(body.productId).trim();
+  const reason = readText(body.reason).trim();
+  if (!isUuid(productId)) return json({ error: "Choose a valid product." }, 400);
+  if (status === "rejected") {
+    if (!reason) {
+      return json({ error: "Add a reason so the seller knows what to fix." }, 400);
+    }
+    if (reason.length > MAX_REASON_LENGTH) {
+      return json({ error: `Keep the reason under ${MAX_REASON_LENGTH} characters.` }, 400);
+    }
+  }
+
+  const { data: existing, error: fetchError } = await admin
+    .from("products")
+    .select("id, name, seller_id, approval_status")
+    .eq("id", productId)
+    .maybeSingle();
+  if (fetchError) throw fetchError;
+  if (!existing) return json({ error: "That product could not be found." }, 404);
+  if (existing.approval_status !== "pending") {
+    return json({ error: "Only products waiting for approval can be reviewed." }, 409);
+  }
+
+  const { data: updated, error: updateError } = await admin
+    .from("products")
+    .update({
+      approval_status: status,
+      approval_note: status === "rejected" ? reason : null,
+      approved_by: caller.id,
+      approved_at: new Date().toISOString(),
+    })
+    .eq("id", productId)
+    .eq("approval_status", "pending")
+    .select("id, approval_status")
+    .maybeSingle();
+  if (updateError) throw updateError;
+  if (!updated) {
+    return json({ error: "Only products waiting for approval can be reviewed." }, 409);
+  }
+
+  return json({ productId, approval_status: status });
 }
 
 async function maybeHardDelete(productId: string, imageUrl: string | null): Promise<boolean> {

@@ -1,26 +1,9 @@
 import { useCallback, useEffect, useRef, useState } from "react";
-import {
-  Activity,
-  Clock3,
-  MessageSquare,
-  RefreshCw,
-  ShieldCheck,
-  Users,
-  Wallet,
-} from "lucide-react";
+import { Activity, MessageSquare, RefreshCw, ShieldCheck, Users, Wallet } from "lucide-react";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import {
-  Card,
-  CardAction,
-  CardContent,
-  CardDescription,
-  CardHeader,
-  CardTitle,
-} from "@/components/ui/card";
 import { Spinner } from "@/components/ui/spinner";
-import { cn } from "@/lib/utils";
 import {
   DashboardLink,
   DashboardRow,
@@ -38,7 +21,6 @@ import { useSessionSnapshot, useSessionStore } from "../../session.tsx";
 import { formatPrice, formatUpdatedAt } from "../workspace/format.ts";
 import { useTableChanges } from "../../workspace-realtime.ts";
 import { loadAdminDashboard, type AdminDashboard } from "./admin-dashboard-api.ts";
-import { AdminNeedsYouNow, AdminRecentOrders } from "./admin-overview-panels.tsx";
 import { AdminWorkspaceShell } from "./admin-workspace-shell.tsx";
 
 type AdminOverviewProps = {
@@ -201,7 +183,6 @@ function AdminOverviewBody({ dashboard }: { dashboard: AdminDashboard }) {
   const summary = dashboard.summary;
   const period = `Last ${dashboard.windowDays} days`;
   const showAccountsMetric = summary.accountsNeedingSetup > 0;
-  const awaitingSeverity = severityFor(summary.ordersAwaitingAction, summary.refundsToComplete > 0);
 
   return (
     <>
@@ -227,36 +208,6 @@ function AdminOverviewBody({ dashboard }: { dashboard: AdminDashboard }) {
           to="/admin/order"
           linkLabel="Open orders"
         />
-        <Card
-          size="sm"
-          data-slot="metric-card"
-          className={cn(
-            "db-metric",
-            awaitingSeverity === "critical" && "ring-destructive/40",
-            awaitingSeverity === "attention" && "ring-primary/30",
-          )}
-        >
-          <CardHeader>
-            <CardDescription className="text-xs font-medium tracking-widest uppercase">
-              <span className="db-metric-label">Needs action</span>
-            </CardDescription>
-            <CardAction>
-              <span className="flex size-9 items-center justify-center rounded-xl bg-muted text-muted-foreground">
-                <Clock3 />
-              </span>
-            </CardAction>
-            <CardTitle className="db-metric-value text-3xl font-semibold tabular-nums">
-              {summary.ordersAwaitingAction}
-            </CardTitle>
-          </CardHeader>
-          <CardContent className="flex flex-col gap-2">
-            <p className="text-xs text-muted-foreground">
-              {summary.pendingOrders} waiting on suppliers · {summary.cancellationRequests}{" "}
-              cancellations · {summary.refundsToComplete} refunds
-            </p>
-            <DashboardLink to="/admin/inbox">Open needs attention</DashboardLink>
-          </CardContent>
-        </Card>
         <MetricCard
           icon={MessageSquare}
           label="Open disputes"
@@ -300,33 +251,23 @@ function AdminOverviewBody({ dashboard }: { dashboard: AdminDashboard }) {
       <DashboardRow split="full">
         <TrendChartCard
           eyebrow="Trend"
-          title="Order volume and order value"
+          title="Orders per day"
           rangeLabel={seriesRange(dashboard.series)}
           labels={dashboard.series.map((bucket) => bucket.label)}
           series={[
-            {
-              key: "orderValue",
-              label: "Order value",
-              values: dashboard.series.map((bucket) => bucket.value),
-              format: formatPrice,
-              kind: "area",
-            },
             {
               key: "orders",
               label: "Orders",
               values: dashboard.series.map((bucket) => bucket.count),
               format: (value) => `${value}`,
-              kind: "line",
+              kind: "bar",
             },
           ]}
-          summary={`${formatPrice(summary.orderValue)} order value across ${summary.orders} orders in the last ${dashboard.windowDays} days. Paid ${formatPrice(summary.paidOrderValue)}. ${summary.orderValueDelta.label}.`}
+          summary={`${summary.orders} orders placed in the last ${dashboard.windowDays} days.`}
           action={<DashboardLink to="/admin/order">All orders</DashboardLink>}
-          emptyCopy="No orders were placed in this window, so there is no trend to read yet."
+          emptyCopy="No orders were placed in this window, so there is nothing to chart yet."
         />
       </DashboardRow>
-
-      <AdminNeedsYouNow dashboard={dashboard} />
-      <AdminRecentOrders dashboard={dashboard} />
     </>
   );
 }

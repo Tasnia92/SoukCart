@@ -8,7 +8,10 @@ import {
   CircleCheckBig,
   CircleX,
   LifeBuoy,
+  MessageSquare,
   PackageCheck,
+  PackagePlus,
+  ShieldCheck,
   Truck,
   Wallet,
   type LucideIcon,
@@ -25,6 +28,7 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import { RouterLink } from "../../components/ui/RouterLink.tsx";
+import { HeaderAction, HeaderCountPill } from "@/components/ui/Workspace";
 import { useSessionSnapshot } from "../../session.tsx";
 import { useTableChanges } from "../../workspace-realtime.ts";
 import { formatDateTime } from "../workspace/format.ts";
@@ -65,6 +69,16 @@ function notificationIcon(type: string): LucideIcon {
       return BadgeCheck;
     case "order_support_requested":
       return LifeBuoy;
+    case "dispute_filed":
+      return MessageSquare;
+    case "verification_submitted":
+      return ShieldCheck;
+    case "product_pending_approval":
+      return PackagePlus;
+    case "product_approved":
+      return PackageCheck;
+    case "product_rejected":
+      return CircleX;
     default:
       return Bell;
   }
@@ -97,13 +111,34 @@ function notificationHref(
     return { to: "/supplier/earnings" };
   }
 
+  if (role === "seller" && notification.order_id === null) {
+    if (notification.type === "product_approved" || notification.type === "product_rejected") {
+      return { to: "/supplier/products" };
+    }
+  }
+
+  if (role === "admin" && notification.order_id === null) {
+    if (notification.type === "verification_submitted") {
+      return { to: "/admin/verifications" };
+    }
+    if (notification.type === "dispute_filed") {
+      return { to: "/admin/complaints" };
+    }
+    if (notification.type === "product_pending_approval") {
+      return { to: "/admin/products" };
+    }
+  }
+
   return null;
 }
 
 export function NotificationsBell({
   viewAllTo,
+  label,
 }: {
   viewAllTo?: "/supplier/notifications" | "/retailer/notifications";
+  /** When set, the bell renders as a labeled action matching sibling header actions. */
+  label?: string;
 } = {}) {
   const navigate = useNavigate();
   const { state } = useSessionSnapshot();
@@ -158,20 +193,29 @@ export function NotificationsBell({
   };
 
   const unread = notifications.filter((notification) => !notification.read_at).length;
+  const baseLabel = label ?? "Notifications";
 
   return (
     <DropdownMenu>
       <DropdownMenuTrigger asChild>
-        <Button variant="ghost" size="icon" className="relative" aria-label="Notifications">
-          <Bell />
-          {unread > 0 ? (
-            <Badge
-              variant="default"
-              className="absolute top-1 right-1 min-w-4 px-1 py-0 text-[10px] leading-4"
-            >
-              {unread}
-            </Badge>
-          ) : null}
+        <Button
+          variant="ghost"
+          size={label ? "default" : "icon"}
+          className={
+            label
+              ? "relative h-9 px-1 text-foreground/70 hover:bg-accent/50 hover:text-foreground"
+              : "relative"
+          }
+          aria-label={unread > 0 ? `${baseLabel}, ${unread} unread` : baseLabel}
+        >
+          {label ? (
+            <HeaderAction icon={Bell} label={label} count={unread} />
+          ) : (
+            <>
+              <Bell className="size-5" aria-hidden="true" />
+              {unread > 0 ? <HeaderCountPill count={unread} /> : null}
+            </>
+          )}
         </Button>
       </DropdownMenuTrigger>
       <DropdownMenuContent align="end" className="w-80">

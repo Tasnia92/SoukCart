@@ -1,6 +1,6 @@
 import { useNavigate } from "@tanstack/react-router";
 import { useCallback, useEffect, useState, type FormEvent } from "react";
-import { KeyRound, LogOut, MapPin, Plus, Store, Trash2 } from "lucide-react";
+import { KeyRound, LogOut, MapPin, Plus, Trash2, UserRound } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
@@ -279,8 +279,7 @@ export function RetailerSettings() {
       onLogout={onLogout}
     >
       <PageHeader
-        eyebrow="Account"
-        title="Settings."
+        title="Account."
         copy="Update your shop contact details and saved delivery addresses for checkout."
       />
 
@@ -296,8 +295,8 @@ export function RetailerSettings() {
           <Card>
             <CardHeader>
               <CardTitle className="flex items-center gap-2">
-                <Store className="size-4" aria-hidden="true" />
-                Shop profile
+                <UserRound className="size-4" aria-hidden="true" />
+                Profile
               </CardTitle>
               <CardDescription>How your retailer account appears across SoukCart.</CardDescription>
             </CardHeader>

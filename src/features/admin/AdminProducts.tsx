@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { EyeOff, Package, RotateCcw, Search, Trash2 } from "lucide-react";
+import { Ban, Check, EyeOff, Package, RotateCcw, Search, Trash2 } from "lucide-react";
 import {
   AlertDialog,
   AlertDialogAction,
@@ -55,10 +55,12 @@ import { formatDate, formatPrice, initials } from "../workspace/format.ts";
 import { AdminWorkspaceShell } from "./admin-workspace-shell.tsx";
 import {
   ADMIN_PRODUCT_SORTS,
+  approveAdminProduct,
   filterAdminProducts,
   getAdminProductStats,
   hideAdminProduct,
   loadAdminProducts,
+  rejectAdminProduct,
   removeAdminProduct,
   restoreAdminProduct,
   sortAdminProducts,
@@ -72,10 +74,12 @@ type AdminProductsProps = {
   hideProduct?: (productId: string, reason: string) => Promise<unknown>;
   removeProduct?: (productId: string, reason: string) => Promise<{ purged?: boolean }>;
   restoreProduct?: (productId: string) => Promise<unknown>;
+  approveProduct?: (productId: string) => Promise<unknown>;
+  rejectProduct?: (productId: string, reason: string) => Promise<unknown>;
 };
 
 type Notice = { message: string; state: NoticeState } | null;
-type ModerateAction = "hide" | "remove";
+type ModerateAction = "hide" | "remove" | "reject";
 
 const MAX_REASON_LENGTH = 1000;
 
@@ -85,6 +89,12 @@ function statusBadge(product: AdminProduct) {
   }
   if (product.moderation_status === "hidden") {
     return <Badge variant="destructive">Hidden by admin</Badge>;
+  }
+  if (product.approval_status === "pending") {
+    return <Badge variant="secondary">Pending approval</Badge>;
+  }
+  if (product.approval_status === "rejected") {
+    return <Badge variant="destructive">Rejected</Badge>;
   }
   if (!product.is_active) {
     return <Badge variant="secondary">Hidden by seller</Badge>;
@@ -108,11 +118,13 @@ function ProductRow({
   busy,
   onModerate,
   onRestore,
+  onApprove,
 }: {
   product: AdminProduct;
   busy: boolean;
   onModerate: (product: AdminProduct, action: ModerateAction) => void;
   onRestore: (product: AdminProduct) => void;
+  onApprove: (product: AdminProduct) => void;
 }) {
   return (
     <TableRow id={`product-${product.id}`}>
@@ -127,6 +139,11 @@ function ProductRow({
             {product.moderation_reason ? (
               <small className="line-clamp-2 text-xs text-destructive">
                 Reason: {product.moderation_reason}
+              </small>
+            ) : null}
+            {product.approval_note ? (
+              <small className="line-clamp-2 text-xs text-destructive">
+                Review note: {product.approval_note}
               </small>
             ) : null}
           </span>
@@ -152,6 +169,30 @@ function ProductRow({
       <TableCell>{statusBadge(product)}</TableCell>
       <TableCell className="text-right">
         <div className="flex items-center justify-end gap-2">
+          {product.approval_status === "pending" ? (
+            <>
+              <Button
+                type="button"
+                variant="outline"
+                size="sm"
+                disabled={busy}
+                onClick={() => onApprove(product)}
+              >
+                <Check data-icon="inline-start" />
+                Approve
+              </Button>
+              <Button
+                type="button"
+                variant="ghost"
+                size="sm"
+                disabled={busy}
+                onClick={() => onModerate(product, "reject")}
+              >
+                <Ban data-icon="inline-start" />
+                Reject
+              </Button>
+            </>
+          ) : null}
           {product.moderation_status === "hidden" ? (
             <Button
               type="button"
@@ -199,6 +240,8 @@ export function AdminProducts({
   hideProduct = hideAdminProduct,
   removeProduct = removeAdminProduct,
   restoreProduct = restoreAdminProduct,
+  approveProduct = approveAdminProduct,
+  rejectProduct = rejectAdminProduct,
 }: AdminProductsProps) {
   const { state } = useSessionSnapshot();
   const store = useSessionStore();
@@ -299,7 +342,11 @@ export function AdminProducts({
     closeModerateDialog();
 
     const request =
-      action === "hide" ? hideProduct(product.id, trimmed) : removeProduct(product.id, trimmed);
+      action === "hide"
+        ? hideProduct(product.id, trimmed)
+        : action === "reject"
+          ? rejectProduct(product.id, trimmed)
+          : removeProduct(product.id, trimmed);
 
     void request
       .then((result) => {
@@ -307,6 +354,18 @@ export function AdminProducts({
           action === "remove" && result && typeof result === "object" && "purged" in result
             ? Boolean((result as { purged?: boolean }).purged)
             : false;
+        if (action === "reject") {
+          applyLocalModeration(product.id, {
+            approval_status: "rejected",
+            approval_note: trimmed,
+            approved_at: new Date().toISOString(),
+          });
+          setNotice({
+            message: `${product.name} was rejected. The seller can edit it and resubmit for review.`,
+            state: "success",
+          });
+          return;
+        }
         applyLocalModeration(
           product.id,
           {
@@ -333,6 +392,32 @@ export function AdminProducts({
             moderateError instanceof Error
               ? moderateError.message
               : "The product could not be moderated.",
+          state: "error",
+        });
+      })
+      .finally(() => setBusyId(null));
+  };
+
+  const onApprove = (product: AdminProduct) => {
+    setBusyId(product.id);
+    void approveProduct(product.id)
+      .then(() => {
+        applyLocalModeration(product.id, {
+          approval_status: "approved",
+          approval_note: null,
+          approved_at: new Date().toISOString(),
+        });
+        setNotice({
+          message: `${product.name} was approved and is now available to retailers.`,
+          state: "success",
+        });
+      })
+      .catch((approveError: unknown) => {
+        setNotice({
+          message:
+            approveError instanceof Error
+              ? approveError.message
+              : "The product could not be approved.",
           state: "error",
         });
       })
@@ -382,7 +467,7 @@ export function AdminProducts({
       <PageHeader
         eyebrow="Catalog"
         title="Product moderation."
-        copy="Review every listing. Hide or remove products that violate marketplace rules, and attach a reason the seller can see."
+        copy="Approve new supplier listings before they reach retailers. Hide or remove products that violate marketplace rules, and attach a reason the seller can see."
       />
       <InlineNotice message={notice?.message} state={notice?.state} />
       {products && stats ? (
@@ -390,6 +475,8 @@ export function AdminProducts({
           <StatGrid label="Products summary">
             <StatCard label="Total" value={stats.total} />
             <StatCard label="Active" value={stats.active} />
+            <StatCard label="Pending approval" value={stats.pending} />
+            <StatCard label="Rejected" value={stats.rejected} />
             <StatCard label="Hidden by admin" value={stats.hidden} />
             <StatCard label="Removed" value={stats.removed} />
           </StatGrid>
@@ -425,6 +512,8 @@ export function AdminProducts({
                 <SelectContent>
                   <SelectItem value="all">All statuses</SelectItem>
                   <SelectItem value="active">Active</SelectItem>
+                  <SelectItem value="pending">Pending approval</SelectItem>
+                  <SelectItem value="rejected">Rejected</SelectItem>
                   <SelectItem value="hidden">Hidden by admin</SelectItem>
                   <SelectItem value="removed">Removed</SelectItem>
                   <SelectItem value="seller_hidden">Hidden by seller</SelectItem>
@@ -457,6 +546,7 @@ export function AdminProducts({
                         busy={busyId === product.id}
                         onModerate={openModerate}
                         onRestore={onRestore}
+                        onApprove={onApprove}
                       />
                     ))
                   ) : (
@@ -488,12 +578,18 @@ export function AdminProducts({
         <DialogContent>
           <DialogHeader>
             <DialogTitle>
-              {pending?.action === "hide" ? "Hide product" : "Remove product"}
+              {pending?.action === "hide"
+                ? "Hide product"
+                : pending?.action === "reject"
+                  ? "Reject listing"
+                  : "Remove product"}
             </DialogTitle>
             <DialogDescription>
               {pending?.action === "hide"
                 ? `"${pending.product.name}" will leave the retailer catalog. The seller can see your reason and cannot show it again until you restore it.`
-                : `"${pending?.product.name ?? "This product"}" will be permanently taken down. If it was never ordered it may be deleted entirely.`}
+                : pending?.action === "reject"
+                  ? `"${pending.product.name}" will not be listed. The seller sees your reason, can fix the listing, and resubmit it for review.`
+                  : `"${pending?.product.name ?? "This product"}" will be permanently taken down. If it was never ordered it may be deleted entirely.`}
             </DialogDescription>
           </DialogHeader>
           <FieldGroup>
@@ -523,11 +619,19 @@ export function AdminProducts({
             </Button>
             <Button
               type="button"
-              variant={pending?.action === "remove" ? "destructive" : "default"}
+              variant={
+                pending?.action === "remove" || pending?.action === "reject"
+                  ? "destructive"
+                  : "default"
+              }
               disabled={busyId !== null}
               onClick={submitModeration}
             >
-              {pending?.action === "hide" ? "Hide product" : "Continue"}
+              {pending?.action === "hide"
+                ? "Hide product"
+                : pending?.action === "reject"
+                  ? "Reject listing"
+                  : "Continue"}
             </Button>
           </DialogFooter>
         </DialogContent>

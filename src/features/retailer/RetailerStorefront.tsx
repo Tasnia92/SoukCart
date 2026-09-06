@@ -1,4 +1,4 @@
-import { useNavigate } from "@tanstack/react-router";
+import { useNavigate, useSearch } from "@tanstack/react-router";
 import {
   ArrowRight,
   ChevronDown,
@@ -7,7 +7,6 @@ import {
   Minus,
   Plus,
   RefreshCw,
-  Search,
   ShoppingBag,
   ShoppingCart,
 } from "lucide-react";
@@ -39,7 +38,6 @@ import {
   WorkspaceError,
   type NoticeState,
 } from "../../components/ui/Workspace.tsx";
-import { InputGroup, InputGroupAddon, InputGroupInput } from "@/components/ui/input-group";
 import { useProductChanges } from "../../product-realtime.ts";
 import { useSessionSnapshot, useSessionStore } from "../../session.tsx";
 import { formatPrice } from "../workspace/format.ts";
@@ -158,11 +156,20 @@ export function RetailerStorefront({
   const { state } = useSessionSnapshot();
   const store = useSessionStore();
   const navigate = useNavigate({ from: "/retailer" });
+  // The shared header search lands on this page with the term in `?q=`; the
+  // local input starts from it and follows along if the URL term changes.
+  const urlQuery = useSearch({
+    strict: false,
+    select: (search) => {
+      const value = (search as Record<string, unknown>).q;
+      return typeof value === "string" ? value : "";
+    },
+  });
   const [products, setProducts] = useState<RetailerProduct[] | null>(null);
   const [cart, setCart] = useState<Record<string, number>>({});
   const [orders, setOrders] = useState<RetailerOrder[]>([]);
   const [quantities, setQuantities] = useState<Record<string, number>>({});
-  const [searchTerm, setSearchTerm] = useState("");
+  const [searchTerm, setSearchTerm] = useState(urlQuery);
   const [selectedCategory, setSelectedCategory] = useState<string | null>(null);
   const [showAllCategories, setShowAllCategories] = useState(false);
   const [sort, setSort] = useState<ProductSort>("name");
@@ -174,6 +181,10 @@ export function RetailerStorefront({
   const [reordering, setReordering] = useState(false);
 
   const addedTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  useEffect(() => {
+    setSearchTerm(urlQuery);
+  }, [urlQuery]);
 
   const retailerId = state.status === "retailer" ? state.session.user.id : "";
 
@@ -360,28 +371,12 @@ export function RetailerStorefront({
     showAllCategories || selectedBeyondPreview ? categories : previewCategories;
   const nextAction = dashboard.nextAction;
 
-  const searchField = (
-    <InputGroup className="w-full">
-      <InputGroupInput
-        type="search"
-        aria-label="Search products"
-        placeholder="Search products, suppliers…"
-        value={searchTerm}
-        onChange={(event) => setSearchTerm(event.target.value)}
-      />
-      <InputGroupAddon align="inline-end">
-        <Search />
-      </InputGroupAddon>
-    </InputGroup>
-  );
-
   return (
     <RetailerWorkspaceShell
       section={variant === "catalog" ? "catalog" : "storefront"}
       userName={userName}
       userEmail={state.profile.email}
       cartCount={cartCount}
-      search={searchField}
       onLogout={onLogout}
     >
       {variant === "catalog" ? (

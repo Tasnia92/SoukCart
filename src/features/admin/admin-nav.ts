@@ -3,7 +3,6 @@ import {
   Clock3,
   HandCoins,
   Home,
-  ListChecks,
   MessageSquare,
   PackageCheck,
   ShieldAlert,
@@ -95,12 +94,6 @@ export function adminNavItems(
       icon: Home,
       label: "Home",
       active: activePath === "/admin",
-    },
-    {
-      to: "/admin/inbox",
-      icon: ListChecks,
-      label: "Needs attention",
-      active: activePath.startsWith("/admin/inbox"),
     },
     {
       to: "/admin/order",

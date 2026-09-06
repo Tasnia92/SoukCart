@@ -45,7 +45,6 @@ export { RouterLink };
 export type WorkspacePath =
   | "/"
   | "/admin"
-  | "/admin/inbox"
   | "/admin/users"
   | "/admin/order"
   | "/admin/activity"
@@ -68,7 +67,6 @@ export type WorkspacePath =
   | "/supplier/products"
   | "/supplier/stock"
   | "/supplier/earnings"
-  | "/supplier/returns"
   | "/supplier/customers"
   | "/supplier/notifications"
   | "/supplier/settings";
@@ -107,7 +105,7 @@ function workspaceRole(items: WorkspaceNavItem[]): { label: string; home: Worksp
   const home = items.find((item) => item.to)?.to ?? "/";
   if (home.startsWith("/admin")) return { label: "Admin", home: "/admin" };
   if (home.startsWith("/retailer")) return { label: "Retailer", home: "/retailer" };
-  if (home.startsWith("/supplier")) return { label: "Seller", home: "/supplier" };
+  if (home.startsWith("/supplier")) return { label: "Supplier", home: "/supplier" };
   return { label: "Workspace", home: "/" };
 }
 

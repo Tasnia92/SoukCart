@@ -3,7 +3,7 @@ import { useEffect, useMemo, useRef, useState, type ChangeEvent, type KeyboardEv
 import { Download, RefreshCw, Search, Store, Upload } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Input } from "@/components/ui/input";
 import {
@@ -27,7 +27,6 @@ import {
 } from "../../components/ui/Workspace.tsx";
 import { useProductChanges } from "../../product-realtime.ts";
 import { useSessionSnapshot, useSessionStore } from "../../session.tsx";
-import { formatDateTime } from "../workspace/format.ts";
 import { RouterLink } from "../workspace/WorkspaceShell.tsx";
 import {
   buildInventoryCsv,
@@ -36,11 +35,8 @@ import {
   friendlyProductError,
   isProductLowStock,
   isProductOutOfStock,
-  loadStockAdjustmentHistory,
   loadSupplierProducts,
   parseInventoryCsv,
-  productReorderThreshold,
-  type StockAdjustmentHistoryRow,
   type StockAdjustmentInput,
   type SupplierProduct,
 } from "./supplier-products-api.ts";
@@ -55,29 +51,25 @@ type SupplierStockProps = {
   loadProducts?: (sellerId: string) => Promise<SupplierProduct[]>;
 };
 
-type StockFilter = "all" | "healthy" | "low" | "out" | "hidden";
+type StockFilter = "all" | "out" | "hidden";
 
 type DraftRow = {
   stock: string;
-  threshold: string;
-  reason: string;
 };
 
 function stockStatus(product: SupplierProduct): {
   label: string;
   variant: "default" | "secondary" | "destructive" | "outline";
-} {
+} | null {
   if (!product.is_active) return { label: "Hidden", variant: "outline" };
   if (isProductOutOfStock(product)) return { label: "Out of stock", variant: "destructive" };
   if (isProductLowStock(product)) return { label: "Low stock", variant: "secondary" };
-  return { label: "Healthy", variant: "default" };
+  return null;
 }
 
 function matchesStockFilter(product: SupplierProduct, filter: StockFilter): boolean {
   if (filter === "hidden") return !product.is_active;
   if (!product.is_active) return false;
-  if (filter === "healthy") return product.stock > productReorderThreshold(product);
-  if (filter === "low") return isProductLowStock(product);
   if (filter === "out") return isProductOutOfStock(product);
   return true;
 }
@@ -121,10 +113,7 @@ function StockRow({
   saving: boolean;
 }) {
   const status = stockStatus(product);
-  const dirty =
-    draft.stock.trim() !== String(product.stock) ||
-    draft.threshold.trim() !== String(product.reorder_threshold) ||
-    Boolean(draft.reason.trim());
+  const dirty = draft.stock.trim() !== String(product.stock);
 
   const onKeyDown = (event: KeyboardEvent<HTMLInputElement>) => {
     if (event.key !== "Enter") return;
@@ -159,7 +148,7 @@ function StockRow({
       <TableCell>
         <div className="flex flex-col items-start gap-1">
           <strong className="tabular-nums">{product.stock}</strong>
-          <Badge variant={status.variant}>{status.label}</Badge>
+          {status && <Badge variant={status.variant}>{status.label}</Badge>}
         </div>
       </TableCell>
       <TableCell>
@@ -172,35 +161,6 @@ function StockRow({
             value={draft.stock}
             aria-label={`New stock for ${product.name}`}
             onChange={(event) => onDraftChange({ stock: event.target.value })}
-            onKeyDown={onKeyDown}
-          />
-        </label>
-      </TableCell>
-      <TableCell>
-        <label className="block min-w-24">
-          <span className="sr-only">Reorder threshold for {product.name}</span>
-          <Input
-            type="number"
-            min="0"
-            step="1"
-            inputMode="numeric"
-            value={draft.threshold}
-            aria-label={`Reorder threshold for ${product.name}`}
-            onChange={(event) => onDraftChange({ threshold: event.target.value })}
-            onKeyDown={onKeyDown}
-          />
-        </label>
-      </TableCell>
-      <TableCell>
-        <label className="block min-w-36">
-          <span className="sr-only">Reason for {product.name}</span>
-          <Input
-            type="text"
-            maxLength={200}
-            placeholder="Optional reason"
-            value={draft.reason}
-            aria-label={`Adjustment reason for ${product.name}`}
-            onChange={(event) => onDraftChange({ reason: event.target.value })}
             onKeyDown={onKeyDown}
           />
         </label>
@@ -220,7 +180,6 @@ export function SupplierStock({ loadProducts = loadSupplierProducts }: SupplierS
   const navigate = useNavigate({ from: "/supplier/stock" });
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [products, setProducts] = useState<SupplierProduct[] | null>(null);
-  const [history, setHistory] = useState<StockAdjustmentHistoryRow[]>([]);
   const [error, setError] = useState<string | null>(null);
   const [loadVersion, setLoadVersion] = useState(0);
   const [searchTerm, setSearchTerm] = useState("");
@@ -245,26 +204,16 @@ export function SupplierStock({ loadProducts = loadSupplierProducts }: SupplierS
     let current = true;
     setError(null);
 
-    void Promise.all([loadProducts(sellerId), loadStockAdjustmentHistory(30)])
-      .then(([nextProducts, nextHistory]) => {
+    void loadProducts(sellerId)
+      .then((nextProducts) => {
         if (!current) return;
         setProducts(nextProducts);
-        setHistory(nextHistory);
         setDrafts((prev) => {
           const next: Record<string, DraftRow> = {};
           for (const product of nextProducts) {
             const existing = prev[product.id];
-            const baseline: DraftRow = {
-              stock: String(product.stock),
-              threshold: String(product.reorder_threshold),
-              reason: "",
-            };
-            if (
-              existing &&
-              (existing.stock !== String(product.stock) ||
-                existing.threshold !== String(product.reorder_threshold) ||
-                existing.reason.trim())
-            ) {
+            const baseline: DraftRow = { stock: String(product.stock) };
+            if (existing && existing.stock !== String(product.stock)) {
               next[product.id] = existing;
             } else {
               next[product.id] = baseline;
@@ -296,8 +245,6 @@ export function SupplierStock({ loadProducts = loadSupplierProducts }: SupplierS
     const active = catalog.filter((product) => product.is_active);
     return {
       all: catalog.length,
-      healthy: active.filter((product) => product.stock > productReorderThreshold(product)).length,
-      low: active.filter(isProductLowStock).length,
       out: active.filter(isProductOutOfStock).length,
       hidden: catalog.filter((product) => !product.is_active).length,
     };
@@ -308,11 +255,7 @@ export function SupplierStock({ loadProducts = loadSupplierProducts }: SupplierS
       .filter((product) => {
         const draft = drafts[product.id];
         if (!draft) return false;
-        return (
-          draft.stock.trim() !== String(product.stock) ||
-          draft.threshold.trim() !== String(product.reorder_threshold) ||
-          Boolean(draft.reason.trim())
-        );
+        return draft.stock.trim() !== String(product.stock);
       })
       .map((product) => product.id);
   }, [catalog, drafts]);
@@ -351,14 +294,7 @@ export function SupplierStock({ loadProducts = loadSupplierProducts }: SupplierS
     if (nextStock === null) {
       return { error: `${product.name}: enter a whole number or relative change like +20 / -5.` };
     }
-    const thresholdRaw = draft.threshold.trim();
-    const threshold = Number(thresholdRaw);
-    if (!thresholdRaw || !Number.isInteger(threshold) || threshold < 0) {
-      return { error: `${product.name}: reorder threshold must be 0 or more.` };
-    }
-    const stockChanged = nextStock !== product.stock;
-    const thresholdChanged = threshold !== product.reorder_threshold;
-    if (!stockChanged && !thresholdChanged && !draft.reason.trim()) {
+    if (nextStock === product.stock) {
       return { error: `${product.name}: nothing to save.` };
     }
     return {
@@ -366,8 +302,6 @@ export function SupplierStock({ loadProducts = loadSupplierProducts }: SupplierS
       mode: "absolute",
       value: nextStock,
       expectedVersion: product.stock_version,
-      reason: draft.reason.trim() || (thresholdChanged && !stockChanged ? "Reorder threshold" : ""),
-      reorderThreshold: threshold,
     };
   };
 
@@ -382,18 +316,13 @@ export function SupplierStock({ loadProducts = loadSupplierProducts }: SupplierS
             ...product,
             stock: result.stock,
             stock_version: result.stockVersion,
-            reorder_threshold: result.reorderThreshold,
           };
         }) ?? prev,
     );
     setDrafts((prev) => {
       const next = { ...prev };
       for (const result of results) {
-        next[result.id] = {
-          stock: String(result.stock),
-          threshold: String(result.reorderThreshold),
-          reason: "",
-        };
+        next[result.id] = { stock: String(result.stock) };
       }
       return next;
     });
@@ -420,7 +349,6 @@ export function SupplierStock({ loadProducts = loadSupplierProducts }: SupplierS
     try {
       const results = await bulkAdjustProductStock(adjustments);
       applyResults(results);
-      setHistory(await loadStockAdjustmentHistory(30));
       setNotice({
         message:
           results.length === 1 ? "Inventory updated." : `${results.length} inventory rows updated.`,
@@ -469,11 +397,9 @@ export function SupplierStock({ loadProducts = loadSupplierProducts }: SupplierS
         mode: "relative",
         value: delta,
         expectedVersion: product.stock_version,
-        reason: `Bulk ${delta > 0 ? "+" : ""}${delta}`,
       }));
       const results = await bulkAdjustProductStock(adjustments);
       applyResults(results);
-      setHistory(await loadStockAdjustmentHistory(30));
       setNotice({
         message: `Applied ${delta > 0 ? "+" : ""}${delta} to ${results.length} product${results.length === 1 ? "" : "s"}.`,
         state: "success",
@@ -511,14 +437,11 @@ export function SupplierStock({ loadProducts = loadSupplierProducts }: SupplierS
           mode: "absolute",
           value: row.stock,
           expectedVersion: product.stock_version,
-          reason: row.reason ?? "CSV import",
-          reorderThreshold: row.reorderThreshold ?? product.reorder_threshold,
         });
       }
       setSavingAll(true);
       const results = await bulkAdjustProductStock(adjustments);
       applyResults(results);
-      setHistory(await loadStockAdjustmentHistory(30));
       setNotice({
         message: `Imported stock for ${results.length} product${results.length === 1 ? "" : "s"}.`,
         state: "success",
@@ -530,9 +453,6 @@ export function SupplierStock({ loadProducts = loadSupplierProducts }: SupplierS
     }
   };
 
-  const historyName = (productId: string) =>
-    catalog.find((product) => product.id === productId)?.name ?? "Product";
-
   return (
     <SupplierWorkspaceShell
       section="stock"
@@ -541,9 +461,7 @@ export function SupplierStock({ loadProducts = loadSupplierProducts }: SupplierS
       onLogout={onLogout}
     >
       <PageHeader
-        eyebrow="Inventory"
-        title="Stock control"
-        copy="Update quantities in bulk, set reorder thresholds, and keep a short history of adjustments."
+        title="Inventory management"
         actions={
           <div className="flex flex-wrap gap-2">
             <Button type="button" variant="outline" onClick={retry}>
@@ -586,23 +504,13 @@ export function SupplierStock({ loadProducts = loadSupplierProducts }: SupplierS
         catalog.length ? (
           <>
             <StatGrid label="Inventory health summary">
-              <StatCard
-                label="Catalog"
-                value={counts.all}
-                detail={`${counts.hidden} hidden · ${counts.all - counts.hidden} visible`}
-              />
-              <StatCard label="Healthy" value={counts.healthy} detail="Above reorder threshold" />
-              <StatCard label="Low stock" value={counts.low} detail="At or below threshold" />
-              <StatCard label="Out of stock" value={counts.out} detail="Needs restocking now" />
+              <StatCard label="Catalog" value={counts.all} />
+              <StatCard label="Out of stock" value={counts.out} />
             </StatGrid>
 
             <Card>
               <CardHeader>
-                <CardTitle>Inventory workbench</CardTitle>
-                <CardDescription>
-                  Use +20 / −5 for relative edits, set a reason, then save one row or all unsaved
-                  changes. Hidden listings are included when you choose that filter.
-                </CardDescription>
+                <CardTitle>Manage Inventory</CardTitle>
               </CardHeader>
               <CardContent className="flex flex-col gap-4">
                 <div className="flex flex-col gap-3 lg:flex-row lg:items-end lg:justify-between">
@@ -618,8 +526,6 @@ export function SupplierStock({ loadProducts = loadSupplierProducts }: SupplierS
                       aria-label="Filter inventory"
                     >
                       <ToggleGroupItem value="all">All ({counts.all})</ToggleGroupItem>
-                      <ToggleGroupItem value="healthy">Healthy ({counts.healthy})</ToggleGroupItem>
-                      <ToggleGroupItem value="low">Low ({counts.low})</ToggleGroupItem>
                       <ToggleGroupItem value="out">Out ({counts.out})</ToggleGroupItem>
                       <ToggleGroupItem value="hidden">Hidden ({counts.hidden})</ToggleGroupItem>
                     </ToggleGroup>
@@ -657,7 +563,6 @@ export function SupplierStock({ loadProducts = loadSupplierProducts }: SupplierS
                   placeholder="Search products"
                   value={searchTerm}
                   onChange={(event) => setSearchTerm(event.target.value)}
-                  result={`${filtered.length} of ${visiblePool.length} shown`}
                 />
 
                 {filtered.length ? (
@@ -683,10 +588,8 @@ export function SupplierStock({ loadProducts = loadSupplierProducts }: SupplierS
                         </TableHead>
                         <TableHead>Product</TableHead>
                         <TableHead>Unit</TableHead>
-                        <TableHead>Available now</TableHead>
+                        <TableHead>Available</TableHead>
                         <TableHead>New quantity</TableHead>
-                        <TableHead>Reorder at</TableHead>
-                        <TableHead>Reason</TableHead>
                         <TableHead>
                           <span className="sr-only">Update stock</span>
                         </TableHead>
@@ -697,13 +600,7 @@ export function SupplierStock({ loadProducts = loadSupplierProducts }: SupplierS
                         <StockRow
                           key={product.id}
                           product={product}
-                          draft={
-                            drafts[product.id] ?? {
-                              stock: String(product.stock),
-                              threshold: String(product.reorder_threshold),
-                              reason: "",
-                            }
-                          }
+                          draft={drafts[product.id] ?? { stock: String(product.stock) }}
                           selected={Boolean(selected[product.id])}
                           onToggleSelected={(checked) =>
                             setSelected((prev) => ({ ...prev, [product.id]: checked }))
@@ -712,11 +609,7 @@ export function SupplierStock({ loadProducts = loadSupplierProducts }: SupplierS
                             setDrafts((prev) => ({
                               ...prev,
                               [product.id]: {
-                                ...(prev[product.id] ?? {
-                                  stock: String(product.stock),
-                                  threshold: String(product.reorder_threshold),
-                                  reason: "",
-                                }),
+                                ...(prev[product.id] ?? { stock: String(product.stock) }),
                                 ...patch,
                               },
                             }))
@@ -732,55 +625,6 @@ export function SupplierStock({ loadProducts = loadSupplierProducts }: SupplierS
                     icon={Search}
                     title="No inventory matches these filters"
                     copy="Try another stock status or a broader search term."
-                  />
-                )}
-              </CardContent>
-            </Card>
-
-            <Card>
-              <CardHeader>
-                <CardTitle>Recent adjustments</CardTitle>
-                <CardDescription>
-                  Latest stock writes for your shop, including CSV imports and bulk deltas.
-                </CardDescription>
-              </CardHeader>
-              <CardContent>
-                {history.length ? (
-                  <Table>
-                    <TableHeader>
-                      <TableRow>
-                        <TableHead>When</TableHead>
-                        <TableHead>Product</TableHead>
-                        <TableHead>Change</TableHead>
-                        <TableHead>Reason</TableHead>
-                      </TableRow>
-                    </TableHeader>
-                    <TableBody>
-                      {history.map((row) => (
-                        <TableRow key={row.id}>
-                          <TableCell className="whitespace-nowrap text-muted-foreground">
-                            {formatDateTime(row.created_at)}
-                          </TableCell>
-                          <TableCell>{historyName(row.product_id)}</TableCell>
-                          <TableCell className="tabular-nums">
-                            {row.previous_stock} → {row.new_stock}{" "}
-                            <span className="text-muted-foreground">
-                              ({row.delta > 0 ? "+" : ""}
-                              {row.delta})
-                            </span>
-                          </TableCell>
-                          <TableCell className="text-muted-foreground">
-                            {row.reason || "—"}
-                          </TableCell>
-                        </TableRow>
-                      ))}
-                    </TableBody>
-                  </Table>
-                ) : (
-                  <EmptyState
-                    icon={Store}
-                    title="No adjustments yet"
-                    copy="Stock updates will appear here after you save changes."
                   />
                 )}
               </CardContent>

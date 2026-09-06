@@ -35,7 +35,6 @@ export type SupplierOrder = {
   notes: string | null;
   created_at: string;
   retailer_name: string;
-  retailer_email: string;
   accepted_at: string | null;
   package_status: "pending" | "confirmed" | "declined" | "shipped" | "delivered";
   declined_at: string | null;
@@ -269,12 +268,7 @@ export function filterSupplierOrders(
   const query = searchTerm.trim().toLowerCase();
   if (!query) return [...orders];
   return orders.filter((order) =>
-    [
-      shortId(order.id),
-      order.retailer_name,
-      order.retailer_email,
-      order.items.map((item) => item.product_name).join(" "),
-    ]
+    [shortId(order.id), order.retailer_name, order.items.map((item) => item.product_name).join(" ")]
       .join(" ")
       .toLowerCase()
       .includes(query),

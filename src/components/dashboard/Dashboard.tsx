@@ -178,7 +178,8 @@ export type MetricCardProps = {
   icon: LucideIcon;
   label: string;
   value: ReactNode;
-  period: string;
+  /** Optional sub-line under the value (e.g. a period or qualifier). */
+  period?: string;
   delta?: MetricDelta;
   context?: ReactNode;
   hint?: ReactNode;
@@ -229,7 +230,7 @@ export function MetricCard({
         </CardTitle>
       </CardHeader>
       <CardContent className="flex flex-col gap-2">
-        <p className="text-xs text-muted-foreground">{period}</p>
+        {period ? <p className="text-xs text-muted-foreground">{period}</p> : null}
         {delta ? (
           <p className="flex items-center gap-1 text-xs font-medium">
             <DeltaIcon />

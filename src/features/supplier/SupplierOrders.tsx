@@ -182,7 +182,6 @@ function toRow(order: SupplierOrder, images: Map<string, string>): OrderTableRow
     productImageUrl: firstId ? (images.get(firstId) ?? null) : null,
     extraItemCount: product.extraCount,
     customerName: order.retailer_name,
-    customerEmail: order.retailer_email,
     type: orderTypeOf(order),
     price: order.supplier_total,
     date: order.created_at,

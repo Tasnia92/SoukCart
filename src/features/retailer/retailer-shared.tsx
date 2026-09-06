@@ -1,17 +1,20 @@
-import type { ReactNode } from "react";
+import { useNavigate, useSearch } from "@tanstack/react-router";
 import {
+  CircleUser,
   Home,
   LogOut,
   Menu,
   MessageSquare,
   Package,
-  Settings,
-  ShoppingBag,
+  Search,
   ShoppingCart,
   Truck,
   type LucideIcon,
 } from "lucide-react";
+import { useEffect, useState, type ReactNode } from "react";
 import { Button } from "../../components/ui/button";
+import { InputGroup, InputGroupAddon, InputGroupInput } from "../../components/ui/input-group";
+import { HeaderAction, badgeCount } from "../../components/ui/Workspace.tsx";
 import { RouterLink } from "../../components/ui/RouterLink.tsx";
 import { Separator } from "../../components/ui/separator";
 import {
@@ -65,12 +68,6 @@ function buildRetailerNav(section: RetailerSection, badges: RetailerNavBadges): 
         active: section === "storefront",
       },
       {
-        to: "/retailer/catalog",
-        icon: ShoppingBag,
-        label: "Products",
-        active: section === "catalog",
-      },
-      {
         to: "/retailer/cart",
         icon: ShoppingCart,
         label: "Cart",
@@ -101,7 +98,7 @@ function buildRetailerNav(section: RetailerSection, badges: RetailerNavBadges): 
       {
         // The account item opens the settings screen, where log out lives.
         to: "/retailer/settings",
-        icon: Settings,
+        icon: CircleUser,
         label: "Account",
         active: section === "settings",
       },
@@ -117,8 +114,6 @@ export type RetailerWorkspaceShellProps = {
   cartCount?: number;
   unreadNotifications?: number;
   inTransitCount?: number;
-  /** Optional page-owned search box, hosted in the header's center slot. */
-  search?: ReactNode;
   onLogout: () => void;
   children: ReactNode;
 };
@@ -135,7 +130,6 @@ export function RetailerWorkspaceShell({
   cartCount = 0,
   unreadNotifications = 0,
   inTransitCount = 0,
-  search,
   onLogout,
   children,
 }: RetailerWorkspaceShellProps) {
@@ -143,7 +137,7 @@ export function RetailerWorkspaceShell({
 
   return (
     <div className="flex min-h-svh flex-col bg-background text-foreground">
-      <RetailerHeader nav={nav} cartCount={cartCount} search={search} onLogout={onLogout} />
+      <RetailerHeader nav={nav} cartCount={cartCount} onLogout={onLogout} />
       <main className="mx-auto flex w-full max-w-7xl flex-1 flex-col gap-6 px-4 py-6 sm:px-6 lg:px-8 print:max-w-none print:p-0">
         {children}
       </main>
@@ -155,7 +149,7 @@ export function RetailerWorkspaceShell({
 function CountPill({ value }: { value: number }) {
   return (
     <span className="ml-0.5 inline-flex min-w-5 items-center justify-center rounded-full bg-primary px-1.5 py-0.5 text-[10px] font-semibold leading-none text-primary-foreground">
-      {value}
+      {badgeCount(value)}
     </span>
   );
 }
@@ -253,21 +247,15 @@ function RetailerMobileMenu({ nav, onLogout }: { nav: RetailerNav; onLogout: () 
   );
 }
 
-/** Labeled cart icon (top-right) with the live item count. */
+/** Labeled cart action (top-right) with the live item count. */
 function CartButton({ count }: { count: number }) {
   return (
     <RouterLink
       to="/retailer/cart"
       aria-label={count ? `Cart, ${count} items` : "Cart"}
-      className="relative flex flex-col items-center gap-0.5 rounded-md px-2 py-1 text-[10px] font-medium text-foreground/70 transition-colors hover:text-foreground"
+      className="flex rounded-md text-foreground/70 transition-colors hover:bg-accent/50 hover:text-foreground focus-visible:outline-none focus-visible:ring-[3px] focus-visible:ring-ring/50"
     >
-      <ShoppingCart className="size-5" aria-hidden="true" />
-      Cart
-      {count ? (
-        <span className="absolute top-0 right-0 flex min-w-4 items-center justify-center rounded-full bg-primary px-1 text-[10px] font-semibold leading-4 text-primary-foreground">
-          {count}
-        </span>
-      ) : null}
+      <HeaderAction icon={ShoppingCart} label="Cart" count={count} />
     </RouterLink>
   );
 }
@@ -295,15 +283,59 @@ function BarNavLink({ item }: { item: RetailerNavItem }) {
   );
 }
 
+/**
+ * Shop search shared by every retailer page. Typing filters nothing on its
+ * own — submitting (Enter) carries the term to the storefront home via the
+ * `?q=` search param, so results behave the same no matter which page the
+ * search started from.
+ */
+export function RetailerHeaderSearch() {
+  const navigate = useNavigate();
+  // Keep the box in step with the URL so the term survives navigation and
+  // clears when a search-less page is opened.
+  const query = useSearch({
+    strict: false,
+    select: (search) => {
+      const value = (search as Record<string, unknown>).q;
+      return typeof value === "string" ? value : "";
+    },
+  });
+  const [term, setTerm] = useState(query);
+
+  useEffect(() => {
+    setTerm(query);
+  }, [query]);
+
+  return (
+    <form
+      onSubmit={(event) => {
+        event.preventDefault();
+        void navigate({ to: "/retailer", search: { q: term || undefined } });
+      }}
+    >
+      <InputGroup className="w-full">
+        <InputGroupInput
+          type="search"
+          aria-label="Search products"
+          placeholder="Search products, suppliers…"
+          value={term}
+          onChange={(event) => setTerm(event.target.value)}
+        />
+        <InputGroupAddon align="inline-end">
+          <Search />
+        </InputGroupAddon>
+      </InputGroup>
+    </form>
+  );
+}
+
 function RetailerHeader({
   nav,
   cartCount,
-  search,
   onLogout,
 }: {
   nav: RetailerNav;
   cartCount: number;
-  search?: ReactNode;
   onLogout: () => void;
 }) {
   // The cart lives in the top-right icon cluster, so the dark strip shows the
@@ -321,23 +353,23 @@ function RetailerHeader({
           <BrandLogo />
         </div>
 
-        {search ? (
-          <div className="hidden min-w-0 flex-1 justify-center lg:flex">
-            <div className="w-full max-w-xl">{search}</div>
+        <div className="hidden min-w-0 flex-1 justify-center lg:flex">
+          <div className="w-full max-w-xl">
+            <RetailerHeaderSearch />
           </div>
-        ) : null}
+        </div>
 
         <div className="ml-auto flex shrink-0 items-center gap-1">
-          <NotificationsBell viewAllTo="/retailer/notifications" />
+          <NotificationsBell viewAllTo="/retailer/notifications" label="Alerts" />
           <CartButton count={cartCount} />
         </div>
       </div>
 
-      {search ? (
-        <div className="border-t px-4 py-2 sm:px-6 lg:hidden">
-          <div className="mx-auto max-w-xl">{search}</div>
+      <div className="border-t px-4 py-2 sm:px-6 lg:hidden">
+        <div className="mx-auto max-w-xl">
+          <RetailerHeaderSearch />
         </div>
-      ) : null}
+      </div>
 
       <div className="hidden bg-primary text-primary-foreground lg:block">
         <div className="mx-auto flex h-11 max-w-7xl items-stretch px-4 sm:px-6 lg:justify-center lg:px-8">

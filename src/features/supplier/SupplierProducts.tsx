@@ -1,6 +1,6 @@
 import { useNavigate, useRouterState } from "@tanstack/react-router";
 import { useEffect, useMemo, useState } from "react";
-import { Copy, MoreHorizontal, Plus, Search, ShoppingBag, Trash2 } from "lucide-react";
+import { MoreHorizontal, Plus, Search, ShoppingBag, Trash2 } from "lucide-react";
 import {
   AlertDialog,
   AlertDialogAction,
@@ -15,7 +15,6 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import {
   Card,
-  CardAction,
   CardContent,
   CardDescription,
   CardFooter,
@@ -49,7 +48,7 @@ import {
 } from "../../components/ui/Workspace.tsx";
 import { useProductChanges } from "../../product-realtime.ts";
 import { useSessionSnapshot, useSessionStore } from "../../session.tsx";
-import { formatDate, formatPrice } from "../workspace/format.ts";
+import { formatPrice } from "../workspace/format.ts";
 import { ProductArt } from "../workspace/product-art.tsx";
 import { searchParam } from "../workspace/search.ts";
 import { RouterLink } from "../workspace/WorkspaceShell.tsx";
@@ -57,7 +56,6 @@ import {
   CATALOG_PAGE_SIZE,
   deleteSupplierProduct,
   deleteSupplierProducts,
-  duplicateSupplierProduct,
   filterSupplierProducts,
   friendlyProductError,
   isProductLowStock,
@@ -71,7 +69,7 @@ import {
   type ProductSort,
   type SupplierProduct,
 } from "./supplier-products-api.ts";
-import { isAdminModerated } from "./supplier-overview-api.ts";
+import { isAdminModerated, isAwaitingReview } from "./supplier-overview-api.ts";
 import {
   consumeSupplierNotice,
   StockChip,
@@ -104,7 +102,6 @@ function ProductCard({
   selected,
   onToggleSelected,
   onToggleActive,
-  onDuplicate,
   onDelete,
 }: {
   product: SupplierProduct;
@@ -112,12 +109,11 @@ function ProductCard({
   selected: boolean;
   onToggleSelected: (checked: boolean) => void;
   onToggleActive: (product: SupplierProduct) => void;
-  onDuplicate: (product: SupplierProduct) => void;
   onDelete: (product: SupplierProduct) => void;
 }) {
   return (
     <Card
-      className="h-full gap-0 overflow-hidden py-0"
+      className="h-full gap-0 overflow-hidden py-0 data-[selected=true]:ring-2 data-[selected=true]:ring-ring"
       data-selected={selected ? "true" : undefined}
     >
       <div className="relative aspect-[4/3] w-full shrink-0 overflow-hidden bg-muted">
@@ -130,21 +126,16 @@ function ProductCard({
             className="border-background bg-background/90"
           />
         </div>
-      </div>
-      <CardHeader className="pt-(--card-spacing)">
-        <CardTitle className="line-clamp-2 min-h-[2.75rem] leading-snug">{product.name}</CardTitle>
-        <CardDescription className="truncate">
-          {formatPrice(product.price)} per {product.unit}
-        </CardDescription>
-        <CardAction>
+        <div className="absolute top-2 right-2 z-10">
           <DropdownMenu>
             <DropdownMenuTrigger asChild>
               <Button
                 type="button"
-                variant="ghost"
+                variant="secondary"
                 size="icon-sm"
                 disabled={busy}
                 aria-label={`More actions for ${product.name}`}
+                className="size-7 bg-background/90"
               >
                 <MoreHorizontal aria-hidden="true" />
               </Button>
@@ -153,7 +144,10 @@ function ProductCard({
               <DropdownMenuGroup>
                 <DropdownMenuItem
                   disabled={
-                    busy || isAdminModerated(product) || (product.is_active && product.stock <= 0)
+                    busy ||
+                    isAdminModerated(product) ||
+                    isAwaitingReview(product) ||
+                    (product.is_active && product.stock <= 0)
                   }
                   onClick={() => onToggleActive(product)}
                 >
@@ -161,11 +155,9 @@ function ProductCard({
                     ? "Hide from retailers"
                     : isAdminModerated(product)
                       ? "Hidden by admin"
-                      : "Show to retailers"}
-                </DropdownMenuItem>
-                <DropdownMenuItem disabled={busy} onClick={() => onDuplicate(product)}>
-                  <Copy />
-                  Duplicate
+                      : isAwaitingReview(product)
+                        ? "Waiting for admin approval"
+                        : "Show to retailers"}
                 </DropdownMenuItem>
               </DropdownMenuGroup>
               <DropdownMenuSeparator />
@@ -181,31 +173,42 @@ function ProductCard({
               </DropdownMenuGroup>
             </DropdownMenuContent>
           </DropdownMenu>
-        </CardAction>
+        </div>
+      </div>
+      <CardHeader className="pt-(--card-spacing)">
+        <CardTitle className="line-clamp-2 min-h-10 text-sm leading-snug">{product.name}</CardTitle>
+        <CardDescription className="text-sm font-semibold text-foreground">
+          {formatPrice(product.price)}{" "}
+          <span className="font-normal text-muted-foreground">per {product.unit}</span>
+        </CardDescription>
       </CardHeader>
-      <CardContent className="flex flex-1 flex-col gap-4">
-        <p className="line-clamp-2 min-h-[2.5rem] text-sm text-muted-foreground">
-          {product.description || "Add a description to help retailers understand this product."}
-        </p>
-        <div className="flex min-h-7 flex-wrap content-start items-center gap-2">
+      <CardContent className="flex flex-1 flex-col gap-2.5">
+        <div className="flex flex-wrap items-center gap-1.5">
           <StockChip product={product} />
-          {product.category ? <Badge variant="outline">{product.category}</Badge> : null}
+          {product.approval_status === "pending" ? (
+            <Badge variant="secondary">Pending approval</Badge>
+          ) : null}
+          {product.approval_status === "rejected" ? (
+            <Badge variant="destructive">Not approved</Badge>
+          ) : null}
           {product.moderation_status === "hidden" ? (
             <Badge variant="destructive">Hidden by admin</Badge>
           ) : null}
           {product.moderation_status === "removed" ? (
             <Badge variant="destructive">Removed by admin</Badge>
           ) : null}
-          {product.is_active && isProductLowStock(product) ? (
-            <Badge variant="outline">Low stock</Badge>
-          ) : null}
         </div>
+        {product.approval_note ? (
+          <p className="rounded-md border border-destructive/30 bg-destructive/5 px-2.5 py-1.5 text-xs text-destructive">
+            <strong>Review note:</strong> {product.approval_note}
+          </p>
+        ) : null}
         {product.moderation_reason ? (
-          <p className="rounded-md border border-destructive/30 bg-destructive/5 px-3 py-2 text-xs text-destructive">
+          <p className="rounded-md border border-destructive/30 bg-destructive/5 px-2.5 py-1.5 text-xs text-destructive">
             <strong>Admin reason:</strong> {product.moderation_reason}
           </p>
         ) : null}
-        <div className="flex items-center justify-between gap-2 text-sm">
+        <div className="mt-auto flex items-baseline justify-between gap-2 text-sm">
           <span>
             <span className="font-medium tabular-nums">{product.stock}</span> {product.unit}{" "}
             available
@@ -213,11 +216,8 @@ function ProductCard({
           <span className="text-xs text-muted-foreground">MOQ {product.min_order_qty}</span>
         </div>
       </CardContent>
-      <CardFooter className="mt-auto justify-between border-t pt-(--card-spacing) pb-(--card-spacing)">
-        <span className="text-xs text-muted-foreground">
-          Added {formatDate(product.created_at)}
-        </span>
-        <Button asChild variant="outline" size="sm">
+      <CardFooter className="mt-auto border-t pt-(--card-spacing) pb-(--card-spacing)">
+        <Button asChild variant="outline" size="sm" className="w-full">
           <RouterLink to="/supplier/products/$productId/edit" params={{ productId: product.id }}>
             Edit product
           </RouterLink>
@@ -326,6 +326,16 @@ export function SupplierProducts({ loadProducts = loadSupplierProducts }: Suppli
       });
       return;
     }
+    if (isAwaitingReview(product)) {
+      setNotice({
+        message:
+          product.approval_status === "pending"
+            ? `${product.name} is waiting for admin approval. Retailers see it once it is approved.`
+            : `${product.name} was not approved. Edit the listing to resubmit it for review.`,
+        state: "error",
+      });
+      return;
+    }
     const nextActive = !product.is_active;
     const previous = product.is_active;
     setBusyId(product.id);
@@ -381,24 +391,6 @@ export function SupplierProducts({ loadProducts = loadSupplierProducts }: Suppli
       .finally(() => setBusyId(null));
   };
 
-  const onDuplicate = (product: SupplierProduct) => {
-    setBusyId(product.id);
-    void duplicateSupplierProduct(product.id)
-      .then(async (copy) => {
-        const refreshed = await loadProducts(sellerId);
-        setProducts(refreshed);
-        setNotice({
-          message: `Created hidden copy “${copy.name}”.`,
-          state: "success",
-        });
-        setFilter("hidden");
-      })
-      .catch((duplicateError: unknown) => {
-        setNotice({ message: friendlyProductError(duplicateError), state: "error" });
-      })
-      .finally(() => setBusyId(null));
-  };
-
   const confirmDelete = () => {
     const product = deleteTarget;
     if (!product) return;
@@ -426,11 +418,14 @@ export function SupplierProducts({ loadProducts = loadSupplierProducts }: Suppli
   const runBulkVisibility = (isActive: boolean) => {
     if (!selectedIds.length || !products) return;
     const targets = products.filter((product) => selectedIds.includes(product.id));
-    const actionable = isActive ? targets.filter((product) => !isAdminModerated(product)) : targets;
+    const actionable = isActive
+      ? targets.filter((product) => !isAdminModerated(product) && !isAwaitingReview(product))
+      : targets;
     const skipped = targets.length - actionable.length;
     if (!actionable.length) {
       setNotice({
-        message: "Selected products were moderated by an administrator and cannot be shown again.",
+        message:
+          "Selected products are admin-moderated or still awaiting approval and cannot be shown.",
         state: "error",
       });
       return;
@@ -449,7 +444,7 @@ export function SupplierProducts({ loadProducts = loadSupplierProducts }: Suppli
         setNotice({
           message: isActive
             ? `Showed ${ids.length} product${ids.length === 1 ? "" : "s"}${
-                skipped ? ` (${skipped} admin-moderated skipped)` : ""
+                skipped ? ` (${skipped} awaiting review or admin-moderated skipped)` : ""
               }.`
             : `Hid ${ids.length} product${ids.length === 1 ? "" : "s"}.`,
           state: "success",
@@ -511,7 +506,6 @@ export function SupplierProducts({ loadProducts = loadSupplierProducts }: Suppli
       <PageHeader
         eyebrow="Catalog"
         title="Products"
-        copy="Filter, sort, duplicate, and bulk-manage listings without leaving the catalog."
         actions={
           <Button asChild>
             <RouterLink to="/supplier/products/new">
@@ -535,31 +529,15 @@ export function SupplierProducts({ loadProducts = loadSupplierProducts }: Suppli
           <Card size="sm">
             <CardHeader>
               <CardTitle>Catalog filters</CardTitle>
-              <CardDescription>
-                {counts.active} active · {counts.low} low · {counts.out} out · {counts.hidden}{" "}
-                hidden
-              </CardDescription>
             </CardHeader>
-            <CardContent className="flex flex-col gap-4">
-              <div className="overflow-x-auto pb-1">
-                <ToggleGroup
-                  type="single"
-                  variant="outline"
-                  size="sm"
-                  value={filter}
-                  onValueChange={(value) => {
-                    if (value) setFilter(value as ProductFilter);
-                  }}
-                  aria-label="Filter products"
-                >
-                  <ToggleGroupItem value="all">All ({counts.all})</ToggleGroupItem>
-                  <ToggleGroupItem value="active">Active ({counts.active})</ToggleGroupItem>
-                  <ToggleGroupItem value="low">Low stock ({counts.low})</ToggleGroupItem>
-                  <ToggleGroupItem value="out">Out ({counts.out})</ToggleGroupItem>
-                  <ToggleGroupItem value="hidden">Hidden ({counts.hidden})</ToggleGroupItem>
-                </ToggleGroup>
-              </div>
-              <div className="grid gap-3 md:grid-cols-2">
+            <CardContent className="flex flex-col gap-3">
+              <div className="grid items-end gap-3 lg:grid-cols-[minmax(0,1fr)_minmax(10rem,auto)_minmax(10rem,auto)]">
+                <SearchToolbar
+                  label="Search products"
+                  placeholder="Search by name, category, or unit"
+                  value={searchTerm}
+                  onChange={(event) => setSearchTerm(event.target.value)}
+                />
                 <label className="flex flex-col gap-1 text-sm">
                   <span className="text-muted-foreground">Category</span>
                   <Select value={category} onValueChange={setCategory}>
@@ -591,15 +569,26 @@ export function SupplierProducts({ loadProducts = loadSupplierProducts }: Suppli
                   </Select>
                 </label>
               </div>
-              <SearchToolbar
-                label="Search products"
-                placeholder="Search by name, category, or unit"
-                value={searchTerm}
-                onChange={(event) => setSearchTerm(event.target.value)}
-                result={`${paged.total} match${paged.total === 1 ? "" : "es"} · page ${paged.page}/${paged.pageCount}`}
-              />
+              <div className="overflow-x-auto pb-1">
+                <ToggleGroup
+                  type="single"
+                  variant="outline"
+                  size="sm"
+                  value={filter}
+                  onValueChange={(value) => {
+                    if (value) setFilter(value as ProductFilter);
+                  }}
+                  aria-label="Filter products"
+                >
+                  <ToggleGroupItem value="all">All ({counts.all})</ToggleGroupItem>
+                  <ToggleGroupItem value="active">Active ({counts.active})</ToggleGroupItem>
+                  <ToggleGroupItem value="low">Low stock ({counts.low})</ToggleGroupItem>
+                  <ToggleGroupItem value="out">Out ({counts.out})</ToggleGroupItem>
+                  <ToggleGroupItem value="hidden">Hidden ({counts.hidden})</ToggleGroupItem>
+                </ToggleGroup>
+              </div>
               {selectedIds.length ? (
-                <div className="flex flex-wrap items-center gap-2">
+                <div className="flex flex-wrap items-center gap-2 border-t pt-3">
                   <span className="text-sm text-muted-foreground">
                     {selectedIds.length} selected
                   </span>
@@ -637,7 +626,7 @@ export function SupplierProducts({ loadProducts = loadSupplierProducts }: Suppli
 
           {paged.items.length ? (
             <>
-              <div className="grid grid-cols-1 gap-4 md:grid-cols-2 2xl:grid-cols-3">
+              <div className="grid grid-cols-2 gap-3 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5">
                 {paged.items.map((product) => (
                   <ProductCard
                     key={product.id}
@@ -648,7 +637,6 @@ export function SupplierProducts({ loadProducts = loadSupplierProducts }: Suppli
                       setSelected((prev) => ({ ...prev, [product.id]: checked }))
                     }
                     onToggleActive={onToggleActive}
-                    onDuplicate={onDuplicate}
                     onDelete={setDeleteTarget}
                   />
                 ))}

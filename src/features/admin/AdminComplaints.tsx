@@ -213,7 +213,7 @@ export function AdminComplaints({
       <PageHeader
         eyebrow="Disputes"
         title="Disputes."
-        copy="Retailer complaints. Resolve open ones here, or from Needs attention."
+        copy="Retailer complaints. Resolve open ones here."
       />
       <InlineNotice message={notice?.message} state={notice?.state} />
       {complaints && stats ? (

@@ -4,7 +4,6 @@ import {
   LayoutDashboard,
   PackageCheck,
   PackageOpen,
-  RotateCcw,
   Settings,
   ShoppingBag,
   Users,
@@ -14,6 +13,7 @@ import {
 import { Badge } from "@/components/ui/badge";
 import { useTableChanges } from "../../workspace-realtime.ts";
 import { useProductChanges } from "../../product-realtime.ts";
+import { badgeCount } from "../../components/ui/Workspace.tsx";
 import { WorkspaceShell, type WorkspaceNavItem } from "../workspace/WorkspaceShell.tsx";
 import {
   EMPTY_SELLER_NAV_BADGES,
@@ -68,7 +68,6 @@ export type SupplierSection =
   | "products"
   | "stock"
   | "earnings"
-  | "returns"
   | "customers"
   | "notifications"
   | "settings";
@@ -106,7 +105,7 @@ export function SupplierWorkspaceShell({
 
   useTableChanges({
     enabled: true,
-    tables: ["orders", "seller_payouts", "notifications", "order_returns"],
+    tables: ["orders", "seller_payouts", "notifications"],
     onChange: refreshBadges,
     coalesceMs: 1500,
   });
@@ -119,7 +118,7 @@ export function SupplierWorkspaceShell({
 
   return (
     <WorkspaceShell
-      navigationLabel="Seller workspace navigation"
+      navigationLabel="Supplier workspace navigation"
       items={supplierNavItems(section, badges)}
       userName={userName}
       userEmail={userEmail}
@@ -147,7 +146,7 @@ export function supplierNavItems(
       icon: PackageCheck,
       label: "Orders",
       active: active === "orders",
-      trailing: badges.needsAction > 0 ? badges.needsAction : undefined,
+      trailing: badges.needsAction > 0 ? badgeCount(badges.needsAction) : undefined,
     },
     {
       to: "/supplier/products",
@@ -160,7 +159,7 @@ export function supplierNavItems(
       icon: Warehouse,
       label: "Inventory",
       active: active === "stock",
-      trailing: badges.stockAtRisk > 0 ? badges.stockAtRisk : undefined,
+      trailing: badges.stockAtRisk > 0 ? badgeCount(badges.stockAtRisk) : undefined,
     },
     {
       to: "/supplier/earnings",
@@ -169,16 +168,9 @@ export function supplierNavItems(
       active: active === "earnings",
     },
     {
-      to: "/supplier/returns",
-      icon: RotateCcw,
-      label: "Returns",
-      active: active === "returns",
-      trailing: badges.openReturns > 0 ? badges.openReturns : undefined,
-    },
-    {
       to: "/supplier/customers",
       icon: Users,
-      label: "Customers",
+      label: "Retailers",
       active: active === "customers",
     },
     {
@@ -186,7 +178,7 @@ export function supplierNavItems(
       icon: Bell,
       label: "Notifications",
       active: active === "notifications",
-      trailing: badges.unreadNotifications > 0 ? badges.unreadNotifications : undefined,
+      trailing: badges.unreadNotifications > 0 ? badgeCount(badges.unreadNotifications) : undefined,
     },
     {
       to: "/supplier/settings",

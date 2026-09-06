@@ -244,6 +244,50 @@ export function PageHeader({ eyebrow, title, copy, actions }: PageHeaderProps) {
   );
 }
 
+type HeaderActionProps = {
+  icon: LucideIcon;
+  label: string;
+  /** Count shown in the corner pill; hidden when zero. */
+  count?: number;
+};
+
+/**
+ * Badge text for a count: the plain number up to 8, then "9+".
+ */
+export function badgeCount(count: number): string {
+  return count > 8 ? "9+" : String(count);
+}
+
+/**
+ * Small circular count pill anchored to an icon's top-right corner. Shared by
+ * header actions and icon buttons so counters always render identically.
+ */
+export function HeaderCountPill({ count }: { count: number }) {
+  return (
+    <span
+      aria-hidden="true"
+      className="absolute top-0 right-0 flex min-w-4 items-center justify-center rounded-full bg-primary px-1 text-[10px] font-semibold leading-4 text-primary-foreground"
+    >
+      {badgeCount(count)}
+    </span>
+  );
+}
+
+/**
+ * Top-right header action: an icon over a tiny label with an optional count
+ * pill. Every header action renders through this so icon size, spacing and
+ * height always match, whatever wraps it (link, dropdown trigger, button).
+ */
+export function HeaderAction({ icon: Icon, label, count = 0 }: HeaderActionProps) {
+  return (
+    <span className="relative flex flex-col items-center gap-0.5 px-2 py-1 text-[10px] font-medium">
+      <Icon className="size-5" aria-hidden="true" />
+      {label}
+      {count ? <HeaderCountPill count={count} /> : null}
+    </span>
+  );
+}
+
 export function StatGrid({ label, children }: { label: string; children: ReactNode }) {
   return (
     <section className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4" aria-label={label}>
@@ -276,7 +320,8 @@ export function StatCard({
 
 type SearchToolbarProps = Omit<InputHTMLAttributes<HTMLInputElement>, "type"> & {
   label: string;
-  result: ReactNode;
+  /** Optional trailing text (e.g. a match count); omitted renders the bare input. */
+  result?: ReactNode;
 };
 
 export function SearchToolbar({ label, result, ...inputProps }: SearchToolbarProps) {
@@ -288,7 +333,9 @@ export function SearchToolbar({ label, result, ...inputProps }: SearchToolbarPro
         </InputGroupAddon>
         <InputGroupInput {...inputProps} type="search" aria-label={label} />
       </InputGroup>
-      <span className="text-sm whitespace-nowrap text-muted-foreground">{result}</span>
+      {result ? (
+        <span className="text-sm whitespace-nowrap text-muted-foreground">{result}</span>
+      ) : null}
     </div>
   );
 }

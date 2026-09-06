@@ -257,7 +257,7 @@ export function SupplierProductForm({
         message = `${payload.name} was updated.`;
       } else {
         await createSupplierProduct(sellerId, payload, imageUrl);
-        message = `${payload.name} was added to your catalog.`;
+        message = `${payload.name} was submitted for approval. Retailers see it once SoukCart approves it.`;
       }
 
       if (originalImageUrl && originalImageUrl !== imageUrl) {
@@ -304,8 +304,8 @@ export function SupplierProductForm({
         title={editing ? "Edit product" : "Add a product"}
         copy={
           editing
-            ? "Update the details or swap the photo — retailers see the changes right away."
-            : "Give retailers what they need: a clear name, a fair price, and a photo. Fields marked * are required."
+            ? "Update the details or swap the photo — approved listings reach retailers right away."
+            : "New listings are reviewed by SoukCart before retailers can order them. Fields marked * are required."
         }
       />
       <InlineNotice />

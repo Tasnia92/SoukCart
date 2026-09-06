@@ -61,7 +61,6 @@ export type SupplierSummary = {
 export type SupplierQueueOrder = {
   id: string;
   retailerName: string;
-  retailerEmail: string;
   createdAt: string;
   ageDays: number;
   units: number;
@@ -137,38 +136,24 @@ export type SellerNavBadges = {
   needsAction: number;
   stockAtRisk: number;
   unreadNotifications: number;
-  openReturns: number;
 };
 
 export const EMPTY_SELLER_NAV_BADGES: SellerNavBadges = {
   needsAction: 0,
   stockAtRisk: 0,
   unreadNotifications: 0,
-  openReturns: 0,
 };
-
-/** Per-product reorder threshold with the historical default of 5. */
-export function productReorderThreshold(
-  product: Pick<SupplierProduct, "reorder_threshold"> | { reorder_threshold?: number },
-): number {
-  const threshold = Number(product.reorder_threshold);
-  return Number.isInteger(threshold) && threshold >= 0 ? threshold : LOW_STOCK_THRESHOLD;
-}
 
 export function isProductOutOfStock(product: Pick<SupplierProduct, "stock">): boolean {
   return product.stock <= 0;
 }
 
-export function isProductLowStock(
-  product: Pick<SupplierProduct, "stock" | "reorder_threshold">,
-): boolean {
-  return product.stock > 0 && product.stock <= productReorderThreshold(product);
+export function isProductLowStock(product: Pick<SupplierProduct, "stock">): boolean {
+  return product.stock > 0 && product.stock <= LOW_STOCK_THRESHOLD;
 }
 
-export function isProductAtRisk(
-  product: Pick<SupplierProduct, "stock" | "reorder_threshold">,
-): boolean {
-  return product.stock <= productReorderThreshold(product);
+export function isProductAtRisk(product: Pick<SupplierProduct, "stock">): boolean {
+  return product.stock <= LOW_STOCK_THRESHOLD;
 }
 
 function asMoney(value: unknown): number {
@@ -260,7 +245,6 @@ export async function loadSellerNavBadges(): Promise<SellerNavBadges> {
     needsAction: asInt(row.needsAction),
     stockAtRisk: asInt(row.stockAtRisk),
     unreadNotifications: asInt(row.unreadNotifications),
-    openReturns: asInt(row.openReturns),
   };
 }
 
@@ -347,7 +331,6 @@ export function buildSupplierDashboard(
     .map<SupplierQueueOrder>((order) => ({
       id: order.id,
       retailerName: order.retailer_name,
-      retailerEmail: order.retailer_email,
       createdAt: order.created_at,
       ageDays: ageInDays(order.created_at, now),
       units: orderUnits(order),
@@ -363,7 +346,7 @@ export function buildSupplierDashboard(
   const active = products.filter((product) => product.is_active);
   const outOfStock = active.filter(isProductOutOfStock);
   const lowStock = active.filter(isProductLowStock);
-  const healthy = active.filter((product) => product.stock > productReorderThreshold(product));
+  const healthy = active.filter((product) => product.stock > LOW_STOCK_THRESHOLD);
 
   const stockRisk = [...outOfStock, ...lowStock]
     .sort((left, right) => left.stock - right.stock)
@@ -443,7 +426,6 @@ function normalizeQueueOrder(value: unknown): SupplierQueueOrder | null {
   return {
     id: row.id,
     retailerName: typeof row.retailerName === "string" ? row.retailerName : "Retailer",
-    retailerEmail: typeof row.retailerEmail === "string" ? row.retailerEmail : "",
     createdAt: typeof row.createdAt === "string" ? row.createdAt : "",
     ageDays: asInt(row.ageDays),
     units: asInt(row.units),
