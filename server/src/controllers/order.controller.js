@@ -1,0 +1,134 @@
+import Order from '../models/Order.js';
+import {
+  createOrderFromCart,
+  setOrderStatus,
+  confirmSupplierLines,
+  collectCod,
+  assertOrderAccess,
+} from '../services/order.service.js';
+import { createSslCommerzSession, sslConfigured, retryPayment } from '../services/payment.service.js';
+import { asyncHandler } from '../utils/asyncHandler.js';
+
+const populate = [
+  { path: 'retailer', select: 'name email businessName phone' },
+  { path: 'supplier', select: 'name businessName' },
+  { path: 'suppliers', select: 'name businessName' },
+  { path: 'items.supplier', select: 'name businessName' },
+  { path: 'cancelledBy', select: 'name role' },
+];
+
+export const placeOrder = asyncHandler(async (req, res) => {
+  try {
+    if (!sslConfigured()) {
+      return res.status(500).json({ message: 'SSLCommerz is not configured. Add store id/password to .env.' });
+    }
+    const order = await createOrderFromCart({
+      retailerId: req.user._id,
+      items: req.body.items,
+      paymentMethod: req.body.paymentMethod,
+      deliveryAddress: req.body.deliveryAddress,
+      recipientName: req.body.recipientName,
+      recipientMobile: req.body.recipientMobile,
+      notes: req.body.notes,
+    });
+    const payment = await createSslCommerzSession(order, req.user);
+    res.status(201).json({
+      order,
+      payment,
+      message: 'Redirect to SSLCommerz to pay. You can retry from Orders if payment fails.',
+    });
+  } catch (e) {
+    res.status(e.status || 500).json({ message: e.message, ssl: e.ssl });
+  }
+});
+
+export const myOrders = asyncHandler(async (req, res) => {
+  const filter = {};
+  if (req.user.role === 'retailer') filter.retailer = req.user._id;
+  if (req.user.role === 'supplier') {
+    filter.$or = [
+      { supplier: req.user._id },
+      { suppliers: req.user._id },
+      { 'items.supplier': req.user._id },
+    ];
+    filter.deliveryFeePaid = true;
+  }
+
+  if (req.query.status) {
+    filter.status = req.query.status;
+  } else if (req.query.all !== '1' && req.user.role === 'supplier') {
+    filter.status = { $nin: ['awaiting_payment'] };
+  }
+
+  if (req.query.refund === 'pending') filter.manualRefundStatus = 'pending';
+  if (req.query.refund === 'completed') filter.manualRefundStatus = 'completed';
+  if (req.query.tracking === '1') {
+    filter.status = { $in: ['placed', 'supplier_approved', 'supplier_confirmed', 'delivery_initiated', 'shipped', 'out_for_delivery'] };
+  }
+
+  const orders = await Order.find(filter).populate(populate).sort({ createdAt: -1 });
+  res.json({ orders });
+});
+
+export const getOrder = asyncHandler(async (req, res) => {
+  const order = await Order.findById(req.params.id).populate(populate);
+  if (!order) return res.status(404).json({ message: 'Not found' });
+  try {
+    assertOrderAccess(order, req.user);
+  } catch (e) {
+    return res.status(e.status || 403).json({ message: e.message });
+  }
+  res.json({ order });
+});
+
+export const updateStatus = asyncHandler(async (req, res) => {
+  const order = await Order.findById(req.params.id);
+  if (!order) return res.status(404).json({ message: 'Not found' });
+  try {
+    const updated = await setOrderStatus(order, req.body.status, req.user, {
+      cancelReason: req.body.cancelReason || req.body.reason,
+    });
+    const fresh = await Order.findById(updated._id).populate(populate);
+    res.json({ order: fresh || updated });
+  } catch (e) {
+    res.status(e.status || 500).json({ message: e.message, availableQty: e.availableQty });
+  }
+});
+
+export const confirmOrder = asyncHandler(async (req, res) => {
+  const order = await Order.findById(req.params.id);
+  if (!order) return res.status(404).json({ message: 'Not found' });
+  try {
+    const updated = await confirmSupplierLines(order, req.user);
+    const fresh = await Order.findById(updated._id).populate(populate);
+    res.json({ order: fresh || updated });
+  } catch (e) {
+    res.status(e.status || 500).json({ message: e.message, availableQty: e.availableQty });
+  }
+});
+
+export const retryOrderPayment = asyncHandler(async (req, res) => {
+  const order = await Order.findById(req.params.id);
+  if (!order) return res.status(404).json({ message: 'Not found' });
+  try {
+    if (!sslConfigured()) {
+      return res.status(500).json({ message: 'SSLCommerz is not configured.' });
+    }
+    const payment = await retryPayment(order, req.user);
+    res.json({ order, payment });
+  } catch (e) {
+    res.status(e.status || 500).json({ message: e.message, ssl: e.ssl });
+  }
+});
+
+export const collectCodPayment = asyncHandler(async (req, res) => {
+  const order = await Order.findById(req.params.id);
+  if (!order) return res.status(404).json({ message: 'Not found' });
+  try {
+    const updated = await collectCod(order, req.user);
+    const fresh = await Order.findById(updated._id).populate(populate);
+    res.json({ order: fresh || updated });
+  } catch (e) {
+    res.status(e.status || 500).json({ message: e.message });
+  }
+});

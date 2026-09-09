@@ -1,0 +1,13 @@
+services:
+  nekcart-mongo:
+    image: mongo:7
+    container_name: nekcart-mongo
+    ports:
+      - "27017:27017"
+    environment:
+      MONGO_INITDB_DATABASE: nekcart
+    volumes:
+      - nekcart_mongo_data:/data/db
+
+volumes:
+  nekcart_mongo_data:

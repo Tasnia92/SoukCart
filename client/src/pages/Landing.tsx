@@ -1,0 +1,271 @@
+import { useState, type FormEvent } from 'react'
+import { Link } from 'react-router-dom'
+import { Brand } from '@/components/Brand'
+import { Button } from '@/components/ui'
+import { ShieldCheck, Tag, Truck, Grid2x2, ClipboardList, Menu, X } from 'lucide-react'
+
+const supplierSteps = [
+  'Create Your Account',
+  'List Your Products',
+  'Receive Orders',
+  'Confirm Orders',
+  'Grow Your Business',
+]
+const retailerSteps = [
+  'Find Products',
+  'Compare & Choose',
+  'Place Your Order',
+  'Track & Receive',
+  'Stock & Grow',
+]
+
+export function Landing() {
+  const [menuOpen, setMenuOpen] = useState(false)
+  const [email, setEmail] = useState('')
+  const [note, setNote] = useState('')
+
+  function subscribe(e: FormEvent) {
+    e.preventDefault()
+    const value = email.trim()
+    if (!value) {
+      setNote('Enter your email to subscribe.')
+      return
+    }
+    if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(value)) {
+      setNote('Enter a valid email address.')
+      return
+    }
+    setNote('Thanks — you are subscribed.')
+    setEmail('')
+  }
+
+  return (
+    <div className="min-h-screen bg-white text-foreground">
+      <header className="border-b border-border/60 relative z-10 bg-white">
+        <div className="mx-auto max-w-[1120px] px-4 h-[68px] flex items-center justify-between gap-4">
+          <Brand />
+          <nav className="hidden md:flex items-center gap-8 text-[14px] text-[#4b5563]">
+            <a href="#how" className="hover:text-foreground">How It Works</a>
+            <a href="#how-suppliers" className="hover:text-foreground">For Suppliers</a>
+            <a href="#how-retailers" className="hover:text-foreground">For Retailers</a>
+          </nav>
+          <div className="flex items-center gap-2">
+            <Link to="/login"><Button className="h-9 px-4">Log in</Button></Link>
+            <button type="button" className="md:hidden p-2 text-muted" aria-label="Open menu" onClick={() => setMenuOpen((v) => !v)}>
+              {menuOpen ? <X size={20} /> : <Menu size={20} />}
+            </button>
+          </div>
+        </div>
+        {menuOpen && (
+          <nav className="md:hidden border-t border-border px-4 py-3 flex flex-col gap-2 text-sm">
+            <a href="#how" onClick={() => setMenuOpen(false)}>How It Works</a>
+            <a href="#how-suppliers" onClick={() => setMenuOpen(false)}>For Suppliers</a>
+            <a href="#how-retailers" onClick={() => setMenuOpen(false)}>For Retailers</a>
+          </nav>
+        )}
+      </header>
+
+      <section className="relative w-full min-h-[420px] md:min-h-[560px] bg-white overflow-hidden">
+        <div
+          className="hidden md:block absolute inset-0"
+          style={{
+            backgroundImage:
+              'linear-gradient(90deg, #fff 0%, #fff 42%, transparent 62%), url(/brand/hero-bg.jpg)',
+            backgroundSize: 'cover',
+            backgroundPosition: 'right center',
+            backgroundRepeat: 'no-repeat',
+          }}
+        />
+        <div className="relative mx-auto max-w-[1120px] px-4 py-14 md:py-20">
+          <div className="max-w-xl md:max-w-[480px]">
+            <h1 className="text-4xl md:text-[44px] font-bold leading-[1.1] tracking-tight text-balance">
+              Wholesale groceries. Stronger businesses.{' '}
+              <span className="text-primary">Better communities.</span>
+            </h1>
+            <p className="mt-4 text-base text-muted max-w-md leading-relaxed text-pretty">
+              SoukCart is the B2B marketplace that connects grocery suppliers and retailers to buy and sell smarter, together.
+            </p>
+            <div className="mt-7 flex flex-wrap gap-3">
+              <Link to="/register?role=retailer"><Button className="h-11 px-5">Join as Retailer →</Button></Link>
+              <Link to="/register?role=supplier"><Button variant="secondary" className="h-11 px-5 bg-white border-[#c9c9c9] text-[#242526]">Join as Supplier →</Button></Link>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <section id="benefits" className="bg-soft">
+        <div className="mx-auto max-w-[1120px] px-4 py-10 grid md:grid-cols-3 gap-6">
+          {[
+            { Icon: ShieldCheck, t: 'Verified Partners', d: 'Trusted & reliable network' },
+            { Icon: Tag, t: 'Competitive Prices', d: 'Better deals, higher margins' },
+            { Icon: Truck, t: 'Reliable Delivery', d: 'On-time, every time' },
+          ].map(({ Icon, t, d }) => (
+            <div key={t} className="flex gap-3 items-start">
+              <span className="h-10 w-10 rounded-xl border border-[#f2ccc1] bg-white flex items-center justify-center text-primary">
+                <Icon size={18} />
+              </span>
+              <div>
+                <div className="font-semibold">{t}</div>
+                <div className="text-sm text-muted">{d}</div>
+              </div>
+            </div>
+          ))}
+        </div>
+      </section>
+
+      <section id="how" className="bg-soft">
+        <div className="mx-auto max-w-[1120px] px-4 py-16">
+          <div className="text-center max-w-2xl mx-auto mb-10">
+            <p className="text-[12px] font-semibold tracking-[0.1em] uppercase text-primary">How it works</p>
+            <h2 className="text-3xl font-bold mt-2 text-balance">Built for how grocery businesses trade.</h2>
+            <p className="text-muted mt-3 text-base text-pretty">
+              Whether you supply or sell, SoukCart makes the process simple, transparent, and profitable.
+            </p>
+          </div>
+          <div className="grid md:grid-cols-2 gap-6">
+            <div id="how-suppliers">
+              <div className="flex items-center gap-2 mb-4 font-semibold">
+                <Grid2x2 size={18} className="text-primary" /> For Suppliers
+              </div>
+              <div className="space-y-3">
+                {supplierSteps.map((title, i) => (
+                  <div key={title} className="rounded-xl border border-border bg-white p-4 flex items-center gap-3">
+                    <span className="h-8 w-8 rounded-full bg-primary text-white text-sm font-semibold flex items-center justify-center">{i + 1}</span>
+                    <div className="font-semibold text-[15px]">{title}</div>
+                  </div>
+                ))}
+              </div>
+            </div>
+            <div id="how-retailers">
+              <div className="flex items-center gap-2 mb-4 font-semibold">
+                <ClipboardList size={18} className="text-primary" /> For Retailers
+              </div>
+              <div className="space-y-3">
+                {retailerSteps.map((title, i) => (
+                  <div key={title} className="rounded-xl border border-border bg-white p-4 flex items-center gap-3">
+                    <span className="h-8 w-8 rounded-full bg-primary text-white text-sm font-semibold flex items-center justify-center">{i + 1}</span>
+                    <div className="font-semibold text-[15px]">{title}</div>
+                  </div>
+                ))}
+              </div>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <section id="pricing" aria-label="SoukCart brand">
+        <div className="mx-auto max-w-[1120px] px-4 py-10">
+          <div className="relative overflow-hidden rounded-xl bg-[#FBF1E7]">
+            <div className="px-6 py-10 lg:absolute lg:inset-0 lg:flex lg:items-center lg:py-0">
+              <div className="max-w-[400px]">
+                <p className="text-[12px] font-semibold tracking-[0.1em] uppercase text-primary">Ready to grow together?</p>
+                <h2 className="text-3xl font-bold mt-2 text-balance">One platform. Endless opportunities.</h2>
+                <p className="text-muted mt-3 text-pretty">Join thousands of grocery businesses already growing with SoukCart.</p>
+                <Link to="/register" className="inline-block mt-6"><Button className="h-11 px-5">Get Started Today →</Button></Link>
+              </div>
+            </div>
+            <img src="/brand/banner-bottom.jpg" alt="" className="block w-full h-auto" />
+          </div>
+        </div>
+      </section>
+
+      <footer className="border-t border-border">
+        <div className="mx-auto max-w-[1120px] px-4 py-12 grid md:grid-cols-5 gap-8 text-sm">
+          <div className="md:col-span-1">
+            <Brand markHeight={24} />
+            <p className="text-muted mt-3 text-[13px]">B2B marketplace connecting grocery suppliers and retailers.</p>
+          </div>
+          <div>
+            <div className="font-semibold mb-3">Platform</div>
+            <ul className="space-y-2 text-muted">
+              <li><a href="#how">How It Works</a></li>
+              <li><a href="#benefits">Benefits</a></li>
+              <li><a href="#how">FAQ</a></li>
+            </ul>
+          </div>
+          <div>
+            <div className="font-semibold mb-3">Company</div>
+            <ul className="space-y-2 text-muted">
+              <li><a href="#how">About Us</a></li>
+              <li><a href="mailto:">Contact Us</a></li>
+            </ul>
+          </div>
+          <div>
+            <div className="font-semibold mb-3">Legal</div>
+            <ul className="space-y-2 text-muted">
+              <li><Link to="/legal#terms">Terms of Use</Link></li>
+              <li><Link to="/legal#privacy">Privacy Policy</Link></li>
+              <li><Link to="/legal#refund">Refund Policy</Link></li>
+            </ul>
+          </div>
+          <div>
+            <div className="font-semibold mb-2">Subscribe to our newsletter</div>
+            <p className="text-muted text-[13px] mb-3">Get updates on new features, offers and more.</p>
+            <form onSubmit={subscribe} className="flex gap-2">
+              <input
+                type="email"
+                required
+                value={email}
+                onChange={(e) => setEmail(e.target.value)}
+                placeholder="Enter your email"
+                className="flex-1 h-10 rounded-lg border border-border bg-[#f7f8f8] px-3 text-base sm:text-sm"
+              />
+              <Button type="submit" className="h-10 px-4 whitespace-nowrap" aria-label="Subscribe">Subscribe</Button>
+            </form>
+            {note ? <p className="text-xs text-muted mt-2">{note}</p> : null}
+          </div>
+        </div>
+        <div className="border-t border-border">
+          <div className="mx-auto max-w-[1120px] px-4 h-14 flex items-center justify-between text-[13px] text-muted">
+            <span>{'\u00a9 2026 SoukCart. All rights reserved.'}</span>
+            <select className="h-8 rounded-md border border-border bg-white px-2 text-[13px]" defaultValue="en" aria-label="Language">
+              <option value="en">English</option>
+            </select>
+          </div>
+        </div>
+      </footer>
+    </div>
+  )
+}
+
+export function Legal() {
+  return (
+    <div className="min-h-screen bg-white">
+      <header className="border-b border-border">
+        <div className="mx-auto max-w-3xl px-4 h-16 flex items-center">
+          <Brand />
+        </div>
+      </header>
+      <main className="mx-auto max-w-3xl px-4 py-12 space-y-10 text-sm leading-relaxed">
+        <h1 className="text-3xl font-bold">Legal</h1>
+        <section id="terms">
+          <h2 className="text-xl font-semibold mb-2">Terms of Use</h2>
+          <p className="text-muted">SoukCart is a B2B grocery marketplace. By creating an account you agree to use the platform for legitimate wholesale trade, keep your details accurate, and honour orders you place or accept.</p>
+        </section>
+        <section id="privacy">
+          <h2 className="text-xl font-semibold mb-2">Privacy Policy</h2>
+          <p className="text-muted">We store the name, email, shop details, and order history needed to run the marketplace. We do not sell personal data. Contact  to request deletion.</p>
+        </section>
+        <section id="refund">
+          <h2 className="text-xl font-semibold mb-2">Refund Policy</h2>
+          <p className="text-muted">Cancelled prepaid orders are refunded manually by SoukCart admin. Delivery fees already paid may be refunded when an order is cancelled before shipment.</p>
+        </section>
+        <Link to="/" className="text-primary font-medium">← Back to home</Link>
+      </main>
+    </div>
+  )
+}
+
+export function NotFound() {
+  return (
+    <div className="min-h-screen flex flex-col items-center justify-center px-4 text-center">
+      <p className="text-sm text-muted">404</p>
+      <h1 className="text-3xl font-bold mt-1">Page not found</h1>
+      <p className="text-muted mt-2 max-w-md">That URL does not exist. Head back to the homepage or sign in to your workspace.</p>
+      <div className="mt-6 flex gap-3">
+        <Link to="/"><Button>Back to home</Button></Link>
+        <Link to="/login"><Button variant="secondary">Log in</Button></Link>
+      </div>
+    </div>
+  )
+}
