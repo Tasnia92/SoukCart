@@ -1,5 +1,4 @@
-# soukcart (nekcart)
-
+# soukcart
 Ground-up B2B marketplace from UI Twin specs + project plan. Not a clone of the old SoukCart repo.
 
 ## Stack
