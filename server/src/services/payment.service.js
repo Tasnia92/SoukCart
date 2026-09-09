@@ -145,7 +145,6 @@ export async function activateOrderAfterPayment(order, sslData = {}) {
   await order.save();
 
   if (order.paymentMethod === 'online') {
-    await accruePayoutsForOrder(order);
     await notifyUser(order.retailer, {
       title: 'Payment received',
       body: `Payment confirmed for order ${order.orderNumber}. Waiting for supplier confirmation.`,

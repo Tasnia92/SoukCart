@@ -364,6 +364,9 @@ export async function setOrderStatus(order, nextStatus, actor, { cancelReason } 
   }
   if (nextStatus === 'delivered') {
     order.deliveredAt = new Date();
+    if (order.productAmountPaid || order.paymentStatus === 'paid') {
+      await accruePayoutsForOrder(order);
+    }
   }
 
   await notifyDelivery(order, nextStatus);

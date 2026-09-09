@@ -492,7 +492,7 @@ export function AdminPayouts() {
     }
   }
   if (!data) return <p className="text-muted">Loading…</p>
-  const earned = data.balances.reduce((s: number, b: any) => s + (b.earned || 0), 0)
+  const grossEarned = data.balances.reduce((s: number, b: any) => s + (b.grossEarned ?? b.earned ?? 0), 0)
   const available = data.balances.reduce((s: number, b: any) => s + (b.available || 0), 0)
   const pendingBatch = data.balances.reduce((s: number, b: any) => s + (b.pendingPayouts || 0), 0)
   const paid = data.balances.reduce((s: number, b: any) => s + (b.alreadyPaid || 0), 0)
@@ -507,7 +507,7 @@ export function AdminPayouts() {
       {msg ? <p className="text-sm text-muted mb-3">{msg}</p> : null}
       <div className="grid sm:grid-cols-2 xl:grid-cols-4 gap-4 mb-4">
         <StatCard Icon={Percent} title="Commission rate" note="Platform commission on merchandise" value={`${(rate * 100).toFixed(1)}%`} foot="Delivery fee excluded" />
-        <StatCard Icon={Wallet} title="Supplier earned" note="Gross earned by suppliers" value={money(earned)} foot="Before commission deducted" />
+        <StatCard Icon={Wallet} title="Supplier earned" note="Gross earned by suppliers" value={money(grossEarned)} foot="Before commission deducted" />
         <StatCard Icon={Banknote} title="Available to pay" note="Ready for payout this cycle" value={money(available)} foot="After commission and payouts" />
         <StatCard Icon={CheckCircle2} title="Paid out" note="Payouts already settled" value={money(paid)} foot="Lifetime transferred to suppliers" />
       </div>

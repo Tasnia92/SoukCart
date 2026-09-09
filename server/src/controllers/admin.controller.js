@@ -26,19 +26,48 @@ export const dashboard = asyncHandler(async (_req, res) => {
     Complaint.countDocuments({ status: { $in: ['open', 'in_review'] } }),
     Order.countDocuments({ manualRefundStatus: 'pending' }),
   ]);
+  const tz = Intl.DateTimeFormat().resolvedOptions().timeZone || '+06:00';
+  const deliveredDateExpr = { $ifNull: ['$deliveredAt', '$createdAt'] };
   const revenue = await Order.aggregate([
     { $match: { status: 'delivered' } },
-    { $group: { _id: null, subtotal: { $sum: '$subtotal' }, commission: { $sum: '$commissionAmount' } } },
+    {
+      $group: {
+        _id: null,
+        subtotal: { $sum: '$subtotal' },
+        commission: {
+          $sum: {
+            $cond: [
+              { $or: [{ $eq: ['$paymentStatus', 'paid'] }, { $eq: ['$productAmountPaid', true] }] },
+              '$commissionAmount',
+              0,
+            ],
+          },
+        },
+      },
+    },
   ]);
   const now = new Date();
   const prevMonthStart = new Date(now.getFullYear(), now.getMonth() - 1, 1);
   const monthlyAgg = await Order.aggregate([
-    { $match: { createdAt: { $gte: prevMonthStart }, status: 'delivered' } },
+    {
+      $match: {
+        status: 'delivered',
+        $expr: { $gte: [deliveredDateExpr, prevMonthStart] },
+      },
+    },
     {
       $group: {
-        _id: { $dateToString: { format: '%Y-%m', date: '$createdAt' } },
+        _id: { $dateToString: { format: '%Y-%m', date: deliveredDateExpr, timezone: tz } },
         subtotal: { $sum: '$subtotal' },
-        commission: { $sum: '$commissionAmount' },
+        commission: {
+          $sum: {
+            $cond: [
+              { $or: [{ $eq: ['$paymentStatus', 'paid'] }, { $eq: ['$productAmountPaid', true] }] },
+              '$commissionAmount',
+              0,
+            ],
+          },
+        },
         orders: { $sum: 1 },
       },
     },
@@ -56,19 +85,20 @@ export const dashboard = asyncHandler(async (_req, res) => {
     { $match: { createdAt: { $gte: since } } },
     {
       $group: {
-        _id: { $dateToString: { format: '%Y-%m-%d', date: '$createdAt' } },
+        _id: { $dateToString: { format: '%Y-%m-%d', date: '$createdAt', timezone: tz } },
         count: { $sum: 1 },
         value: { $sum: '$subtotal' },
       },
     },
     { $sort: { _id: 1 } },
   ]);
+  const pad = (n) => String(n).padStart(2, '0');
+  const toLocalDateKey = (d) => `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`;
   const trend = [];
   for (let i = 6; i >= 0; i--) {
     const d = new Date();
-    d.setHours(0, 0, 0, 0);
     d.setDate(d.getDate() - i);
-    const key = d.toISOString().slice(0, 10);
+    const key = toLocalDateKey(d);
     const hit = byDay.find((x) => x._id === key);
     trend.push({ date: key, count: hit?.count || 0, value: hit?.value || 0 });
   }

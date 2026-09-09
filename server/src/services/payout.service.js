@@ -23,8 +23,9 @@ export function uniqueSupplierIds(order) {
   return [...ids];
 }
 
-/** Create a pending payout per supplier when merchandise is paid (online) or COD cash is collected. Idempotent. */
+/** Create a pending payout per supplier when merchandise is paid and order is delivered. Idempotent. */
 export async function accruePayoutsForOrder(order) {
+  if (order.status !== 'delivered') return [];
   const merchandisePaid =
     order.productAmountPaid === true || order.paymentStatus === 'paid';
   if (!merchandisePaid) return [];
@@ -80,7 +81,6 @@ export async function getEligibleOrders(supplierId) {
     $or: [{ supplier: supplierId }, { suppliers: supplierId }, { 'items.supplier': supplierId }],
     status: 'delivered',
     paymentStatus: 'paid',
-    payoutSettled: { $ne: true },
   };
   if (reservedIds.length) filter._id = { $nin: reservedIds };
 
@@ -98,6 +98,8 @@ export async function computeSupplierBalance(supplierId) {
   ]);
   const alreadyPaid = paidAgg[0]?.total || 0;
   const pendingPayouts = pendingAgg[0]?.total || 0;
+  const totalPaidComm = paidAgg[0]?.commission || 0;
+  const totalPendingComm = pendingAgg[0]?.commission || 0;
 
   const eligible = await getEligibleOrders(supplierId);
   const legacyAvailable = Number(eligible.reduce((s, o) => {
@@ -111,10 +113,13 @@ export async function computeSupplierBalance(supplierId) {
 
   const available = Number((pendingPayouts + legacyAvailable).toFixed(2));
   const earned = Number((alreadyPaid + pendingPayouts + legacyAvailable).toFixed(2));
-  const commissionPending = Number(((pendingAgg[0]?.commission || 0) + legacyCommission).toFixed(2));
+  const totalCommission = Number((totalPaidComm + totalPendingComm + legacyCommission).toFixed(2));
+  const grossEarned = Number((earned + totalCommission).toFixed(2));
+  const commissionPending = Number((totalPendingComm + legacyCommission).toFixed(2));
 
   return {
     earned,
+    grossEarned,
     alreadyPaid,
     pendingPayouts,
     available,
@@ -125,12 +130,26 @@ export async function computeSupplierBalance(supplierId) {
   };
 }
 
+async function updateOrdersPayoutSettled(orderIds) {
+  for (const orderId of orderIds) {
+    const order = await Order.findById(orderId);
+    if (!order) continue;
+    const allSids = uniqueSupplierIds(order);
+    const paidPayouts = await Payout.find({ orderIds: orderId, status: 'paid' });
+    const paidSids = new Set(paidPayouts.map((p) => String(p.supplier)));
+    if (allSids.every((sid) => paidSids.has(sid))) {
+      order.payoutSettled = true;
+      await order.save();
+    }
+  }
+}
+
 /**
  * Pay existing pending payouts, or create from legacy eligible delivered orders.
  * status: 'pending' (weekly batch) or 'paid' (immediate).
  */
 export async function createPayoutForSupplier(supplierId, { status = 'paid', note = '', amount } = {}) {
-  const existingPending = await Payout.find({ supplier: supplierId, status: 'pending' });
+  const existingPending = await Payout.find({ supplier: supplierId, status: 'pending' }).sort({ createdAt: 1 });
 
   if (existingPending.length) {
     if (status === 'pending') {
@@ -140,12 +159,43 @@ export async function createPayoutForSupplier(supplierId, { status = 'paid', not
     if (amount != null && amount - total > 0.01) {
       throw httpError(`Amount exceeds available Tk ${total}`, 400);
     }
+    let remainingToPay = amount != null ? Number(amount) : total;
     let last = null;
     for (const p of existingPending) {
-      last = await markPayoutAsPaid(p._id);
-      if (note && last) {
-        last.note = note;
-        await last.save();
+      if (remainingToPay <= 0) break;
+      if (p.amount <= remainingToPay + 0.01) {
+        remainingToPay = Number((remainingToPay - p.amount).toFixed(2));
+        last = await markPayoutAsPaid(p._id);
+        if (note && last) {
+          last.note = note;
+          await last.save();
+        }
+      } else {
+        // Partial: split this pending payout
+        const paidPortion = remainingToPay;
+        const remainingPortion = Number((p.amount - paidPortion).toFixed(2));
+        const commRatio = p.amount > 0 ? paidPortion / p.amount : 0;
+        const paidComm = Number(((p.commissionTotal || 0) * commRatio).toFixed(2));
+        const remainingComm = Number(((p.commissionTotal || 0) - paidComm).toFixed(2));
+
+        p.amount = remainingPortion;
+        p.commissionTotal = remainingComm;
+        await p.save();
+
+        const paidPayout = await Payout.create({
+          supplier: supplierId,
+          amount: paidPortion,
+          commissionTotal: paidComm,
+          orderIds: p.orderIds,
+          status: 'paid',
+          note: note || p.note,
+        });
+        if (paidPayout.orderIds?.length) {
+          await updateOrdersPayoutSettled(paidPayout.orderIds);
+        }
+        last = paidPayout;
+        remainingToPay = 0;
+        break;
       }
     }
     return last || existingPending[0];
@@ -185,7 +235,7 @@ export async function createPayoutForSupplier(supplierId, { status = 'paid', not
   });
 
   if (status === 'paid') {
-    await Order.updateMany({ _id: { $in: orderIds } }, { $set: { payoutSettled: true } });
+    await updateOrdersPayoutSettled(orderIds);
   }
 
   return payout;
@@ -197,14 +247,14 @@ export async function processWeeklyPayouts() {
   const created = [];
   const skipped = [];
   for (const s of suppliers) {
-    const existingPending = await Payout.findOne({ supplier: s._id, status: 'pending' });
-    if (existingPending) {
-      skipped.push({ supplierId: s._id, reason: 'already_pending', payoutId: existingPending._id });
-      continue;
-    }
-    const bal = await computeSupplierBalance(s._id);
-    if (bal.available <= 0) {
-      skipped.push({ supplierId: s._id, reason: 'no_balance' });
+    const eligible = await getEligibleOrders(s._id);
+    if (!eligible.length) {
+      const existingPending = await Payout.findOne({ supplier: s._id, status: 'pending' });
+      if (existingPending) {
+        skipped.push({ supplierId: s._id, reason: 'already_pending', payoutId: existingPending._id });
+      } else {
+        skipped.push({ supplierId: s._id, reason: 'no_balance' });
+      }
       continue;
     }
     try {
@@ -230,7 +280,7 @@ export async function markPayoutAsPaid(payoutId) {
   payout.status = 'paid';
   await payout.save();
   if (payout.orderIds?.length) {
-    await Order.updateMany({ _id: { $in: payout.orderIds } }, { $set: { payoutSettled: true } });
+    await updateOrdersPayoutSettled(payout.orderIds);
   }
   return payout;
 }
