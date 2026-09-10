@@ -165,7 +165,7 @@ export function RetailerLayout() {
           </aside>
         </div>
       )}
-      <main className="flex-1 mx-auto w-full max-w-6xl px-4 py-6">
+      <main className="flex-1 min-h-dvh mx-auto w-full max-w-6xl px-4 py-6">
         <Outlet />
       </main>
       <footer className="bg-[#f9fafb] border-t border-border mt-8">
