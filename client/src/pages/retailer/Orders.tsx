@@ -1,7 +1,7 @@
 import { useCallback, useMemo, useState } from 'react'
 import { Link, useSearchParams } from 'react-router-dom'
 import { MoreVertical } from 'lucide-react'
-import { Badge, Button, Card, DropdownMenu } from '@/components/ui'
+import { Badge, Button, Card, DropdownMenu, Label } from '@/components/ui'
 import { CancelOrderModal } from '@/components/CancelOrderModal'
 import { api } from '@/services/api'
 import { money, cn, statusLabel, canCancelStatus, needsPaymentRetry } from '@/lib/utils'
@@ -46,6 +46,9 @@ export function RetailerOrders() {
   const paid = params.get('paid')
   const [cancelTarget, setCancelTarget] = useState<any | null>(null)
   const [cancelling, setCancelling] = useState(false)
+  const [showFilters, setShowFilters] = useState(false)
+  const [typeFilter, setTypeFilter] = useState<'All' | 'COD' | 'Online'>('All')
+  const [payFilter, setPayFilter] = useState<'All' | 'Paid' | 'Unpaid' | 'Failed'>('All')
 
   const load = useCallback(async () => {
     const d = await api.get<{ orders: any[] }>('/orders')
@@ -54,7 +57,28 @@ export function RetailerOrders() {
 
   usePoll(() => void load(), [load])
 
-  const visible = useMemo(() => orders.filter((o) => mapFilter(o.status, filter)), [orders, filter])
+  const visible = useMemo(
+    () =>
+      orders.filter((o) => {
+        if (!mapFilter(o.status, filter)) return false
+        const method = (o.paymentMethod || 'cod').toLowerCase()
+        if (typeFilter === 'COD' && method !== 'cod') return false
+        if (typeFilter === 'Online' && method === 'cod') return false
+        const isPaid = o.paymentStatus === 'paid' || o.productAmountPaid
+        if (payFilter === 'Paid' && !isPaid) return false
+        if (payFilter === 'Unpaid' && (isPaid || o.paymentStatus === 'failed')) return false
+        if (payFilter === 'Failed' && o.paymentStatus !== 'failed') return false
+        return true
+      }),
+    [orders, filter, typeFilter, payFilter],
+  )
+
+  const activeFilterCount = (typeFilter !== 'All' ? 1 : 0) + (payFilter !== 'All' ? 1 : 0)
+
+  function resetFilters() {
+    setTypeFilter('All')
+    setPayFilter('All')
+  }
 
   async function confirmCancel(reason: string) {
     if (!cancelTarget) return
@@ -103,8 +127,49 @@ export function RetailerOrders() {
             </button>
           )
         })}
-        <Button variant="secondary" className="h-8 ml-auto" onClick={() => setFilter('All')}>Filters</Button>
+        <Button
+          variant="secondary"
+          className="h-8 ml-auto"
+          aria-expanded={showFilters}
+          onClick={() => setShowFilters((v) => !v)}
+        >
+          Filters{activeFilterCount ? ` (${activeFilterCount})` : ''}
+        </Button>
       </div>
+      {showFilters ? (
+        <Card className="mb-4 p-4 flex flex-wrap items-end gap-4">
+          <div>
+            <Label htmlFor="order-type-filter">Payment type</Label>
+            <select
+              id="order-type-filter"
+              value={typeFilter}
+              onChange={(e) => setTypeFilter(e.target.value as typeof typeFilter)}
+              className="h-10 rounded-[8px] border border-border bg-[#f7f8f8] px-3 text-sm"
+            >
+              <option value="All">All types</option>
+              <option value="COD">COD</option>
+              <option value="Online">Online</option>
+            </select>
+          </div>
+          <div>
+            <Label htmlFor="order-pay-filter">Payment status</Label>
+            <select
+              id="order-pay-filter"
+              value={payFilter}
+              onChange={(e) => setPayFilter(e.target.value as typeof payFilter)}
+              className="h-10 rounded-[8px] border border-border bg-[#f7f8f8] px-3 text-sm"
+            >
+              <option value="All">All statuses</option>
+              <option value="Paid">Paid</option>
+              <option value="Unpaid">Unpaid</option>
+              <option value="Failed">Failed</option>
+            </select>
+          </div>
+          <Button variant="ghost" className="h-10" onClick={resetFilters} disabled={!activeFilterCount}>
+            Reset filters
+          </Button>
+        </Card>
+      ) : null}
       <Card className="overflow-hidden rounded-[12px]">
         <table className="w-full text-sm">
           <thead className="bg-canvas text-left text-muted">

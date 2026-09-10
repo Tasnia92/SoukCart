@@ -873,13 +873,29 @@ export function AdminCategories() {
   const [name, setName] = useState('')
   const [editing, setEditing] = useState<string | null>(null)
   const [editName, setEditName] = useState('')
+  const [error, setError] = useState('')
   async function load() { setCats((await api.get<{ categories: any[] }>('/products/categories?all=1')).categories) }
   useEffect(() => { void load() }, [])
-  async function add(e: FormEvent) { e.preventDefault(); await api.post('/products/categories', { name }); setName(''); await load() }
+  async function add(e: FormEvent) {
+    e.preventDefault()
+    setError('')
+    try {
+      await api.post('/products/categories', { name })
+      setName('')
+      await load()
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Could not add category')
+    }
+  }
   async function saveEdit(id: string) {
-    await api.patch(`/products/categories/${id}`, { name: editName })
-    setEditing(null)
-    await load()
+    setError('')
+    try {
+      await api.patch(`/products/categories/${id}`, { name: editName })
+      setEditing(null)
+      await load()
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Could not update category')
+    }
   }
   async function hide(id: string, isActive: boolean) {
     await api.patch(`/products/categories/${id}`, { isActive: !isActive })
@@ -898,6 +914,7 @@ export function AdminCategories() {
           <Button type="submit" className="whitespace-nowrap">+ Add category</Button>
         </form>
       </div>
+      {error ? <p className="mb-3 text-sm text-danger">{error}</p> : null}
       <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-4">
         <StatCard Icon={Folder} title="Total" value={cats.length} foot="All categories" />
         <StatCard Icon={CheckCircle2} title="Active" value={cats.filter((c)=>c.isActive !== false).length} foot="Visible in catalog" />

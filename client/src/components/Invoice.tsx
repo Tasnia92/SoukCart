@@ -1,6 +1,6 @@
 import { X } from 'lucide-react'
 import { Button } from '@/components/ui'
-import { cn, money } from '@/lib/utils'
+import { cn, money, statusLabel } from '@/lib/utils'
 
 type InvoiceItem = {
   name?: string
@@ -111,7 +111,7 @@ export function InvoiceSheet({ order, className }: { order: InvoiceOrder; classN
             </div>
             <div className="flex justify-between gap-4">
               <span className="text-[#565b60]">Status</span>
-              <span className="font-medium">{order.deliveredAt ? 'Delivered' : (order.confirmedAt ? 'Confirmed' : 'In transit')}</span>
+              <span className="font-medium">{order.status ? statusLabel(order.status) : (order.deliveredAt ? 'Delivered' : order.confirmedAt ? 'Confirmed' : 'Pending confirm')}</span>
             </div>
             {order.confirmedAt && (
               <div className="flex justify-between gap-4">

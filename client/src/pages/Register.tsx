@@ -15,7 +15,6 @@ export function Register() {
   const [showConfirm, setShowConfirm] = useState(false)
   const [terms, setTerms] = useState(false)
   const [error, setError] = useState('')
-  const [forgot, setForgot] = useState('')
   const [loading, setLoading] = useState(false)
 
   async function onSubmit(e: FormEvent) {
@@ -89,10 +88,6 @@ export function Register() {
           <input type="checkbox" className="mt-1" checked={terms} onChange={(e) => setTerms(e.target.checked)} />
           <span>I agree to SoukCart&apos;s <Link to="/legal" className="text-primary font-medium">Terms & Privacy</Link>.</span>
         </label>
-        <button type="button" className="text-sm text-primary font-medium" onClick={() => setForgot('Password reset is not self-serve yet. Email  after you create an account.')}>
-          Forgot password?
-        </button>
-        {forgot ? <p className="text-sm text-muted">{forgot}</p> : null}
         {error ? <p className="text-sm text-danger">{error}</p> : null}
         <Button className="w-full h-11" disabled={loading}>{loading ? 'Creating…' : 'Create account'}</Button>
       </form>

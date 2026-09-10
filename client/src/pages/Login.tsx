@@ -20,7 +20,7 @@ export function Login() {
   const [show, setShow] = useState(false)
   const [keep, setKeep] = useState(false)
   const [error, setError] = useState('')
-  const [forgot, setForgot] = useState('')
+  const [forgot, setForgot] = useState(false)
   const [loading, setLoading] = useState(false)
 
   async function onSubmit(e: FormEvent) {
@@ -88,12 +88,17 @@ export function Login() {
           <button
             type="button"
             className="text-primary font-medium"
-            onClick={() => setForgot('Password reset is not self-serve yet. Email  or use a demo account.')}
+            onClick={() => setForgot(true)}
           >
             Forgot password?
           </button>
         </div>
-        {forgot ? <p className="text-sm text-muted">{forgot}</p> : null}
+        {forgot ? (
+          <p className="text-sm text-muted">
+            To reset your password, send an email to{' '}
+            <a className="text-primary font-medium" href="mailto:help@soukcart.com">help@soukcart.com</a>.
+          </p>
+        ) : null}
         {error ? <p className="text-sm text-danger">{error}</p> : null}
         <Button className="w-full h-11" disabled={loading}>{loading ? 'Signing in…' : 'Sign in'}</Button>
       </form>
@@ -115,7 +120,7 @@ export function AdminLogin() {
   const [show, setShow] = useState(false)
   const [keep, setKeep] = useState(false)
   const [error, setError] = useState('')
-  const [forgot, setForgot] = useState('')
+  const [forgot, setForgot] = useState(false)
   const [loading, setLoading] = useState(false)
 
   async function onSubmit(e: FormEvent) {
@@ -172,12 +177,17 @@ export function AdminLogin() {
           <button
             type="button"
             className="text-primary font-medium"
-            onClick={() => setForgot('Password reset is not self-serve yet. Email  or use a demo account.')}
+            onClick={() => setForgot(true)}
           >
             Forgot password?
           </button>
         </div>
-        {forgot ? <p className="text-sm text-muted">{forgot}</p> : null}
+        {forgot ? (
+          <p className="text-sm text-muted">
+            To reset your password, send an email to{' '}
+            <a className="text-primary font-medium" href="mailto:help@soukcart.com">help@soukcart.com</a>.
+          </p>
+        ) : null}
         {error ? <p className="text-sm text-danger">{error}</p> : null}
         <Button className="w-full h-11" disabled={loading}>{loading ? 'Signing in…' : 'Sign in to admin'}</Button>
       </form>

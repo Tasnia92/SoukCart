@@ -227,6 +227,8 @@ export const createCategory = asyncHandler(async (req, res) => {
   const name = (req.body.name || '').trim();
   if (!name) return res.status(400).json({ message: 'Name required' });
   const slug = name.toLowerCase().replace(/\s+/g, '-');
+  const existing = await Category.findOne({ slug });
+  if (existing) return res.status(409).json({ message: `Category "${existing.name}" already exists` });
   const category = await Category.create({ name, slug, description: req.body.description });
   res.status(201).json({ category });
 });
@@ -237,6 +239,8 @@ export const updateCategory = asyncHandler(async (req, res) => {
   if (req.body.name !== undefined) {
     category.name = req.body.name.trim();
     category.slug = category.name.toLowerCase().replace(/\s+/g, '-');
+    const clash = await Category.findOne({ slug: category.slug, _id: { $ne: category._id } });
+    if (clash) return res.status(409).json({ message: `Category "${clash.name}" already exists` });
   }
   if (req.body.description !== undefined) category.description = req.body.description;
   if (req.body.isActive !== undefined) category.isActive = !!req.body.isActive;

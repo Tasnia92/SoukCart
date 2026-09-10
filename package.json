@@ -13,5 +13,12 @@
   },
   "devDependencies": {
     "concurrently": "^9.2.1"
+  },
+  "devEngines": {
+    "packageManager": {
+      "name": "npm",
+      "version": "12.0.2",
+      "onFail": "download"
+    }
   }
 }
