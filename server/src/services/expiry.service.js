@@ -8,6 +8,10 @@ const ONLINE_TTL = 48 * HOUR;
 
 let running = false;
 
+// ── REFUND-FLOW 1/6 · CANCEL TRIGGER (system auto-cancel of stale orders) ──
+// SEARCH: refund-flow, auto cancel, stale order, expiry
+// DOES:   cancels unpaid orders older than the COD/online TTL via
+//         cancelAndQueueRefund(..., { stale: true }), which also queues any refund.
 export async function expireStaleOrders() {
   if (running) return { expired: 0, skipped: true };
   running = true;

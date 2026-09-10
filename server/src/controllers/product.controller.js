@@ -51,6 +51,11 @@ export const getProduct = asyncHandler(async (req, res) => {
   res.json({ product });
 });
 
+// ── SUPPLIER-FLOW 3/8 · PRODUCTS — add a product (supplier) ──
+// SEARCH: supplier-flow, add product, create product
+// DOES:   validates the fields, saves the product with status "pending" for admin
+//         approval, records the opening stock, and alerts admins (NOTIFY-FLOW 2/5).
+// NOTE:   it appears in the catalog only after ADMIN-FLOW 7/7 approves it.
 export const createProduct = asyncHandler(async (req, res) => {
   const { name, description, price, unit, stock, moq, imageUrl, category } = req.body;
   if (!name || price == null || !unit || stock == null || moq == null) {
@@ -98,6 +103,11 @@ export const createProduct = asyncHandler(async (req, res) => {
   res.status(201).json({ product });
 });
 
+// ── SUPPLIER-FLOW 3/8 · PRODUCTS — edit a product (supplier or admin) ──
+// SEARCH: supplier-flow, edit product, update product, resubmit
+// DOES:   updates catalog fields. If a SUPPLIER changes catalog fields, the product
+//         goes back to "pending" and admins are notified again (NOTIFY-FLOW 2/5).
+//         Stock changes go through setStock; admins may also flip isActive.
 export const updateProduct = asyncHandler(async (req, res) => {
   const product = await Product.findById(req.params.id);
   if (!product) return res.status(404).json({ message: 'Not found' });
@@ -155,6 +165,10 @@ export const updateProduct = asyncHandler(async (req, res) => {
   res.json({ product });
 });
 
+// ── ADMIN-FLOW 7/7 · PRODUCTS — delete a product (admin) ──
+// SEARCH: admin-flow, delete product, remove product
+// DOES:   calls removeProductWithOrders, which keeps history and cancels pending
+//         orders for the product (REFUND-FLOW 1/6 trigger).
 export const deleteProduct = asyncHandler(async (req, res) => {
   const product = await Product.findById(req.params.id);
   if (!product) return res.status(404).json({ message: 'Not found' });
@@ -162,6 +176,11 @@ export const deleteProduct = asyncHandler(async (req, res) => {
   res.json({ ok: true, ...result });
 });
 
+// ── ADMIN-FLOW 7/7 · PRODUCTS — approve / reject / hide / restore / remove ──
+// SEARCH: admin-flow, moderate product, approve product, reject product, hide product
+// DOES:   action/status decides the outcome: hide, restore, remove (keeps history,
+//         cancels pending orders via REFUND-FLOW 1/6), or set approved/rejected
+//         (stores a reject reason). The supplier is notified (NOTIFY-FLOW 1/5).
 export const moderateProduct = asyncHandler(async (req, res) => {
   const { status, action, reason } = req.body;
   const product = await Product.findById(req.params.id);
@@ -223,6 +242,9 @@ export const listCategories = asyncHandler(async (req, res) => {
   res.json({ categories });
 });
 
+// ── ADMIN-FLOW 7/7 · CATEGORIES — create (admin) ──
+// SEARCH: admin-flow, create category
+// DOES:   builds the slug from the name and rejects duplicate slugs.
 export const createCategory = asyncHandler(async (req, res) => {
   const name = (req.body.name || '').trim();
   if (!name) return res.status(400).json({ message: 'Name required' });
@@ -233,6 +255,9 @@ export const createCategory = asyncHandler(async (req, res) => {
   res.status(201).json({ category });
 });
 
+// ── ADMIN-FLOW 7/7 · CATEGORIES — update name / description / active (admin) ──
+// SEARCH: admin-flow, update category
+// DOES:   re-slugs on rename and blocks a slug that clashes with another category.
 export const updateCategory = asyncHandler(async (req, res) => {
   const category = await Category.findById(req.params.id);
   if (!category) return res.status(404).json({ message: 'Not found' });
@@ -248,6 +273,8 @@ export const updateCategory = asyncHandler(async (req, res) => {
   res.json({ category });
 });
 
+// ── ADMIN-FLOW 7/7 · CATEGORIES — delete (admin) ──
+// SEARCH: admin-flow, delete category
 export const deleteCategory = asyncHandler(async (req, res) => {
   const category = await Category.findByIdAndDelete(req.params.id);
   if (!category) return res.status(404).json({ message: 'Not found' });

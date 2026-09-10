@@ -23,6 +23,10 @@ export function uniqueSupplierIds(order) {
   return [...ids];
 }
 
+// ── ADMIN-FLOW 4/7 · PAYOUTS — accrue pending payouts (runs automatically) ──
+// SEARCH: admin-flow, accrue payout, pending payout, delivered
+// DOES:   once a merchandise-paid order is delivered, creates one "pending" Payout
+//         per supplier. Idempotent. This is what fills the admin payout page.
 /** Create a pending payout per supplier when merchandise is paid and order is delivered. Idempotent. */
 export async function accruePayoutsForOrder(order) {
   if (order.status !== 'delivered') return [];
@@ -62,6 +66,10 @@ export async function accruePayoutsForOrder(order) {
   return created;
 }
 
+// ── REFUND-FLOW 5/6 · SIDE EFFECTS — reverse pending supplier payouts ──
+// SEARCH: refund-flow, reverse payout, pending payout
+// DOES:   flags this order's still-"pending" Payouts as "reversed" so a cancelled
+//         order cannot be paid out. Called by cancelAndQueueRefund.
 export async function reversePendingPayouts(order, note = 'Reversed on cancel') {
   return Payout.updateMany(
     { orderIds: order._id, status: 'pending' },
@@ -69,6 +77,8 @@ export async function reversePendingPayouts(order, note = 'Reversed on cancel') 
   );
 }
 
+// ── ADMIN-FLOW 4/7 · PAYOUTS — helper: delivered + paid orders not yet paid out ──
+// SEARCH: admin-flow, eligible orders, payout helper
 /** Delivered orders that are merchandise-paid and not already in a pending/paid payout (legacy fallback). */
 export async function getEligibleOrders(supplierId) {
   const reserved = await Payout.find({
@@ -87,6 +97,11 @@ export async function getEligibleOrders(supplierId) {
   return Order.find(filter).sort({ createdAt: 1 });
 }
 
+// ── ADMIN-FLOW 4/7 · PAYOUTS — supplier balance shown on the admin payout page ──
+// SEARCH: admin-flow, supplier balance, earned, available
+// DOES:   adds up paid + pending payouts and legacy eligible orders to show what
+//         each supplier has earned and what is still available to pay out.
+// ALSO:   SUPPLIER-FLOW 7/8 (the supplier earnings page uses this too).
 export async function computeSupplierBalance(supplierId) {
   const paidAgg = await Payout.aggregate([
     { $match: { supplier: supplierId, status: 'paid' } },
@@ -130,6 +145,8 @@ export async function computeSupplierBalance(supplierId) {
   };
 }
 
+// ── ADMIN-FLOW 4/7 · PAYOUTS — helper: mark orders as fully settled ──
+// SEARCH: admin-flow, payout settled
 async function updateOrdersPayoutSettled(orderIds) {
   for (const orderId of orderIds) {
     const order = await Order.findById(orderId);
@@ -144,6 +161,11 @@ async function updateOrdersPayoutSettled(orderIds) {
   }
 }
 
+// ── ADMIN-FLOW 4/7 · PAYOUTS — pay or queue a supplier (core function) ──
+// SEARCH: admin-flow, create payout, pay supplier, partial payout
+// DOES:   if the supplier already has pending payouts it pays (or tops up) those,
+//         otherwise it builds a new payout from eligible delivered orders.
+// NOTES:  status "paid" pays now; "pending" waits for the weekly batch.
 /**
  * Pay existing pending payouts, or create from legacy eligible delivered orders.
  * status: 'pending' (weekly batch) or 'paid' (immediate).
@@ -241,6 +263,10 @@ export async function createPayoutForSupplier(supplierId, { status = 'paid', not
   return payout;
 }
 
+// ── ADMIN-FLOW 4/7 · PAYOUTS — weekly payout batch ──
+// SEARCH: admin-flow, weekly payouts, batch
+// DOES:   for every active supplier with a balance, creates a "pending" payout
+//         (unless one already exists). Returns who was created vs skipped.
 /** Build pending weekly payouts for every supplier with available (legacy) balance. */
 export async function processWeeklyPayouts() {
   const suppliers = await User.find({ role: 'supplier', isActive: true }).select('_id');
@@ -270,6 +296,10 @@ export async function processWeeklyPayouts() {
   return { created, skipped };
 }
 
+// ── ADMIN-FLOW 4/7 · PAYOUTS — mark a payout as paid ──
+// SEARCH: admin-flow, mark paid, pay payout
+// DOES:   flips a pending payout to "paid"; blocks failed/reversed payouts and
+//         updates each related order's payoutSettled flag.
 export async function markPayoutAsPaid(payoutId) {
   const payout = await Payout.findById(payoutId);
   if (!payout) throw httpError('Payout not found', 404);

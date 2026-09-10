@@ -18,14 +18,6 @@ const retailerSteps = [
   { title: 'Track & Receive', Icon: Truck },
   { title: 'Stock & Grow', Icon: Warehouse },
 ]
-const faqs = [
-  { q: 'How do I place an order?', a: 'Browse the catalog, add products to your cart, then check out. You can pay online or choose cash on delivery.' },
-  { q: 'How do I become a supplier?', a: 'Register as a supplier, submit your NID for verification, and once approved you can list your products.' },
-  { q: 'How are deliveries handled?', a: 'When a supplier confirms your order, SoukCart coordinates the delivery and keeps your tracking up to date.' },
-  { q: 'Can I cancel an order?', a: 'Yes. Orders can be cancelled while they are still pending, and any prepaid amount is refunded by our admin team.' },
-  { q: 'Still need help?', a: 'Email help@soukcart.com and our team will get back to you.' },
-]
-
 export function Landing() {
   const [menuOpen, setMenuOpen] = useState(false)
   const [email, setEmail] = useState('')
@@ -192,33 +184,6 @@ export function Landing() {
         </div>
       </section>
 
-      <section id="about" className="border-t border-border bg-soft">
-        <div className="mx-auto max-w-[1120px] px-4 py-16 grid md:grid-cols-2 gap-10 items-start">
-          <div>
-            <p className="text-[12px] font-semibold tracking-[0.1em] uppercase text-primary">About us</p>
-            <h2 className="text-3xl font-bold mt-2 text-balance">Wholesale trade, made simple.</h2>
-            <p className="text-muted mt-3 text-base text-pretty">
-              SoukCart is a B2B grocery marketplace that connects verified suppliers and retailers directly. We bring discovery, ordering, delivery coordination, and payments together so small businesses can stock their shelves with confidence.
-            </p>
-            <p className="text-muted mt-3 text-base text-pretty">
-              Need a hand? Email <a className="text-primary font-medium" href="mailto:help@soukcart.com">help@soukcart.com</a> and our team will get back to you.
-            </p>
-          </div>
-          <div id="faq" className="scroll-mt-6">
-            <p className="text-[12px] font-semibold tracking-[0.1em] uppercase text-primary">FAQ</p>
-            <h2 className="text-3xl font-bold mt-2 text-balance">Frequently asked questions.</h2>
-            <div className="mt-5 space-y-3">
-              {faqs.map(({ q, a }) => (
-                <div key={q} className="rounded-xl border border-border bg-white p-4">
-                  <div className="font-semibold">{q}</div>
-                  <p className="text-muted mt-1 text-sm text-pretty">{a}</p>
-                </div>
-              ))}
-            </div>
-          </div>
-        </div>
-      </section>
-
       <footer className="border-t border-border">
         <div className="mx-auto max-w-[1120px] px-4 py-12 grid md:grid-cols-5 gap-8 text-sm">
           <div className="md:col-span-1">
@@ -230,13 +195,11 @@ export function Landing() {
             <ul className="space-y-2 text-muted">
               <li><a href="#how">How It Works</a></li>
               <li><a href="#benefits">Benefits</a></li>
-              <li><a href="#faq">FAQ</a></li>
             </ul>
           </div>
           <div>
             <div className="font-semibold mb-3">Company</div>
             <ul className="space-y-2 text-muted">
-              <li><a href="#about">About Us</a></li>
               <li><a href="mailto:help@soukcart.com">Contact Us</a></li>
             </ul>
           </div>

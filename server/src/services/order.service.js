@@ -14,6 +14,37 @@ import { accruePayoutsForOrder, uniqueSupplierIds } from './payout.service.js';
 import { cancelAndQueueRefund, CANCELLED_STATUSES, canCancelOrder } from './refund.service.js';
 import { httpError } from '../utils/httpError.js';
 
+// ════════════════════════════════════════════════════════════════════════════
+// ORDER-FLOW — MASTER MAP  (search "ORDER-FLOW" to jump to every anchor)
+// ────────────────────────────────────────────────────────────────────────────
+// The full life of one order. Each step in the code is tagged as:
+//   // ── ORDER-FLOW <n>/8 · <TITLE> ──
+//
+//   1/8 PLACE ORDER ........ order starts here (creates awaiting_payment order)
+//         order.controller.js   placeOrder
+//         order.service.js      createOrderFromCart   ← anchor in this file
+//   2/8 START PAYMENT ...... create SSLCommerz session / redirect
+//         payment.service.js    createSslCommerzSession
+//   3/8 PAYMENT RESULT ..... validate SSL, activate order, or mark failed
+//         payment.controller.js sslSuccess / sslFail / sslCancel / sslIpn
+//         payment.service.js    validateSslPayment / activateOrderAfterPayment / markSslFailed
+//   4/8 RETRY PAYMENT ...... retailer pays again after a failure
+//         payment.service.js    retryPayment
+//   5/8 SUPPLIER CONFIRM ... payment check + reserve stock + confirm lines
+//         order.service.js      isPaidEnoughToConfirm / confirmSupplierLines
+//   6/8 DELIVERY STATUS .... initiated → shipped → out_for_delivery → delivered
+//         order.service.js      setOrderStatus
+//   7/8 COD COLLECTION ..... admin collects cash after delivery
+//         order.service.js      collectCod
+//   8/8 CANCEL / REFUND .... cancel before delivery, queue refund
+//         order.service.js      setOrderStatus → cancelAndQueueRefund
+//         ↳ full detail in REFUND-FLOW 1/6 … 6/6 (search "REFUND-FLOW")
+//
+// Order status badges: awaiting_payment → placed → supplier_confirmed →
+//   delivery_initiated → shipped → out_for_delivery → delivered
+// Payment flags: deliveryFeePaid, productAmountPaid, paymentStatus
+// ════════════════════════════════════════════════════════════════════════════
+
 async function nextOrderNumber() {
   const count = await Order.countDocuments();
   const stamp = Date.now().toString(36).toUpperCase().slice(-4);
@@ -36,6 +67,11 @@ export function assertOrderAccess(order, user) {
   throw httpError('Forbidden', 403);
 }
 
+// ── ORDER-FLOW 5/8 · SUPPLIER CONFIRM — payment check ──
+// SEARCH: order-flow, payment check, can confirm, delivery fee paid, paid enough
+// DOES:   a supplier may only confirm once enough is paid — COD requires the
+//         delivery fee paid; online requires the product amount paid (or fee paid).
+// USED BY: confirmSupplierLines() below (ORDER-FLOW 5/8)
 export function isPaidEnoughToConfirm(order) {
   if (order.paymentMethod === 'online') {
     return Boolean(order.productAmountPaid && (order.paymentStatus === 'paid' || order.deliveryFeePaid));
@@ -52,6 +88,11 @@ function allLinesConfirmed(order) {
   return (order.items || []).length > 0 && order.items.every((i) => i.confirmedAt);
 }
 
+// ── ORDER-FLOW 1/8 · PLACE ORDER (order starts here) ──
+// SEARCH: order-flow, place order, checkout, cart, awaiting_payment, create order
+// DOES:   validates cart items & stock, builds line items + totals, then creates
+//         the order with status "awaiting_payment". Stock is NOT reserved yet.
+// NEXT:   ORDER-FLOW 2/8 START PAYMENT → payment.service.js createSslCommerzSession()
 /**
  * Build an awaiting_payment order. Stock is NOT reserved until supplier confirm.
  * Suppliers are notified at checkout; they can confirm only after payment.
@@ -155,6 +196,13 @@ export async function createOrderFromCart({
   return order;
 }
 
+// ── ORDER-FLOW 5/8 · SUPPLIER CONFIRM (payment + stock check) ──
+// SEARCH: order-flow, confirm order, supplier confirm, reserve stock, supplier_confirmed
+// DOES:   requires "paid enough" (isPaidEnoughToConfirm above), reserves stock, and
+//         marks this supplier's lines confirmed. When every supplier confirms the
+//         status becomes "supplier_confirmed", otherwise it stays/becomes "placed".
+// NEXT:   ORDER-FLOW 6/8 DELIVERY STATUS → setOrderStatus() below
+// ALSO:   SUPPLIER-FLOW 5/8 (this is the supplier's "confirm order" action).
 export async function confirmSupplierLines(order, supplierUser) {
   if (!orderHasSupplier(order, supplierUser._id)) throw httpError('Forbidden', 403);
   if (CANCELLED_STATUSES.includes(order.status)) throw httpError('Order is cancelled', 400);
@@ -212,6 +260,10 @@ export async function confirmSupplierLines(order, supplierUser) {
   return order;
 }
 
+// ── ORDER-FLOW 7/8 · COD COLLECTION (admin collects cash) ──
+// SEARCH: order-flow, collect cod, cash on delivery, payment collected
+// DOES:   only for COD orders already "delivered". Marks the product amount paid,
+//         records who collected it, and accrues supplier payouts.
 export async function collectCod(order, admin) {
   if (order.paymentMethod !== 'cod') throw httpError('Not a COD order', 400);
   if (order.status !== 'delivered') throw httpError('Collect cash after the order is delivered', 400);
@@ -293,9 +345,18 @@ function notifyDelivery(order, nextStatus) {
   return null;
 }
 
-export async function setOrderStatus(order, nextStatus, actor, { cancelReason } = {}) {
+// ── ORDER-FLOW 6/8 & 8/8 · DELIVERY STATUS + CANCEL / REFUND ──
+// SEARCH: order-flow, status change, delivery, cancel, refund
+// DOES:   single gateway for every status change:
+//         • cancel/refund statuses → ORDER-FLOW 8/8 → REFUND-FLOW 1/6-6/6
+//         • supplier confirm      → ORDER-FLOW 5/8 (confirmSupplierLines)
+//         • collect_cod           → ORDER-FLOW 7/8 (collectCod)
+//         • delivery transitions  → ORDER-FLOW 6/8 (initiated→shipped→… below)
+// SUB-FLOW: see refund.service.js "REFUND-FLOW" master map for cancellation detail.
+export async function setOrderStatus(order, nextStatus, actor) {
   assertOrderAccess(order, actor);
 
+  // REFUND-FLOW 1/6 · CANCEL TRIGGER — retailer/supplier cancels before delivery
   if (['cancelled', 'supplier_cancelled', 'refunded'].includes(nextStatus)) {
     if (actor.role !== 'retailer' && actor.role !== 'supplier') {
       throw httpError('Only suppliers and retailers can cancel an order', 403);
@@ -303,7 +364,7 @@ export async function setOrderStatus(order, nextStatus, actor, { cancelReason } 
     if (!canCancelOrder(order)) {
       throw httpError('Cannot cancel after delivery has started', 400);
     }
-    return cancelAndQueueRefund(order, actor, cancelReason || `${actor.role} cancelled before delivery`);
+    return cancelAndQueueRefund(order, actor);
   }
 
   if (nextStatus === 'supplier_approved' || nextStatus === 'supplier_confirmed') {
@@ -314,6 +375,7 @@ export async function setOrderStatus(order, nextStatus, actor, { cancelReason } 
     return confirmSupplierLines(order, supplierActor);
   }
 
+  // ORDER-FLOW 7/8 · COD COLLECTION branch
   if (nextStatus === 'collect_cod') {
     if (actor.role !== 'admin') throw httpError('Only admin can collect COD', 403);
     return collectCod(order, actor);
@@ -351,6 +413,7 @@ export async function setOrderStatus(order, nextStatus, actor, { cancelReason } 
     throw httpError('Only admin can change delivery status', 403);
   }
 
+  // ORDER-FLOW 6/8 · DELIVERY STATUS transition (only admin reaches this point)
   order.status = nextStatus;
   if (nextStatus === 'delivery_initiated') {
     order.deliveryStarted = true;

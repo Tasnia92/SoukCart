@@ -9,6 +9,17 @@ import {
 import { createSslCommerzSession, sslConfigured, retryPayment } from '../services/payment.service.js';
 import { asyncHandler } from '../utils/asyncHandler.js';
 
+// ════════════════════════════════════════════════════════════════════════════
+// ORDER-FLOW — HTTP entry points (search "ORDER-FLOW")
+//   1/8 placeOrder        POST   /api/orders
+//   4/8 retryOrderPayment POST   /api/orders/:id/pay
+//   5/8 confirmOrder      POST   /api/orders/:id/confirm
+//   6/8 updateStatus      PATCH  /api/orders/:id/status
+//   7/8 collectCodPayment POST   /api/orders/:id/collect-cod
+//   8/8 updateStatus      PATCH  /api/orders/:id/status  (cancel/refund statuses)
+// See order.service.js for the full master map.
+// ════════════════════════════════════════════════════════════════════════════
+
 const populate = [
   { path: 'retailer', select: 'name email businessName phone' },
   { path: 'supplier', select: 'name businessName' },
@@ -17,6 +28,10 @@ const populate = [
   { path: 'cancelledBy', select: 'name role' },
 ];
 
+// ── ORDER-FLOW 1/8 · PLACE ORDER (HTTP entry — order starts here) ──
+// SEARCH: order-flow, place order, checkout
+// DOES:   requires SSLCommerz config, creates the order (createOrderFromCart),
+//         then opens the payment session and returns the redirect URL.
 export const placeOrder = asyncHandler(async (req, res) => {
   try {
     if (!sslConfigured()) {
@@ -82,13 +97,15 @@ export const getOrder = asyncHandler(async (req, res) => {
   res.json({ order });
 });
 
+// ── ORDER-FLOW 6/8 & 8/8 · STATUS CHANGE (delivery / cancel / refund / confirm / COD) ──
+// SEARCH: order-flow, status change, delivery, cancel
+// DOES:   delegates to setOrderStatus, which routes to the right step. Also used
+//         by suppliers/admins to confirm (5/8) and to change delivery status (6/8).
 export const updateStatus = asyncHandler(async (req, res) => {
   const order = await Order.findById(req.params.id);
   if (!order) return res.status(404).json({ message: 'Not found' });
   try {
-    const updated = await setOrderStatus(order, req.body.status, req.user, {
-      cancelReason: req.body.cancelReason || req.body.reason,
-    });
+    const updated = await setOrderStatus(order, req.body.status, req.user);
     const fresh = await Order.findById(updated._id).populate(populate);
     res.json({ order: fresh || updated });
   } catch (e) {
@@ -96,6 +113,8 @@ export const updateStatus = asyncHandler(async (req, res) => {
   }
 });
 
+// ── ORDER-FLOW 5/8 · SUPPLIER CONFIRM (HTTP entry) ──
+// SEARCH: order-flow, confirm order, supplier confirm
 export const confirmOrder = asyncHandler(async (req, res) => {
   const order = await Order.findById(req.params.id);
   if (!order) return res.status(404).json({ message: 'Not found' });
@@ -108,6 +127,8 @@ export const confirmOrder = asyncHandler(async (req, res) => {
   }
 });
 
+// ── ORDER-FLOW 4/8 · RETRY PAYMENT (HTTP entry) ──
+// SEARCH: order-flow, retry payment, pay again
 export const retryOrderPayment = asyncHandler(async (req, res) => {
   const order = await Order.findById(req.params.id);
   if (!order) return res.status(404).json({ message: 'Not found' });
@@ -122,6 +143,8 @@ export const retryOrderPayment = asyncHandler(async (req, res) => {
   }
 });
 
+// ── ORDER-FLOW 7/8 · COD COLLECTION (HTTP entry) ──
+// SEARCH: order-flow, collect cod, cash on delivery
 export const collectCodPayment = asyncHandler(async (req, res) => {
   const order = await Order.findById(req.params.id);
   if (!order) return res.status(404).json({ message: 'Not found' });

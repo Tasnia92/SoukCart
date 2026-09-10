@@ -356,7 +356,7 @@ export function AdminRefunds() {
       <Card className="overflow-hidden">
         <table className="w-full text-sm">
           <thead className="bg-canvas text-muted text-left"><tr>
-            <th className="px-3 py-3">Order</th><th className="px-3 py-3">Retailer</th><th className="px-3 py-3">Amount</th><th className="px-3 py-3">Reason</th><th className="px-3 py-3">Status</th><th className="px-3 py-3"></th>
+            <th className="px-3 py-3">Order</th><th className="px-3 py-3">Retailer</th><th className="px-3 py-3">Amount</th><th className="px-3 py-3">Status</th><th className="px-3 py-3"></th>
           </tr></thead>
           <tbody>
             {visible.map((o) => (
@@ -364,7 +364,6 @@ export function AdminRefunds() {
                 <td className="px-3 py-3 font-medium">{o.orderNumber}</td>
                 <td className="px-3 py-3">{o.retailer?.name}</td>
                 <td className="px-3 py-3 tabular-nums">{money(o.refundAmount)}</td>
-                <td className="px-3 py-3 text-muted max-w-xs truncate">{o.cancelReason || '—'}</td>
                 <td className="px-3 py-3"><Badge>{o.manualRefundStatus}</Badge></td>
                 <td className="px-3 py-3 text-right">
                   {o.manualRefundStatus === 'pending' && <Button className="h-8 text-xs" onClick={() => openComplete(o)}>Mark refunded</Button>}
@@ -401,9 +400,6 @@ export function AdminRefunds() {
                 <span className="text-muted">Refund amount</span>
                 <span className="font-semibold tabular-nums">{money(selected.refundAmount)}</span>
               </div>
-              {selected.cancelReason ? (
-                <div className="mt-2 text-muted">Reason: <span className="text-foreground">{selected.cancelReason}</span></div>
-              ) : null}
             </div>
 
             <p className="text-sm mt-4 text-foreground">

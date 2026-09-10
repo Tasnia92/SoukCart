@@ -1,4 +1,3 @@
-import { useState } from 'react'
 import { Button } from './ui'
 import { X } from 'lucide-react'
 
@@ -12,11 +11,9 @@ export function CancelOrderModal({
   open: boolean
   orderNumber: string
   busy: boolean
-  onCancel: (reason: string) => void
+  onCancel: () => void
   onClose: () => void
 }) {
-  const [reason, setReason] = useState('')
-
   if (!open) return null
 
   return (
@@ -40,22 +37,12 @@ export function CancelOrderModal({
         </div>
 
         <p className="text-sm mt-4 text-foreground">
-          Let the other party know why you're cancelling. The message is shown to the supplier, retailer, and admin.
+          Are you sure you want to cancel this order? Any prepaid amount will be refunded by admin. This cannot be undone.
         </p>
-
-        <textarea
-          value={reason}
-          onChange={(e) => setReason(e.target.value)}
-          disabled={busy}
-          placeholder="Write a cancellation message (optional)"
-          rows={4}
-          autoFocus
-          className="mt-3 w-full rounded-lg border border-border bg-[#f7f8f8] px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-primary/30 disabled:opacity-60"
-        />
 
         <div className="mt-5 flex gap-2 justify-end">
           <Button variant="secondary" onClick={onClose} disabled={busy}>Back</Button>
-          <Button variant="danger" disabled={busy} onClick={() => onCancel(reason)}>
+          <Button variant="danger" disabled={busy} onClick={() => onCancel()}>
             {busy ? 'Cancelling…' : 'Cancel order'}
           </Button>
         </div>

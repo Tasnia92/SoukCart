@@ -1,5 +1,14 @@
 import mongoose from 'mongoose';
 
+// ════════════════════════════════════════════════════════════════════════════
+// ORDER-FLOW — data shape. Search "ORDER-FLOW".
+// Status lifecycle (see order.service.js master map):
+//   awaiting_payment → placed → supplier_confirmed → delivery_initiated →
+//   shipped → out_for_delivery → delivered     (+ cancelled / supplier_cancelled / refunded)
+// Payment flags: deliveryFeePaid, productAmountPaid, paymentStatus
+// Cancel/refund fields: see refund.service.js "REFUND-FLOW" master map.
+// ════════════════════════════════════════════════════════════════════════════
+
 const orderItemSchema = new mongoose.Schema(
   {
     product: { type: mongoose.Schema.Types.ObjectId, ref: 'Product', required: true },
@@ -44,6 +53,7 @@ const orderSchema = new mongoose.Schema(
     sslValId: String,
     sslSessionKey: String,
     lastPaymentError: String,
+    // ORDER-FLOW status badge — drives every step. See order.service.js master map.
     status: {
       type: String,
       enum: [
@@ -67,7 +77,7 @@ const orderSchema = new mongoose.Schema(
     /** Origin the retailer checked out from — used for the SSLCommerz return redirect. */
     clientOrigin: String,
     notes: String,
-    cancelReason: String,
+    // REFUND-FLOW cancel audit (set by cancelAndQueueRefund, step 4/6)
     cancelledBy: { type: mongoose.Schema.Types.ObjectId, ref: 'User' },
     cancelledByRole: String,
     cancelledAt: Date,
@@ -80,6 +90,7 @@ const orderSchema = new mongoose.Schema(
     codCollectedAt: Date,
     codCollectedBy: { type: mongoose.Schema.Types.ObjectId, ref: 'User' },
     payoutSettled: { type: Boolean, default: false },
+    // REFUND-FLOW: manual refund queued at step 4/6, completed at step 6/6
     manualRefundStatus: {
       type: String,
       enum: ['none', 'pending', 'completed'],

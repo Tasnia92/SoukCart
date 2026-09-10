@@ -5,6 +5,15 @@ import { accruePayoutsForOrder, uniqueSupplierIds } from './payout.service.js';
 import { CANCELLED_STATUSES } from './refund.service.js';
 import { httpError } from '../utils/httpError.js';
 
+// ════════════════════════════════════════════════════════════════════════════
+// ORDER-FLOW (payment steps 2–4) — search "ORDER-FLOW"
+//   2/8 START PAYMENT ... createSslCommerzSession   (amount due = fee only for
+//                         COD, fee + merchandise for online)
+//   3/8 PAYMENT RESULT .. validateSslPayment → activateOrderAfterPayment | markSslFailed
+//   4/8 RETRY PAYMENT ... retryPayment
+// See order.service.js for the full 1/8 … 8/8 master map.
+// ════════════════════════════════════════════════════════════════════════════
+
 // This project always uses the SSLCommerz SANDBOX environment — never live.
 const SSL_API_BASE = 'https://sandbox.sslcommerz.com';
 
@@ -24,6 +33,12 @@ export function sslConfigured() {
   return Boolean(storeId && storePasswd);
 }
 
+// ── ORDER-FLOW 2/8 · START PAYMENT (open SSLCommerz session) ──
+// SEARCH: order-flow, start payment, sslcommerz, initiate payment, redirect
+// DOES:   builds the SSLCommerz checkout params and returns { redirectUrl, tranId }.
+//         Amount charged is order.amountDueNow (delivery fee for COD; fee + goods
+//         for online). Called right after the order is placed (step 1).
+// NEXT:   ORDER-FLOW 3/8 PAYMENT RESULT (SSL callback / IPN)
 /**
  * Init SSLCommerz session. Amount = delivery fee only (COD) or subtotal+fee (online).
  * Returns { redirectUrl, tranId, sessionkey }.
@@ -92,6 +107,10 @@ export async function createSslCommerzSession(order, retailer, { forceNew = fals
   };
 }
 
+// ── ORDER-FLOW 3/8 · PAYMENT RESULT — validate the SSL payment ──
+// SEARCH: order-flow, payment check, validate payment, ssl validate
+// DOES:   asks SSLCommerz whether the transaction is VALID/VALIDATED and checks
+//         the tran_id matches. Throws on failure; used by success + IPN handlers.
 export async function validateSslPayment({ valId, tranId }) {
   const c = cfg();
   if (!valId) throw httpError('Missing val_id', 400);
@@ -117,6 +136,11 @@ export async function validateSslPayment({ valId, tranId }) {
   return data;
 }
 
+// ── ORDER-FLOW 3/8 · PAYMENT RESULT — activate order after payment ──
+// SEARCH: order-flow, payment received, activate order, delivery fee paid
+// DOES:   marks deliveryFeePaid (+ productAmountPaid/paymentStatus for online) and
+//         moves status awaiting_payment → placed. Idempotent; stock NOT reserved.
+// NEXT:   ORDER-FLOW 5/8 SUPPLIER CONFIRM (suppliers notified to confirm)
 /** Activate order after validated delivery-fee (and merchandise if online) payment. Idempotent. Stock is NOT reserved here. */
 export async function activateOrderAfterPayment(order, sslData = {}) {
   if (!order) throw httpError('Order not found', 404);
@@ -173,6 +197,10 @@ export async function activateOrderAfterPayment(order, sslData = {}) {
   return order;
 }
 
+// ── ORDER-FLOW 3/8 · PAYMENT RESULT — payment failed/cancelled ──
+// SEARCH: order-flow, payment failed, payment cancelled
+// DOES:   keeps the order alive so the retailer can retry (does NOT cancel it).
+// NEXT:   ORDER-FLOW 4/8 RETRY PAYMENT
 /** Failed/cancelled SSL: keep the order so the retailer can retry. */
 export async function markSslFailed(order, reason = 'Payment failed') {
   if (!order) return order;
@@ -191,6 +219,11 @@ export async function markSslFailed(order, reason = 'Payment failed') {
   return order;
 }
 
+// ── ORDER-FLOW 4/8 · RETRY PAYMENT ──
+// SEARCH: order-flow, retry payment, pay again, payment retry
+// DOES:   only the order's retailer (or admin) may retry, only while unpaid and
+//         still awaiting_payment/placed. Clears the previous error, opens a fresh
+//         SSLCommerz session (see ORDER-FLOW 2/8).
 export async function retryPayment(order, retailer) {
   if (String(order.retailer) !== String(retailer._id) && retailer.role !== 'admin') {
     throw httpError('Forbidden', 403);

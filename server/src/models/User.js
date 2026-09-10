@@ -1,5 +1,13 @@
 import mongoose from 'mongoose';
 
+// ════════════════════════════════════════════════════════════════════════════
+// SUPPLIER-FLOW — supplier profile fields (search "SUPPLIER-FLOW")
+//   1/8 VERIFICATION: businessName, shopLink, shopSlug, businessDescription,
+//        nidDocUrl, verificationStatus (none|pending|approved|rejected) and
+//        verificationRejectReason. Set by submitVerification; changed by admin
+//        (ADMIN-FLOW 3/7). role becomes "supplier" once approved.
+// ════════════════════════════════════════════════════════════════════════════
+
 const userSchema = new mongoose.Schema(
   {
     name: { type: String, required: true, trim: true },
@@ -12,6 +20,7 @@ const userSchema = new mongoose.Schema(
     shopSlug: { type: String, lowercase: true, trim: true, sparse: true, unique: true },
     businessDescription: String,
     nidDocUrl: String,
+    // SUPPLIER-FLOW 1/8 · verification state (none → pending → approved/rejected)
     verificationStatus: {
       type: String,
       enum: ['none', 'pending', 'approved', 'rejected'],

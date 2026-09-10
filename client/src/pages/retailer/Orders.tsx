@@ -80,11 +80,11 @@ export function RetailerOrders() {
     setPayFilter('All')
   }
 
-  async function confirmCancel(reason: string) {
+  async function confirmCancel() {
     if (!cancelTarget) return
     setCancelling(true)
     try {
-      await api.patch(`/orders/${cancelTarget._id}/status`, { status: 'cancelled', cancelReason: reason })
+      await api.patch(`/orders/${cancelTarget._id}/status`, { status: 'cancelled' })
       setCancelTarget(null)
       await load()
     } catch (e) {
@@ -251,7 +251,7 @@ export function RetailerOrders() {
         open={!!cancelTarget}
         orderNumber={cancelTarget?.orderNumber || ''}
         busy={cancelling}
-        onCancel={(r) => void confirmCancel(r)}
+        onCancel={() => void confirmCancel()}
         onClose={() => setCancelTarget(null)}
       />
     </div>

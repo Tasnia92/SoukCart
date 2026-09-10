@@ -75,6 +75,10 @@ export async function reserveStockForItems(items, { orderId, actorId } = {}) {
   return reserved;
 }
 
+// ── REFUND-FLOW 5/6 · SIDE EFFECTS — restore reserved stock ──
+// SEARCH: refund-flow, release stock, restore stock
+// DOES:   adds each reserved/confirmed item's qty back to Product.stock and logs a
+//         StockHistory entry with reason "cancel". Called by cancelAndQueueRefund.
 export async function releaseStockForItems(items, { orderId, actorId, note } = {}) {
   for (const item of items) {
     if (!item.stockReserved && !item.confirmedAt) continue;

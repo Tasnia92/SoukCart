@@ -108,18 +108,18 @@ export function SupplierOrders() {
       if (status === 'supplier_confirmed') {
         await api.post(`/orders/${id}/confirm`, {})
       } else {
-        await api.patch(`/orders/${id}/status`, { status, cancelReason: undefined })
+        await api.patch(`/orders/${id}/status`, { status })
       }
       await load()
     } catch (e) {
       window.alert(e instanceof Error ? e.message : 'Action failed')
     }
   }
-  async function confirmCancel(reason: string) {
+  async function confirmCancel() {
     if (!cancelTarget) return
     setCancelling(true)
     try {
-      await api.patch(`/orders/${cancelTarget._id}/status`, { status: 'supplier_cancelled', cancelReason: reason })
+      await api.patch(`/orders/${cancelTarget._id}/status`, { status: 'supplier_cancelled' })
       setCancelTarget(null)
       await load()
     } catch (e) {
@@ -198,7 +198,7 @@ export function SupplierOrders() {
         open={!!cancelTarget}
         orderNumber={cancelTarget?.orderNumber || ''}
         busy={cancelling}
-        onCancel={(r) => void confirmCancel(r)}
+        onCancel={() => void confirmCancel()}
         onClose={() => setCancelTarget(null)}
       />
     </div>
