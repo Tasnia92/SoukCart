@@ -40,18 +40,11 @@ export const dashboard = asyncHandler(async (_req, res) => {
   };
   const orderValueMatch = {
     $or: [
-      { $and: [{ $ne: ['$paymentMethod', 'online'] }, { $eq: ['$status', 'delivered'] }] },
+      { paymentMethod: { $ne: 'online' }, status: 'delivered' },
       {
-        $and: [
-          { $eq: ['$paymentMethod', 'online'] },
-          { $or: [{ $eq: ['$paymentStatus', 'paid'] }, { $eq: ['$productAmountPaid', true] }] },
-          {
-            $in: [
-              '$status',
-              ['delivery_initiated', 'shipped', 'out_for_delivery', 'delivered'],
-            ],
-          },
-        ],
+        paymentMethod: 'online',
+        $or: [{ paymentStatus: 'paid' }, { productAmountPaid: true }],
+        status: { $in: ['delivery_initiated', 'shipped', 'out_for_delivery', 'delivered'] },
       },
     ],
   };
