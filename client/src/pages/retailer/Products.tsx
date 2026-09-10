@@ -101,8 +101,8 @@ export function RetailerProducts() {
       <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4">
         {filtered.map((p) => (
           <Card key={p._id} className="overflow-hidden flex flex-col rounded-[12px]">
-            <Link to={`/retailer/products/${p._id}`}>
-              <img src={p.imageUrl || 'https://placehold.co/400x240'} alt={p.name} className="h-36 w-full object-cover bg-canvas" />
+            <Link to={`/retailer/products/${p._id}`} className="block aspect-[4/3] bg-canvas overflow-hidden">
+              <img src={p.imageUrl || 'https://placehold.co/400x240'} alt={p.name} loading="lazy" className="h-full w-full object-contain" />
             </Link>
             <div className="p-3 flex flex-col gap-1.5 flex-1">
               <Link to={`/retailer/products/${p._id}`} className="font-semibold text-sm hover:text-primary line-clamp-1">{p.name}</Link>
@@ -125,14 +125,16 @@ export function RetailerProducts() {
                   </button>
                   <span className="w-7 text-center text-xs font-medium">{qty[p._id] || p.moq}</span>
                   <button
-                    className="h-8 w-8 text-sm"
-                    onClick={() => setQty((q) => ({ ...q, [p._id]: (q[p._id] || p.moq) + 1 }))}
+                    className="h-8 w-8 text-sm disabled:opacity-40 disabled:cursor-not-allowed"
+                    disabled={qty[p._id] >= p.stock}
+                    onClick={() => setQty((q) => ({ ...q, [p._id]: Math.min(p.stock, (q[p._id] || p.moq) + 1) }))}
                   >
                     +
                   </button>
                 </div>
                 <Button
                   className="flex-1 h-8 text-xs"
+                  disabled={p.stock < p.moq}
                   onClick={() =>
                     add(
                       {
@@ -141,6 +143,7 @@ export function RetailerProducts() {
                         price: p.price,
                         unit: p.unit,
                         moq: p.moq,
+                        stock: p.stock,
                         imageUrl: p.imageUrl,
                         supplierId: p.supplier._id,
                       },
@@ -148,7 +151,7 @@ export function RetailerProducts() {
                     )
                   }
                 >
-                  Add
+                  {p.stock < p.moq ? 'Out of stock' : 'Add'}
                 </Button>
               </div>
             </div>

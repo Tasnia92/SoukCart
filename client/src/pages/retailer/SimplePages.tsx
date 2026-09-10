@@ -1,9 +1,10 @@
 import { Fragment, useCallback, useEffect, useState, type FormEvent } from 'react'
-import { Check, ChevronDown, Download, Home, Truck, type LucideIcon } from 'lucide-react'
+import { Check, ChevronDown, Download, Home, Printer, Truck, type LucideIcon } from 'lucide-react'
 import { Button, Card, EmptyState, Input, Label, Badge } from '@/components/ui'
 import { useAuth } from '@/context/AuthContext'
 import { api } from '@/services/api'
 import { NotificationsInbox } from '@/components/NotificationsInbox'
+import { PrintInvoiceModal, type InvoiceOrder } from '@/components/Invoice'
 import { cn, downloadCsv, money, statusLabel } from '@/lib/utils'
 import { usePoll } from '@/lib/poll'
 
@@ -66,6 +67,7 @@ function invoiceCsv(o: any) {
 export function RetailerTracking() {
   const [orders, setOrders] = useState<any[]>([])
   const [openId, setOpenId] = useState<string | null>(null)
+  const [invoiceTarget, setInvoiceTarget] = useState<InvoiceOrder | null>(null)
   const load = useCallback(async () => {
     const d = await api.get<{ orders: any[] }>('/orders?tracking=1')
     setOrders(d.orders.filter((o: any) => o.status !== 'delivered' && o.status !== 'cancelled' && o.status !== 'supplier_cancelled' && o.status !== 'refunded'))
@@ -118,9 +120,14 @@ export function RetailerTracking() {
                         Order placed on <span className="font-medium text-foreground">{fmtDateTime(o.createdAt)}</span>
                       </p>
                     </div>
-                    <Button variant="secondary" onClick={() => downloadCsv(`invoice-${o.orderNumber}.csv`, invoiceCsv(o))}>
-                      Download Invoice <Download size={14} />
-                    </Button>
+                    <div className="flex flex-wrap gap-2">
+                      <Button variant="secondary" onClick={() => downloadCsv(`invoice-${o.orderNumber}.csv`, invoiceCsv(o))}>
+                        Download CSV <Download size={14} />
+                      </Button>
+                      <Button onClick={() => setInvoiceTarget(o)}>
+                        Print Invoice <Printer size={14} />
+                      </Button>
+                    </div>
                   </div>
                   <div className="mt-8 mb-2">
                     <OrderTimeline {...o} />
@@ -150,6 +157,7 @@ export function RetailerTracking() {
           )
         })}
       </div>
+      <PrintInvoiceModal order={invoiceTarget} onClose={() => setInvoiceTarget(null)} />
     </div>
   )
 }
@@ -289,7 +297,7 @@ export function RetailerSettings() {
         }
         await changeEmail(profile.email, emailPw)
       }
-      await updateProfile({ name: profile.name, phone: profile.phone, businessName: profile.businessName })
+      await updateProfile({ name: profile.name, phone: profile.phone })
       setEmailPw('')
       setProfileMsg('Saved')
       setTimeout(() => setProfileMsg(''), 1200)
@@ -344,7 +352,6 @@ export function RetailerSettings() {
               <div><Label htmlFor="settings-email-pw">Current password</Label><Input id="settings-email-pw" type="password" value={emailPw} onChange={(e) => setEmailPw(e.target.value)} placeholder="Password to confirm the change" /></div>
             )}
             <div><Label htmlFor="settings-phone">Phone</Label><Input id="settings-phone" value={profile.phone} onChange={(e) => setProfile({ ...profile, phone: e.target.value })} placeholder="01XXXXXXXXX" /></div>
-            <div><Label htmlFor="settings-shop">Shop name</Label><Input id="settings-shop" value={profile.businessName} onChange={(e) => setProfile({ ...profile, businessName: e.target.value })} placeholder="Your shop" /></div>
             {profileMsg ? <p className="text-sm text-primary">{profileMsg}</p> : null}
             {profileErr ? <p className="text-sm text-danger">{profileErr}</p> : null}
             <div className="flex gap-2">
@@ -358,7 +365,6 @@ export function RetailerSettings() {
             {addresses.map((a) => (
               <div key={a.id} className="flex items-start justify-between gap-3 rounded-xl border border-border p-3">
                 <div>
-                  <div className="font-medium">{a.label}</div>
                   <div className="text-sm text-muted">{a.line}</div>
                   <div className="text-sm text-muted">{a.phone}</div>
                 </div>
@@ -370,13 +376,12 @@ export function RetailerSettings() {
               className="space-y-3 pt-2 border-t border-border"
               onSubmit={(e) => {
                 e.preventDefault()
-                if (!draft.label.trim() || !draft.line.trim()) return
+                if (!draft.line.trim()) return
                 saveAddresses([...addresses, { id: String(Date.now()), ...draft }])
                 setDraft({ label: '', line: '', phone: '' })
               }}
             >
               <div className="font-medium">Add address</div>
-              <div><Label htmlFor="addr-label">Label</Label><Input id="addr-label" value={draft.label} onChange={(e) => setDraft({ ...draft, label: e.target.value })} placeholder="Shop" required /></div>
               <div><Label htmlFor="addr-line">Address</Label><Input id="addr-line" value={draft.line} onChange={(e) => setDraft({ ...draft, line: e.target.value })} placeholder="Road, area, city" required /></div>
               <div><Label htmlFor="addr-phone">Phone</Label><Input id="addr-phone" value={draft.phone} onChange={(e) => setDraft({ ...draft, phone: e.target.value })} placeholder="01XXXXXXXXX" /></div>
               <Button type="submit">Save address</Button>

@@ -1,7 +1,7 @@
 import { useCallback, useMemo, useState } from 'react'
 import { Link, useSearchParams } from 'react-router-dom'
 import { MoreVertical } from 'lucide-react'
-import { Badge, Button, Card } from '@/components/ui'
+import { Badge, Button, Card, DropdownMenu } from '@/components/ui'
 import { CancelOrderModal } from '@/components/CancelOrderModal'
 import { api } from '@/services/api'
 import { money, cn, statusLabel, canCancelStatus, needsPaymentRetry } from '@/lib/utils'
@@ -41,7 +41,6 @@ export function RetailerOrders() {
   const [orders, setOrders] = useState<any[]>([])
   const [filter, setFilter] = useState<(typeof filters)[number]>('All')
   const [selected, setSelected] = useState<string[]>([])
-  const [menu, setMenu] = useState<string | null>(null)
   const [params] = useSearchParams()
   const payHint = params.get('pay')
   const paid = params.get('paid')
@@ -168,16 +167,11 @@ export function RetailerOrders() {
                         <Button className="h-8 text-xs" onClick={() => void retry(o._id).catch((e) => window.alert(e instanceof Error ? e.message : 'Retry failed'))}>Retry pay</Button>
                       )}
                       {canCancelStatus(o.status) && (
-                        <div className="relative">
-                          <button type="button" className="p-1 text-muted" aria-label="Order actions" onClick={() => setMenu(menu === o._id ? null : o._id)}>
-                            <MoreVertical size={16} />
-                          </button>
-                          {menu === o._id && (
-                            <div className="absolute right-0 top-7 z-10 bg-white border border-border rounded-lg shadow-sm p-1 min-w-[120px]">
-                              <button className="w-full text-left px-3 py-1.5 text-sm hover:bg-canvas rounded" onClick={() => { setMenu(null); setCancelTarget(o) }}>Cancel</button>
-                            </div>
-                          )}
-                        </div>
+                        <DropdownMenu
+                          button={<span className="inline-flex p-1 text-muted" aria-label="Order actions"><MoreVertical size={16} /></span>}
+                        >
+                          <button className="w-full text-left px-3 py-1.5 text-sm hover:bg-canvas rounded" onClick={() => setCancelTarget(o)}>Cancel</button>
+                        </DropdownMenu>
                       )}
                     </div>
                   </td>

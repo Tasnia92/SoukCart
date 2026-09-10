@@ -65,7 +65,7 @@ export function RetailerLayout() {
   }, [drawerOpen])
 
   return (
-    <div className="min-h-screen flex flex-col bg-white">
+    <div className="min-h-dvh flex flex-col bg-white">
       <header className="border-b border-border">
         <div className="mx-auto max-w-6xl px-4 h-16 flex items-center justify-between gap-4 relative">
           <div className="flex items-center gap-1">

@@ -206,9 +206,12 @@ export async function retryPayment(order, retailer) {
   return createSslCommerzSession(order, retailer, { forceNew: true });
 }
 
-export function clientRedirect(path) {
+export function clientRedirect(path, order) {
   const { clientUrl } = cfg();
-  return `${clientUrl}${path.startsWith('/') ? path : `/${path}`}`;
+  // Prefer the origin the retailer actually checked out from. Falling back to
+  // the env CLIENT_URL keeps old orders / unknown-order callbacks working.
+  const base = order?.clientOrigin || clientUrl;
+  return `${base.replace(/\/$/, '')}${path.startsWith('/') ? path : `/${path}`}`;
 }
 
 export async function findOrderFromSslPayload(body = {}) {

@@ -6,6 +6,7 @@ export type CartItem = {
   price: number
   unit: string
   moq: number
+  stock?: number
   imageUrl?: string
   supplierId: string
   quantity: number
@@ -43,13 +44,23 @@ export function CartProvider({ children }: { children: ReactNode }) {
       const q = qty ?? item.moq
       const existing = items.find((i) => i.productId === item.productId)
       if (existing) {
-        persist(items.map((i) => (i.productId === item.productId ? { ...i, quantity: i.quantity + q } : i)))
+        const combined = Math.max(existing.moq, existing.quantity + q)
+        const next = item.stock != null ? Math.min(combined, item.stock) : combined
+        persist(items.map((i) => (i.productId === item.productId ? { ...i, stock: item.stock, quantity: next } : i)))
       } else {
-        persist([...items, { ...item, quantity: q }])
+        const capped = item.stock != null ? Math.min(q, item.stock) : q
+        persist([...items, { ...item, quantity: Math.max(item.moq, capped) }])
       }
     },
     setQty(productId, quantity) {
-      persist(items.map((i) => (i.productId === productId ? { ...i, quantity: Math.max(i.moq, quantity) } : i)))
+      persist(
+        items.map((i) => {
+          if (i.productId !== productId) return i
+          let next = Math.max(i.moq, quantity)
+          if (i.stock != null) next = Math.min(next, i.stock)
+          return { ...i, quantity: next }
+        }),
+      )
     },
     remove(productId) {
       persist(items.filter((i) => i.productId !== productId))

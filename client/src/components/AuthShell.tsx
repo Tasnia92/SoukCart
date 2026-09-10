@@ -1,6 +1,6 @@
 import type { ReactNode } from 'react'
 import { Brand } from '@/components/Brand'
-import { Store, Package, Monitor, Layers, RefreshCw } from 'lucide-react'
+import { Store, Package } from 'lucide-react'
 
 export function AuthShell({
   children,
@@ -27,17 +27,6 @@ export function AuthShell({
           <p className="text-xs font-semibold tracking-[0.12em] uppercase text-white/90">Why SoukCart</p>
           <h2 className="mt-3 text-4xl font-bold leading-tight tracking-tight text-balance max-w-md">{headline}</h2>
           <p className="mt-4 text-white/90 max-w-md text-[15px] leading-relaxed text-pretty">{body}</p>
-        </div>
-        <div className="relative flex flex-wrap gap-3">
-          {[
-            { icon: Monitor, label: 'Storefront sync' },
-            { icon: Layers, label: 'Live inventory' },
-            { icon: RefreshCw, label: 'Order routing' },
-          ].map(({ icon: Icon, label }) => (
-            <span key={label} className="inline-flex items-center gap-2 rounded-full bg-white text-foreground px-3 py-1.5 text-sm font-medium">
-              <Icon size={14} /> {label}
-            </span>
-          ))}
         </div>
       </div>
     </div>

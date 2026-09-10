@@ -28,6 +28,33 @@ export const dashboard = asyncHandler(async (_req, res) => {
   ]);
   const tz = Intl.DateTimeFormat().resolvedOptions().timeZone || '+06:00';
   const deliveredDateExpr = { $ifNull: ['$deliveredAt', '$createdAt'] };
+  // Order value recognition date:
+  // - Fully prepaid online orders count from the moment delivery is initiated.
+  // - COD orders count once the order is delivered.
+  const orderValueDateExpr = {
+    $cond: [
+      { $eq: ['$paymentMethod', 'online'] },
+      { $ifNull: ['$deliveryInitiatedAt', { $ifNull: ['$deliveredAt', '$createdAt'] }] },
+      { $ifNull: ['$deliveredAt', '$createdAt'] },
+    ],
+  };
+  const orderValueMatch = {
+    $or: [
+      { $and: [{ $ne: ['$paymentMethod', 'online'] }, { $eq: ['$status', 'delivered'] }] },
+      {
+        $and: [
+          { $eq: ['$paymentMethod', 'online'] },
+          { $or: [{ $eq: ['$paymentStatus', 'paid'] }, { $eq: ['$productAmountPaid', true] }] },
+          {
+            $in: [
+              '$status',
+              ['delivery_initiated', 'shipped', 'out_for_delivery', 'delivered'],
+            ],
+          },
+        ],
+      },
+    ],
+  };
   const revenue = await Order.aggregate([
     { $match: { status: 'delivered' } },
     {
@@ -78,6 +105,26 @@ export const dashboard = asyncHandler(async (_req, res) => {
     thisMonth: monthlyAgg.find((m) => m._id === monthKey(now)) || emptyMonth,
     prevMonth: monthlyAgg.find((m) => m._id === monthKey(prevMonthStart)) || emptyMonth,
   };
+  const orderValueAgg = await Order.aggregate([
+    {
+      $match: {
+        ...orderValueMatch,
+        $expr: { $gte: [orderValueDateExpr, prevMonthStart] },
+      },
+    },
+    {
+      $group: {
+        _id: { $dateToString: { format: '%Y-%m', date: orderValueDateExpr, timezone: tz } },
+        subtotal: { $sum: '$subtotal' },
+        orders: { $sum: 1 },
+      },
+    },
+  ]);
+  const emptyOrderValue = { subtotal: 0, orders: 0 };
+  const orderValue = {
+    thisMonth: orderValueAgg.find((m) => m._id === monthKey(now)) || emptyOrderValue,
+    prevMonth: orderValueAgg.find((m) => m._id === monthKey(prevMonthStart)) || emptyOrderValue,
+  };
   const since = new Date();
   since.setDate(since.getDate() - 6);
   since.setHours(0, 0, 0, 0);
@@ -115,6 +162,7 @@ export const dashboard = asyncHandler(async (_req, res) => {
       revenueSubtotal: revenue[0]?.subtotal || 0,
       commission: revenue[0]?.commission || 0,
       monthly,
+      orderValue,
       trend,
     },
   });

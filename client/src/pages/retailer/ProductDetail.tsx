@@ -53,9 +53,10 @@ export function RetailerProductDetail() {
             <div className="inline-flex items-center rounded-full border border-border">
               <button className="h-10 w-10" onClick={() => setQty((q) => Math.max(product.moq, q - 1))}>−</button>
               <span className="w-10 text-center text-sm font-medium">{qty}</span>
-              <button className="h-10 w-10" onClick={() => setQty((q) => q + 1)}>+</button>
+              <button className="h-10 w-10 disabled:opacity-40 disabled:cursor-not-allowed" disabled={qty >= product.stock} onClick={() => setQty((q) => Math.min(product.stock, q + 1))}>+</button>
             </div>
             <Button
+              disabled={product.stock < product.moq}
               onClick={() =>
                 add(
                   {
@@ -64,6 +65,7 @@ export function RetailerProductDetail() {
                     price: product.price,
                     unit: product.unit,
                     moq: product.moq,
+                    stock: product.stock,
                     imageUrl: product.imageUrl,
                     supplierId: product.supplier._id,
                   },
@@ -71,7 +73,7 @@ export function RetailerProductDetail() {
                 )
               }
             >
-              Add to order
+              {product.stock < product.moq ? 'Out of stock' : 'Add to order'}
             </Button>
           </div>
         </div>

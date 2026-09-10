@@ -1,7 +1,94 @@
 import { ArrowDownRight, ArrowUpRight, Inbox, type LucideIcon } from 'lucide-react'
 import { Link } from 'react-router-dom'
 import { cn } from '@/lib/utils'
-import type { ButtonHTMLAttributes, HTMLAttributes, InputHTMLAttributes, LabelHTMLAttributes, ReactNode } from 'react'
+import { useEffect, useRef, useState, type ButtonHTMLAttributes, type HTMLAttributes, type InputHTMLAttributes, type LabelHTMLAttributes, type ReactNode } from 'react'
+
+/**
+ * Dropdown anchored to a trigger button. The menu is rendered with `position: fixed`
+ * and flips upward when there is not enough room below the trigger, so it is never
+ * clipped by nearby `overflow-hidden` containers and can always be clicked.
+ */
+export function DropdownMenu({
+  button,
+  children,
+  align = 'right',
+}: {
+  button: ReactNode
+  children: ReactNode
+  align?: 'left' | 'right'
+}) {
+  const rootRef = useRef<HTMLDivElement>(null)
+  const triggerRef = useRef<HTMLButtonElement>(null)
+  const [open, setOpen] = useState(false)
+  const [pos, setPos] = useState<{ top: number; left: number } | null>(null)
+
+  const itemCount = (Array.isArray(children) ? children : [children]).filter(Boolean).length
+  const menuHeight = Math.min(itemCount, 6) * 32 + 16
+
+  useEffect(() => {
+    if (!open) {
+      setPos(null)
+      return
+    }
+    const btn = triggerRef.current
+    if (!btn) return
+    const r = btn.getBoundingClientRect()
+    const gap = 6
+    const menuWidth = 170
+    const topBelow = r.bottom + gap
+    const topAbove = r.top - gap - menuHeight
+    const fitsBelow = window.innerHeight - topBelow >= menuHeight
+    const fitsAbove = topAbove >= 0
+    const top = fitsBelow || !fitsAbove ? topBelow : topAbove
+    const left = align === 'right' ? Math.max(8, r.right - menuWidth) : Math.max(8, r.left)
+    const viewport = window.visualViewport?.width ?? window.innerWidth
+    setPos({ top, left: align === 'right' ? Math.min(left, viewport - menuWidth - 8) : left })
+  }, [open, align, children])
+
+  useEffect(() => {
+    if (!open) return
+    function onDown(e: MouseEvent) {
+      if (rootRef.current && !rootRef.current.contains(e.target as Node)) setOpen(false)
+    }
+    function onKey(e: KeyboardEvent) {
+      if (e.key === 'Escape') setOpen(false)
+    }
+    function onScroll() {
+      setOpen(false)
+    }
+    document.addEventListener('mousedown', onDown)
+    document.addEventListener('keydown', onKey)
+    window.addEventListener('scroll', onScroll, true)
+    return () => {
+      document.removeEventListener('mousedown', onDown)
+      document.removeEventListener('keydown', onKey)
+      window.removeEventListener('scroll', onScroll, true)
+    }
+  }, [open])
+
+  return (
+    <div ref={rootRef} className="inline-flex relative">
+      <button
+        ref={triggerRef}
+        type="button"
+        aria-haspopup="menu"
+        aria-expanded={open}
+        onClick={() => setOpen((v) => !v)}
+      >
+        {button}
+      </button>
+      {open && pos && (
+        <div
+          role="menu"
+          className="fixed z-50 bg-white border border-border rounded-lg shadow-lg p-1 min-w-[120px]"
+          style={{ top: pos.top, left: pos.left }}
+        >
+          {children}
+        </div>
+      )}
+    </div>
+  )
+}
 
 export function Button({
   className,

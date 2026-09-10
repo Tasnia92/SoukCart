@@ -8,7 +8,8 @@
     "dev:client": "npm --prefix client run dev",
     "build": "npm --prefix client run build",
     "seed": "npm --prefix server run seed",
-    "install:all": "npm --prefix server install && npm --prefix client install"
+    "install:all": "node scripts/install-all.mjs",
+    "postinstall": "npm run install:all"
   },
   "devDependencies": {
     "concurrently": "^9.2.1"

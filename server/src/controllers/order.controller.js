@@ -30,6 +30,7 @@ export const placeOrder = asyncHandler(async (req, res) => {
       recipientName: req.body.recipientName,
       recipientMobile: req.body.recipientMobile,
       notes: req.body.notes,
+      clientOrigin: req.body.clientOrigin,
     });
     const payment = await createSslCommerzSession(order, req.user);
     res.status(201).json({

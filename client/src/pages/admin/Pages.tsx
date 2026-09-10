@@ -21,7 +21,7 @@ import {
   X,
   XCircle,
 } from 'lucide-react'
-import { Badge, Button, Card, EmptyState, Input, Label, StatCard } from '@/components/ui'
+import { Badge, Button, Card, DropdownMenu, EmptyState, Input, Label, StatCard } from '@/components/ui'
 import { NotificationsInbox } from '@/components/NotificationsInbox'
 import { api } from '@/services/api'
 import { money, cn, statusLabel } from '@/lib/utils'
@@ -53,6 +53,7 @@ export function AdminHome() {
   if (!stats) return <p className="text-muted">Loading…</p>
   const trend = stats.trend || []
   const monthly = stats.monthly
+  const orderValue = stats.orderValue
   const max = Math.max(1, ...trend.map((x: any) => x.count))
   const totalOrders = trend.reduce((s: number, x: any) => s + (x.count || 0), 0)
   const todayCount = trend.length ? trend[trend.length - 1].count || 0 : 0
@@ -61,9 +62,9 @@ export function AdminHome() {
     {
       Icon: Banknote,
       title: 'Order value',
-      note: `${money(monthly?.prevMonth?.subtotal)} previous month`,
-      value: money(monthly?.thisMonth?.subtotal),
-      delta: pctDelta(monthly?.thisMonth?.subtotal, monthly?.prevMonth?.subtotal),
+      note: `${money(orderValue?.prevMonth?.subtotal)} previous month`,
+      value: money(orderValue?.thisMonth?.subtotal),
+      delta: pctDelta(orderValue?.thisMonth?.subtotal, orderValue?.prevMonth?.subtotal),
       to: '/admin/orders',
     },
     {
@@ -1091,7 +1092,6 @@ export function AdminVerificationDetail() {
 export function AdminUsers() {
   const [users, setUsers] = useState<any[]>([])
   const [open, setOpen] = useState(false)
-  const [menu, setMenu] = useState<string | null>(null)
   const [form, setForm] = useState({ name: '', email: '', password: '', role: 'retailer' })
   const [err, setErr] = useState('')
   async function load() { setUsers((await api.get<{ users: any[] }>('/admin/users')).users) }
@@ -1110,7 +1110,6 @@ export function AdminUsers() {
   }
   async function toggleActive(u: any) {
     await api.patch(`/admin/users/${u._id}`, { isActive: u.isActive === false })
-    setMenu(null)
     await load()
   }
   return (
@@ -1158,15 +1157,14 @@ export function AdminUsers() {
                 <td className="px-4 py-3"><Badge>{u.role}</Badge></td>
                 <td className="px-4 py-3">{u.role === 'admin' || u.verificationStatus === 'approved' ? 'Yes' : 'No'}</td>
                 <td className="px-4 py-3 text-xs text-muted font-mono">{u._id?.slice(-8)}</td>
-                <td className="px-4 py-3 text-right relative">
-                  <button type="button" className="p-1 text-muted" aria-label="User actions" onClick={() => setMenu(menu === u._id ? null : u._id)}><MoreVertical size={16} /></button>
-                  {menu === u._id && (
-                    <div className="absolute right-4 top-10 z-10 bg-white border border-border rounded-lg shadow-sm p-1 min-w-[140px] text-left">
-                      <button className="w-full text-left px-3 py-1.5 text-sm hover:bg-canvas rounded" onClick={() => void toggleActive(u)}>
-                        {u.isActive === false ? 'Activate' : 'Deactivate'}
-                      </button>
-                    </div>
-                  )}
+                <td className="px-4 py-3 text-right">
+                  <DropdownMenu
+                    button={<span className="inline-flex p-1 text-muted"><MoreVertical size={16} /></span>}
+                  >
+                    <button className="w-full text-left px-3 py-1.5 text-sm hover:bg-canvas rounded" onClick={() => void toggleActive(u)}>
+                      {u.isActive === false ? 'Activate' : 'Deactivate'}
+                    </button>
+                  </DropdownMenu>
                 </td>
               </tr>
             ))}

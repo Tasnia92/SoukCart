@@ -64,6 +64,8 @@ const orderSchema = new mongoose.Schema(
     recipientName: String,
     recipientMobile: String,
     deliveryAddress: String,
+    /** Origin the retailer checked out from — used for the SSLCommerz return redirect. */
+    clientOrigin: String,
     notes: String,
     cancelReason: String,
     cancelledBy: { type: mongoose.Schema.Types.ObjectId, ref: 'User' },

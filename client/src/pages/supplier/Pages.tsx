@@ -10,6 +10,15 @@ import { money, cn, statusLabel, canCancelStatus, downloadCsv } from '@/lib/util
 import { useAuth } from '@/context/AuthContext'
 import { usePoll } from '@/lib/poll'
 
+/** Client-side mirror of server `toShopSlug` for names — lowercase alnum with dashes. */
+function slugFromName(name: string) {
+  return String(name || '')
+    .trim()
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, '-')
+    .replace(/^-+|-+$/g, '')
+}
+
 function ImagePicker({ url, onUrl, onError }: { url: string; onUrl: (u: string) => void; onError: (m: string) => void }) {
   return (
     <label className="mt-1 flex flex-col items-center justify-center gap-2 rounded-2xl border-2 border-dashed border-[#f2ccc1] bg-[#fff4ef] min-h-[140px] cursor-pointer px-4 text-center overflow-hidden">
@@ -90,7 +99,6 @@ export function SupplierOrders() {
   const uid = String(user?.id || user?._id || '')
   const [orders, setOrders] = useState<any[]>([])
   const [tab, setTab] = useState('All')
-  const [menu, setMenu] = useState<string | null>(null)
   const [cancelTarget, setCancelTarget] = useState<any | null>(null)
   const [cancelling, setCancelling] = useState(false)
   async function load() { setOrders((await api.get<{ orders: any[] }>('/orders')).orders) }
@@ -178,14 +186,6 @@ export function SupplierOrders() {
                     {canCancelStatus(o.status) && (
                       <Button variant="secondary" className="h-8 text-xs" onClick={() => setCancelTarget(o)}>Cancel</Button>
                     )}
-                    <div className="relative">
-                      <button type="button" className="p-1 text-muted" aria-label="Order actions" onClick={() => setMenu(menu === o._id ? null : o._id)}><MoreVertical size={16}/></button>
-                      {menu === o._id && (
-                        <div className="absolute right-0 top-7 z-10 bg-white border border-border rounded-lg shadow-sm p-1 min-w-[140px]">
-                          <button className="w-full text-left px-3 py-1.5 text-sm hover:bg-canvas rounded" onClick={() => { navigator.clipboard.writeText(o.orderNumber); setMenu(null) }}>Copy order no.</button>
-                        </div>
-                      )}
-                    </div>
                   </div>
                 </td>
               </tr>
@@ -839,14 +839,20 @@ export function SupplierVerification() {
   const [msg, setMsg] = useState('')
   const [err, setErr] = useState('')
   const status = user?.verificationStatus || 'none'
+  /** True once the user edits the shop link by hand; auto-fill from the name stops. */
+  const [slugDirty, setSlugDirty] = useState(() => Boolean(user?.shopSlug || user?.shopLink))
 
   useEffect(() => {
     setForm((f) => ({
       ...f,
       businessName: user?.businessName || f.businessName,
-      shopLink: user?.shopSlug || user?.shopLink || f.shopLink,
+      shopLink:
+        user?.shopSlug ||
+        user?.shopLink ||
+        (slugDirty ? f.shopLink : slugFromName(user?.businessName || f.businessName)),
       businessDescription: user?.businessDescription || f.businessDescription,
     }))
+    if (user?.shopSlug || user?.shopLink) setSlugDirty(true)
   }, [user])
 
   async function submit(e: FormEvent) {
@@ -881,11 +887,22 @@ export function SupplierVerification() {
             <Badge className={status === 'approved' ? 'bg-primary text-white' : ''}>{status}</Badge>
           </div>
           <form className="mt-5 space-y-3" onSubmit={submit}>
-            <div><Label>Business name *</Label><Input required value={form.businessName} onChange={(e)=>setForm({...form,businessName:e.target.value})} /></div>
+            <div><Label>Business name *</Label><Input required value={form.businessName} onChange={(e) => {
+              const name = e.target.value
+              setForm((f) => ({
+                ...f,
+                businessName: name,
+                shopLink: slugDirty ? f.shopLink : slugFromName(name),
+              }))
+            }} /></div>
             <div>
               <Label>Shop link *</Label>
-              <Input required value={form.shopLink} onChange={(e)=>setForm({...form,shopLink:e.target.value})} />
-              <p className="text-xs text-muted mt-1">Your public shop handle — soukcart.com/@{form.shopLink || 'your-shop'}</p>
+              <Input required value={form.shopLink} onChange={(e) => {
+                const v = e.target.value
+                setSlugDirty(Boolean(v))
+                setForm((f) => ({ ...f, shopLink: v }))
+              }} />
+              <p className="text-xs text-muted mt-1">Auto-generated from your business name (editable) — soukcart.com/@{form.shopLink || 'your-shop'}</p>
             </div>
             <div><Label>Description</Label><textarea className="w-full min-h-24 rounded-[8px] border border-border bg-[#f7f8f8] p-3 text-sm" value={form.businessDescription} onChange={(e)=>setForm({...form,businessDescription:e.target.value})} /></div>
             <div>

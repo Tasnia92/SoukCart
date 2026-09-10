@@ -64,6 +64,7 @@ export async function createOrderFromCart({
   recipientName,
   recipientMobile,
   notes,
+  clientOrigin,
 }) {
   if (!items?.length) throw httpError('Cart is empty', 400);
   if (!recipientName?.trim()) throw httpError('Full name required', 400);
@@ -132,6 +133,7 @@ export async function createOrderFromCart({
     recipientName: recipientName.trim(),
     recipientMobile: mobile,
     deliveryAddress: deliveryAddress.trim(),
+    clientOrigin: clientOrigin || undefined,
     notes,
     status: 'awaiting_payment',
     paymentStatus: 'unpaid',

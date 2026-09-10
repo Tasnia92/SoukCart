@@ -2,21 +2,21 @@ import { useState, type FormEvent } from 'react'
 import { Link } from 'react-router-dom'
 import { Brand } from '@/components/Brand'
 import { Button } from '@/components/ui'
-import { ShieldCheck, Tag, Truck, Grid2x2, ClipboardList, Menu, X } from 'lucide-react'
+import { ShieldCheck, Tag, Truck, Grid2x2, ClipboardList, Menu, X, UserPlus, PackagePlus, Inbox, ClipboardCheck, TrendingUp, Search, Scale, ShoppingCart, Warehouse } from 'lucide-react'
 
 const supplierSteps = [
-  'Create Your Account',
-  'List Your Products',
-  'Receive Orders',
-  'Confirm Orders',
-  'Grow Your Business',
+  { title: 'Create Your Account', Icon: UserPlus },
+  { title: 'List Your Products', Icon: PackagePlus },
+  { title: 'Receive Orders', Icon: Inbox },
+  { title: 'Confirm Orders', Icon: ClipboardCheck },
+  { title: 'Grow Your Business', Icon: TrendingUp },
 ]
 const retailerSteps = [
-  'Find Products',
-  'Compare & Choose',
-  'Place Your Order',
-  'Track & Receive',
-  'Stock & Grow',
+  { title: 'Find Products', Icon: Search },
+  { title: 'Compare & Choose', Icon: Scale },
+  { title: 'Place Your Order', Icon: ShoppingCart },
+  { title: 'Track & Receive', Icon: Truck },
+  { title: 'Stock & Grow', Icon: Warehouse },
 ]
 
 export function Landing() {
@@ -65,7 +65,10 @@ export function Landing() {
         )}
       </header>
 
-      <section className="relative w-full min-h-[420px] md:min-h-[560px] bg-white overflow-hidden">
+      <section
+        className="relative w-full flex items-center bg-white overflow-hidden"
+        style={{ minHeight: 'calc(100dvh - 68px)' }}
+      >
         <div
           className="hidden md:block absolute inset-0"
           style={{
@@ -76,37 +79,37 @@ export function Landing() {
             backgroundRepeat: 'no-repeat',
           }}
         />
-        <div className="relative mx-auto max-w-[1120px] px-4 py-14 md:py-20">
-          <div className="max-w-xl md:max-w-[480px]">
-            <h1 className="text-4xl md:text-[44px] font-bold leading-[1.1] tracking-tight text-balance">
+        <div className="relative w-full mx-auto max-w-[1120px] px-4 py-14 md:py-20">
+          <div className="max-w-xl md:max-w-[560px]">
+            <h1 className="text-5xl md:text-[64px] font-bold leading-[1.05] tracking-tight text-balance">
               Wholesale groceries. Stronger businesses.{' '}
               <span className="text-primary">Better communities.</span>
             </h1>
-            <p className="mt-4 text-base text-muted max-w-md leading-relaxed text-pretty">
+            <p className="mt-6 text-lg md:text-xl text-muted max-w-lg leading-relaxed text-pretty">
               SoukCart is the B2B marketplace that connects grocery suppliers and retailers to buy and sell smarter, together.
             </p>
-            <div className="mt-7 flex flex-wrap gap-3">
-              <Link to="/register?role=retailer"><Button className="h-11 px-5">Join as Retailer →</Button></Link>
-              <Link to="/register?role=supplier"><Button variant="secondary" className="h-11 px-5 bg-white border-[#c9c9c9] text-[#242526]">Join as Supplier →</Button></Link>
+            <div className="mt-8 flex flex-wrap gap-3">
+              <Link to="/register?role=retailer"><Button className="h-12 px-6">Join as Retailer →</Button></Link>
+              <Link to="/register?role=supplier"><Button variant="secondary" className="h-12 px-6 bg-white border-[#c9c9c9] text-[#242526]">Join as Supplier →</Button></Link>
             </div>
           </div>
         </div>
       </section>
 
       <section id="benefits" className="bg-soft">
-        <div className="mx-auto max-w-[1120px] px-4 py-10 grid md:grid-cols-3 gap-6">
+        <div className="mx-auto max-w-[1120px] px-4 py-12 grid md:grid-cols-3 gap-8 items-center">
           {[
             { Icon: ShieldCheck, t: 'Verified Partners', d: 'Trusted & reliable network' },
             { Icon: Tag, t: 'Competitive Prices', d: 'Better deals, higher margins' },
             { Icon: Truck, t: 'Reliable Delivery', d: 'On-time, every time' },
           ].map(({ Icon, t, d }) => (
-            <div key={t} className="flex gap-3 items-start">
-              <span className="h-10 w-10 rounded-xl border border-[#f2ccc1] bg-white flex items-center justify-center text-primary">
-                <Icon size={18} />
+            <div key={t} className="flex flex-col items-center text-center gap-3">
+              <span className="h-14 w-14 rounded-2xl border border-[#f2ccc1] bg-white flex items-center justify-center text-primary">
+                <Icon size={26} />
               </span>
               <div>
-                <div className="font-semibold">{t}</div>
-                <div className="text-sm text-muted">{d}</div>
+                <div className="font-semibold text-lg text-foreground">{t}</div>
+                <div className="text-[15px] text-muted mt-0.5">{d}</div>
               </div>
             </div>
           ))}
@@ -115,36 +118,48 @@ export function Landing() {
 
       <section id="how" className="bg-soft">
         <div className="mx-auto max-w-[1120px] px-4 py-16">
-          <div className="text-center max-w-2xl mx-auto mb-10">
+          <div className="text-center max-w-2xl mx-auto mb-12">
             <p className="text-[12px] font-semibold tracking-[0.1em] uppercase text-primary">How it works</p>
             <h2 className="text-3xl font-bold mt-2 text-balance">Built for how grocery businesses trade.</h2>
             <p className="text-muted mt-3 text-base text-pretty">
               Whether you supply or sell, SoukCart makes the process simple, transparent, and profitable.
             </p>
           </div>
-          <div className="grid md:grid-cols-2 gap-6">
+          <div className="grid md:grid-cols-2 gap-8">
             <div id="how-suppliers">
-              <div className="flex items-center gap-2 mb-4 font-semibold">
-                <Grid2x2 size={18} className="text-primary" /> For Suppliers
+              <div className="flex items-center gap-3 mb-5">
+                <span className="h-12 w-12 rounded-2xl border border-[#f2ccc1] bg-white flex items-center justify-center text-primary">
+                  <Grid2x2 size={22} />
+                </span>
+                <div className="text-xl font-semibold">For Suppliers</div>
               </div>
               <div className="space-y-3">
-                {supplierSteps.map((title, i) => (
-                  <div key={title} className="rounded-xl border border-border bg-white p-4 flex items-center gap-3">
-                    <span className="h-8 w-8 rounded-full bg-primary text-white text-sm font-semibold flex items-center justify-center">{i + 1}</span>
-                    <div className="font-semibold text-[15px]">{title}</div>
+                {supplierSteps.map(({ title, Icon }, i) => (
+                  <div key={title} className="rounded-xl border border-border bg-white p-4 flex items-center gap-4">
+                    <span className="h-12 w-12 rounded-2xl border border-[#f2ccc1] bg-white flex items-center justify-center text-primary shrink-0">
+                      <Icon size={22} />
+                    </span>
+                    <div className="flex-1 font-semibold text-lg">{title}</div>
+                    <span className="text-sm font-semibold text-muted tabular-nums">{i + 1}</span>
                   </div>
                 ))}
               </div>
             </div>
             <div id="how-retailers">
-              <div className="flex items-center gap-2 mb-4 font-semibold">
-                <ClipboardList size={18} className="text-primary" /> For Retailers
+              <div className="flex items-center gap-3 mb-5">
+                <span className="h-12 w-12 rounded-2xl border border-[#f2ccc1] bg-white flex items-center justify-center text-primary">
+                  <ClipboardList size={22} />
+                </span>
+                <div className="text-xl font-semibold">For Retailers</div>
               </div>
               <div className="space-y-3">
-                {retailerSteps.map((title, i) => (
-                  <div key={title} className="rounded-xl border border-border bg-white p-4 flex items-center gap-3">
-                    <span className="h-8 w-8 rounded-full bg-primary text-white text-sm font-semibold flex items-center justify-center">{i + 1}</span>
-                    <div className="font-semibold text-[15px]">{title}</div>
+                {retailerSteps.map(({ title, Icon }, i) => (
+                  <div key={title} className="rounded-xl border border-border bg-white p-4 flex items-center gap-4">
+                    <span className="h-12 w-12 rounded-2xl border border-[#f2ccc1] bg-white flex items-center justify-center text-primary shrink-0">
+                      <Icon size={22} />
+                    </span>
+                    <div className="flex-1 font-semibold text-lg">{title}</div>
+                    <span className="text-sm font-semibold text-muted tabular-nums">{i + 1}</span>
                   </div>
                 ))}
               </div>

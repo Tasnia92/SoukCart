@@ -20,7 +20,7 @@ async function finalizeSuccess(req, res) {
   const tranId = pick(body, 'tran_id', 'tranId');
   const order = await findOrderFromSslPayload(body);
   if (!order) {
-    return res.redirect(clientRedirect('/retailer/orders?pay=missing'));
+    return res.redirect(clientRedirect('/retailer/orders?pay=missing', null));
   }
   try {
     const ssl = await validateSslPayment({ valId, tranId: tranId || order.sslTranId });
@@ -29,11 +29,11 @@ async function finalizeSuccess(req, res) {
       console.warn('SSL amount mismatch', { paid, due: order.amountDueNow, order: order.orderNumber });
     }
     await activateOrderAfterPayment(order, ssl);
-    return res.redirect(clientRedirect(`/retailer/orders?paid=${encodeURIComponent(order.orderNumber)}`));
+    return res.redirect(clientRedirect(`/retailer/orders?paid=${encodeURIComponent(order.orderNumber)}`, order));
   } catch (e) {
     console.error('SSL success finalize failed', e.message);
     await markSslFailed(order, e.message);
-    return res.redirect(clientRedirect(`/retailer/orders?pay=fail&reason=${encodeURIComponent(e.message)}`));
+    return res.redirect(clientRedirect(`/retailer/orders?pay=fail&reason=${encodeURIComponent(e.message)}`, order));
   }
 }
 
@@ -41,7 +41,7 @@ async function finalizeFail(req, res, label) {
   const body = { ...req.query, ...req.body };
   const order = await findOrderFromSslPayload(body);
   if (order) await markSslFailed(order, label);
-  return res.redirect(clientRedirect(`/retailer/orders?pay=${label}`));
+  return res.redirect(clientRedirect(`/retailer/orders?pay=${label}`, order));
 }
 
 export const sslSuccess = asyncHandler(async (req, res) => finalizeSuccess(req, res));

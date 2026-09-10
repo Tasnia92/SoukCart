@@ -61,6 +61,10 @@ export function RetailerCart() {
         recipientName: fullName.trim(),
         recipientMobile: digits,
         deliveryAddress: address.trim(),
+        // Round-trip the real app origin so SSLCommerz redirects land back on the
+        // same host the user browsed (localhost vs 127.0.0.1 share no localStorage,
+        // which previously dropped the auth token after payment).
+        clientOrigin: window.location.origin,
       })
       const url = res.payment?.redirectUrl
       if (!url) throw new Error('No SSLCommerz redirect URL returned')
@@ -111,11 +115,21 @@ export function RetailerCart() {
                 <div className="font-medium truncate">{i.name}</div>
                 <div className="text-sm text-muted tabular-nums">{money(i.price)} / {i.unit}</div>
                 <div className="text-sm font-semibold mt-1 tabular-nums">{money(i.price * i.quantity)}</div>
+                {i.stock != null ? (
+                  <div className="text-xs text-muted mt-0.5">{i.stock} in stock</div>
+                ) : null}
               </div>
               <div className="inline-flex items-center rounded-full border border-border">
                 <button type="button" className="h-9 w-9" onClick={() => setQty(i.productId, i.quantity - 1)}>−</button>
                 <span className="w-8 text-center text-sm">{i.quantity}</span>
-                <button type="button" className="h-9 w-9" onClick={() => setQty(i.productId, i.quantity + 1)}>+</button>
+                <button
+                  type="button"
+                  className="h-9 w-9 disabled:opacity-40 disabled:cursor-not-allowed"
+                  disabled={i.stock != null && i.quantity >= i.stock}
+                  onClick={() => setQty(i.productId, i.quantity + 1)}
+                >
+                  +
+                </button>
               </div>
               <button type="button" className="text-sm text-muted" onClick={() => remove(i.productId)}>Remove</button>
             </Card>

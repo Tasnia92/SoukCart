@@ -77,3 +77,38 @@ html, body, #root {
     color: inherit;
   }
 }
+
+/* Printable invoice: only the invoice sheet is shown when printing */
+@media print {
+  @page {
+    margin: 18mm;
+  }
+  body * {
+    visibility: hidden;
+  }
+  /* The printable region (modal content) becomes visible and flows full-width */
+  .invoice-overlay {
+    position: absolute !important;
+    inset: 0 !important;
+    padding: 0 !important;
+    overflow: visible !important;
+    background: #fff !important;
+    display: block !important;
+  }
+  .invoice-overlay,
+  .invoice-overlay * {
+    visibility: visible;
+  }
+  .invoice-modal-card {
+    width: 100% !important;
+    max-width: 100% !important;
+    box-shadow: none !important;
+    border-radius: 0 !important;
+  }
+  .invoice-toolbar {
+    display: none !important;
+  }
+  .invoice-sheet {
+    padding: 0 !important;
+  }
+}
