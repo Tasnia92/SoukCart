@@ -87,12 +87,13 @@ export function Landing() {
           }}
         />
         <div className="relative w-full mx-auto max-w-[1120px] px-4 py-14 md:py-20">
-          <div className="max-w-xl md:max-w-[560px]">
-            <h1 className="text-5xl md:text-[64px] font-bold leading-[1.05] tracking-tight text-balance">
-              Wholesale groceries. Stronger businesses.{' '}
-              <span className="text-primary">Better communities.</span>
+          <div className="max-w-[22rem] sm:max-w-[28rem] md:max-w-[36rem]">
+            <h1 className="text-[2.125rem] sm:text-[2.5rem] md:text-[3.25rem] font-bold leading-[1.14] tracking-[-0.03em] [text-wrap:unset]">
+              <span className="block">Wholesale groceries.</span>
+              <span className="block">Stronger businesses.</span>
+              <span className="block text-primary">Better communities.</span>
             </h1>
-            <p className="mt-6 text-lg md:text-xl text-muted max-w-lg leading-relaxed text-pretty">
+            <p className="mt-6 text-base md:text-lg text-muted max-w-[30rem] leading-[1.65]">
               SoukCart is the B2B marketplace that connects grocery suppliers and retailers to buy and sell smarter, together.
             </p>
             <div className="mt-8 flex flex-wrap gap-3">
