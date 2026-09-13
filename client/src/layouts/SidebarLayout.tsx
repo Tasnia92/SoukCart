@@ -1,16 +1,18 @@
-import { useEffect, useMemo, useState } from 'react'
+import { useEffect, useLayoutEffect, useMemo, useState } from 'react'
 import { Link, NavLink, Outlet, useLocation } from 'react-router-dom'
 import {
   Bell,
   LogOut,
   PanelLeftClose,
   PanelLeft,
+  PanelRight,
+  PanelRightClose,
   type LucideIcon,
 } from 'lucide-react'
 import { Brand } from '@/components/Brand'
 import { useAuth } from '@/context/AuthContext'
 import { useNotifications } from '@/context/NotificationContext'
-import { cn } from '@/lib/utils'
+import { applySidebarSide, cn, type SidebarSide } from '@/lib/utils'
 
 export type SideNavItem = {
   to: string
@@ -36,7 +38,14 @@ export function SidebarLayout({
   const { unread: bellCount } = useNotifications()
   const [collapsed, setCollapsed] = useState(false)
   const [mobileOpen, setMobileOpen] = useState(false)
+  const [side, setSide] = useState<SidebarSide>(() =>
+    typeof document !== 'undefined' && document.documentElement.dataset.sidebar === 'right' ? 'right' : 'left',
+  )
   const location = useLocation()
+
+  useLayoutEffect(() => {
+    setSide(applySidebarSide())
+  }, [])
 
   useEffect(() => {
     setMobileOpen(false)
@@ -49,12 +58,28 @@ export function SidebarLayout({
     return hit?.label || roleLabel
   }, [items, location.pathname, roleLabel])
 
+  const collapseButton = (
+    <button
+      type="button"
+      onClick={() => setCollapsed((c) => !c)}
+      className="hidden md:inline-flex p-2 rounded-lg border border-border text-muted hover:bg-canvas"
+      aria-label="Toggle sidebar"
+    >
+      {collapsed
+        ? side === 'right'
+          ? <PanelRight size={16} />
+          : <PanelLeft size={16} />
+        : side === 'right'
+          ? <PanelRightClose size={16} />
+          : <PanelLeftClose size={16} />}
+    </button>
+  )
+
   return (
     <div
-      className={cn(
-        'min-h-screen bg-canvas md:grid',
-        collapsed ? 'md:grid-cols-[160px_1fr]' : wide ? 'md:grid-cols-[280px_1fr]' : 'md:grid-cols-[240px_1fr]',
-      )}
+      className="dash-shell"
+      data-wide={wide ? 'true' : undefined}
+      data-collapsed={collapsed ? 'true' : undefined}
     >
       {mobileOpen && (
         <button
@@ -64,13 +89,7 @@ export function SidebarLayout({
           onClick={() => setMobileOpen(false)}
         />
       )}
-      <aside
-        className={cn(
-          'bg-white border-r border-border p-3 flex flex-col',
-          'fixed inset-y-0 left-0 z-50 w-[240px] transition-transform md:sticky md:top-0 md:z-auto md:w-auto md:h-screen',
-          mobileOpen ? 'translate-x-0' : '-translate-x-full md:translate-x-0',
-        )}
-      >
+      <aside className={cn('dash-sidebar', mobileOpen && 'is-open')}>
         <div className={cn('px-2 mb-3', collapsed && 'md:px-0 md:flex md:justify-center')}>
           {!collapsed ? <Brand /> : <Brand className="hidden md:inline-flex" />}
           {collapsed && <Brand className="md:hidden" />}
@@ -133,30 +152,26 @@ export function SidebarLayout({
               className="p-2 rounded-lg border border-border text-muted hover:bg-canvas md:hidden"
               aria-label="Open menu"
             >
-              <PanelLeft size={16} />
+              {side === 'right' ? <PanelRight size={16} /> : <PanelLeft size={16} />}
             </button>
-            <button
-              type="button"
-              onClick={() => setCollapsed((c) => !c)}
-              className="hidden md:inline-flex p-2 rounded-lg border border-border text-muted hover:bg-canvas"
-              aria-label="Toggle sidebar"
-            >
-              {collapsed ? <PanelLeft size={16} /> : <PanelLeftClose size={16} />}
-            </button>
+            {side === 'left' ? collapseButton : null}
             <div className="text-muted">
               <span>{roleLabel}</span>
               <span className="mx-1.5">›</span>
               <span className="text-foreground font-medium">{pageName}</span>
             </div>
           </div>
-          <Link to={notificationsTo} className="relative p-2 text-muted hover:text-foreground">
-            <Bell size={18} />
-            {bellCount > 0 && (
-              <span className="absolute -top-0.5 -right-0.5 h-4 min-w-4 rounded-full bg-danger text-white text-[10px] flex items-center justify-center px-1">
-                {bellCount}
-              </span>
-            )}
-          </Link>
+          <div className="flex items-center gap-2">
+            {side === 'right' ? collapseButton : null}
+            <Link to={notificationsTo} className="relative p-2 text-muted hover:text-foreground">
+              <Bell size={18} />
+              {bellCount > 0 && (
+                <span className="absolute -top-0.5 -right-0.5 h-4 min-w-4 rounded-full bg-danger text-white text-[10px] flex items-center justify-center px-1">
+                  {bellCount}
+                </span>
+              )}
+            </Link>
+          </div>
         </header>
         <main className="p-6 flex-1">
           {roleLabel === 'Supplier' && user?.verificationStatus && user.verificationStatus !== 'approved' && (

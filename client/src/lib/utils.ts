@@ -5,6 +5,17 @@ export function cn(...inputs: ClassValue[]) {
   return twMerge(clsx(inputs))
 }
 
+/** Reads `--sidebar` from index.css (`left` | `right`) and mirrors it onto `<html data-sidebar>`. */
+export type SidebarSide = 'left' | 'right'
+
+export function applySidebarSide(): SidebarSide {
+  if (typeof document === 'undefined') return 'left'
+  const raw = getComputedStyle(document.documentElement).getPropertyValue('--sidebar').trim().toLowerCase()
+  const side: SidebarSide = raw === 'right' ? 'right' : 'left'
+  document.documentElement.dataset.sidebar = side
+  return side
+}
+
 export function money(n: number) {
   return `Tk ${Number(n || 0).toLocaleString('en-BD')}`
 }
