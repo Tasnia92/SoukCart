@@ -65,8 +65,8 @@ export const createProduct = asyncHandler(async (req, res) => {
   const priceNum = Number(price);
   const stockNum = Number(stock);
   const moqNum = Number(moq);
-  if (!Number.isFinite(priceNum) || priceNum <= 0) {
-    return res.status(400).json({ message: 'Price must be greater than 0' });
+  if (!Number.isFinite(priceNum) || priceNum <= 1) {
+    return res.status(400).json({ message: 'Price must be greater than 1' });
   }
   if (!Number.isFinite(stockNum) || stockNum < 1) {
     return res.status(400).json({ message: 'Initial stock must be at least 1 when adding a product' });
