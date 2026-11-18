@@ -608,11 +608,94 @@ export function SupplierInventory() {
 
 export function SupplierEarnings() {
   const [data, setData] = useState<any>(null)
-  const [chip, setChip] = useState<'All' | 'Payouts' | 'Orders'>('All')
-  useEffect(() => { void api.get('/supplier/earnings').then(setData) }, [])
+  const [chip, setChip] = useState<'All' | 'Pending' | 'Paid'>('All')
+  usePoll(() => { void api.get('/supplier/earnings').then(setData) }, [])
   if (!data) return <p className="text-muted">Loading…</p>
-  const payouts = data.payouts || []
-  const recent = data.recent || []
+  const payouts: any[] = data.payouts || []
+  const recent: any[] = data.recent || []
+
+  const coveredOrderIds = new Set<string>()
+  const coveredOrderNumbers = new Set<string>()
+  for (const p of payouts) {
+    for (const oid of p.orderIds || []) {
+      const id = typeof oid === 'object' && oid !== null ? oid._id : oid
+      if (id) coveredOrderIds.add(String(id))
+      if (typeof oid === 'object' && oid?.orderNumber) {
+        coveredOrderNumbers.add(String(oid.orderNumber))
+      }
+    }
+    const m = typeof p.note === 'string' ? p.note.match(/Order\s+(SC-[\w-]+)/i) : null
+    if (m?.[1]) coveredOrderNumbers.add(m[1])
+  }
+
+  type LedgerRow = {
+    key: string
+    label: string
+    sublabel?: string
+    amount: number
+    date: string
+    status: 'paid' | 'pending' | 'awaiting_cod' | 'failed'
+  }
+
+  const rows: LedgerRow[] = [
+    ...payouts.map((p: any): LedgerRow => {
+      const orderNums = (p.orderIds || [])
+        .map((oid: any) => (typeof oid === 'object' && oid?.orderNumber ? oid.orderNumber : null))
+        .filter(Boolean) as string[]
+      let label = p.note || 'Payout'
+      let sublabel: string | undefined
+      if (orderNums.length === 1) {
+        label = `Order ${orderNums[0]}`
+        if (p.note && p.note !== label && p.note !== orderNums[0]) {
+          sublabel = p.note
+        }
+      } else if (orderNums.length > 1) {
+        label = p.note || 'Batch payout'
+        sublabel = orderNums.join(', ')
+      }
+      const rawStatus = String(p.status || 'pending')
+      const status: LedgerRow['status'] =
+        rawStatus === 'paid' ? 'paid' : rawStatus === 'failed' ? 'failed' : 'pending'
+      return {
+        key: `payout-${p._id}`,
+        label,
+        sublabel,
+        amount: Number(p.amount || 0),
+        date: p.createdAt || p.updatedAt,
+        status,
+      }
+    }),
+    ...recent
+      .filter(
+        (o: any) =>
+          !coveredOrderIds.has(String(o._id)) &&
+          (!o.orderNumber || !coveredOrderNumbers.has(String(o.orderNumber))),
+      )
+      .map((o: any): LedgerRow => {
+        const merchandisePaid = o.productAmountPaid === true || o.paymentStatus === 'paid'
+        return {
+          key: `order-${o._id}`,
+          label: `Order ${o.orderNumber}`,
+          amount: Number(o.supplierAmount || 0),
+          date: o.deliveredAt || o.updatedAt || o.createdAt,
+          status: merchandisePaid ? 'pending' : 'awaiting_cod',
+        }
+      }),
+  ].sort((a, b) => new Date(b.date || 0).getTime() - new Date(a.date || 0).getTime())
+
+  const visible = rows.filter((r) => {
+    if (chip === 'Paid') return r.status === 'paid'
+    if (chip === 'Pending') return r.status === 'pending' || r.status === 'awaiting_cod'
+    return true
+  })
+
+  function statusBadge(status: LedgerRow['status']) {
+    if (status === 'paid') return <Badge className="bg-[#d1fae5] text-[#047857]">Paid</Badge>
+    if (status === 'pending') return <Badge className="bg-[#fef3c7] text-[#b45309]">Pending</Badge>
+    if (status === 'failed') return <Badge className="bg-[#f6b2be] text-[#e84461]">Failed</Badge>
+    return <Badge>Awaiting COD</Badge>
+  }
+
   return (
     <div>
       <h2 className="text-2xl font-semibold mb-4">Earnings and payouts.</h2>
@@ -625,21 +708,26 @@ export function SupplierEarnings() {
         <div className="px-4 py-3 border-b border-border flex items-center justify-between">
           <div className="font-medium">Payout ledger</div>
           <div className="flex gap-2 text-sm">
-            {(['All', 'Payouts', 'Orders'] as const).map((c) => (
+            {(['All', 'Pending', 'Paid'] as const).map((c) => (
               <button key={c} type="button" onClick={() => setChip(c)} className={cn('px-3 py-1 rounded-full', chip === c ? 'bg-[#242526] text-white' : 'bg-[#f3f4f6]')}>{c}</button>
             ))}
           </div>
         </div>
         <table className="w-full text-sm">
-          <thead className="bg-canvas text-muted text-left"><tr><th className="px-4 py-3">Payout</th><th className="px-4 py-3">Amount</th><th className="px-4 py-3">Date</th><th className="px-4 py-3">Status</th></tr></thead>
+          <thead className="bg-canvas text-muted text-left"><tr><th className="px-4 py-3">Order / Payout</th><th className="px-4 py-3">Amount</th><th className="px-4 py-3">Date</th><th className="px-4 py-3">Status</th></tr></thead>
           <tbody>
-            {(chip !== 'Orders' ? payouts : []).map((p:any)=>(
-              <tr key={p._id} className="border-t border-border"><td className="px-4 py-3">{p.note || 'Payout'}</td><td className="px-4 py-3 tabular-nums">{money(p.amount)}</td><td className="px-4 py-3">{new Date(p.createdAt).toLocaleDateString()}</td><td className="px-4 py-3"><Badge>{p.status}</Badge></td></tr>
+            {visible.map((r) => (
+              <tr key={r.key} className="border-t border-border">
+                <td className="px-4 py-3">
+                  <div>{r.label}</div>
+                  {r.sublabel ? <div className="text-xs text-muted">{r.sublabel}</div> : null}
+                </td>
+                <td className="px-4 py-3 tabular-nums">{money(r.amount)}</td>
+                <td className="px-4 py-3">{r.date ? new Date(r.date).toLocaleDateString() : '—'}</td>
+                <td className="px-4 py-3">{statusBadge(r.status)}</td>
+              </tr>
             ))}
-            {(chip !== 'Payouts' ? recent : []).map((o:any)=>(
-              <tr key={o._id} className="border-t border-border"><td className="px-4 py-3">{o.orderNumber}</td><td className="px-4 py-3 tabular-nums">{money(o.supplierAmount)}</td><td className="px-4 py-3">{new Date(o.updatedAt).toLocaleDateString()}</td><td className="px-4 py-3"><Badge>Delivered</Badge></td></tr>
-            ))}
-            {(chip === 'Payouts' ? !payouts.length : chip === 'Orders' ? !recent.length : !payouts.length && !recent.length) && <tr><td colSpan={4} className="p-8 text-center text-muted">No ledger entries yet</td></tr>}
+            {!visible.length && <tr><td colSpan={4} className="p-8 text-center text-muted">No ledger entries yet</td></tr>}
           </tbody>
         </table>
       </Card>
