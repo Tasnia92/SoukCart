@@ -7,7 +7,7 @@ import Settings from '../models/Settings.js';
 import { computeSupplierBalance } from '../services/payout.service.js';
 import { setStock } from '../services/stock.service.js';
 import { notifyAdmins } from '../services/notify.js';
-import { DEFAULT_COMMISSION_RATE } from '../services/calculations.js';
+import { DEFAULT_COMMISSION_RATE, supplierShare } from '../services/calculations.js';
 import { toShopSlug } from '../utils/slug.js';
 import { asyncHandler } from '../utils/asyncHandler.js';
 
@@ -181,20 +181,42 @@ export const applyDelta = asyncHandler(async (req, res) => {
   res.json({ updated: products.length, products });
 });
 
-// ── SUPPLIER-FLOW 7/8 · EARNINGS — balance, payouts, recent delivered orders ──
+// ── SUPPLIER-FLOW 7/8 · EARNINGS — balance, payouts, unaccrued delivered orders ──
 // SEARCH: supplier-flow, earnings, payouts, balance, commission
-// DOES:   returns the computed balance (computeSupplierBalance), up to 50 payouts,
-//         20 recent delivered orders and the current commission rate.
+// DOES:   returns the computed balance (computeSupplierBalance), up to 50 active payouts
+//         (with order numbers populated), any delivered orders not already covered by a
+//         payout (with this supplier's share), and the current commission rate.
 export const earnings = asyncHandler(async (req, res) => {
-  const balance = await computeSupplierBalance(req.user._id);
-  const payouts = await Payout.find({ supplier: req.user._id }).sort({ createdAt: -1 }).limit(50);
-  const settings = await Settings.findOne({ key: 'global' });
-  const recent = await Order.find({
-    $or: [{ supplier: req.user._id }, { suppliers: req.user._id }, { 'items.supplier': req.user._id }],
+  const supplierId = req.user._id;
+  const [balance, payouts, coveredPayouts, settings] = await Promise.all([
+    computeSupplierBalance(supplierId),
+    Payout.find({ supplier: supplierId, status: { $ne: 'reversed' } })
+      .populate('orderIds', 'orderNumber')
+      .sort({ createdAt: -1 })
+      .limit(50),
+    Payout.find({ supplier: supplierId, status: { $ne: 'reversed' } }).select('orderIds'),
+    Settings.findOne({ key: 'global' }),
+  ]);
+
+  const coveredOrderIds = coveredPayouts.flatMap((p) => p.orderIds || []);
+  const recentFilter = {
+    $or: [{ supplier: supplierId }, { suppliers: supplierId }, { 'items.supplier': supplierId }],
     status: 'delivered',
-  })
-    .sort({ updatedAt: -1 })
-    .limit(20);
+  };
+  if (coveredOrderIds.length) {
+    recentFilter._id = { $nin: coveredOrderIds };
+  }
+
+  const rawRecent = await Order.find(recentFilter).sort({ updatedAt: -1 }).limit(20);
+  const recent = rawRecent.map((o) => {
+    const obj = o.toObject();
+    const rate = o.commissionRate ?? DEFAULT_COMMISSION_RATE;
+    const share = supplierShare(o.items || [], supplierId, rate);
+    obj.supplierAmount =
+      share.subtotal > 0 ? share.supplierAmount : Number((o.supplierAmount || 0).toFixed(2));
+    return obj;
+  });
+
   res.json({
     balance,
     payouts,
