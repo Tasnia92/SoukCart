@@ -1,38 +1,6 @@
-import { createContext, useContext, useEffect, useMemo, useState, type ReactNode } from 'react'
+import { useEffect, useMemo, useState, type ReactNode } from 'react'
 import { api, clearToken, getToken, setToken as persistToken } from '@/services/api'
-
-export type Role = 'retailer' | 'supplier' | 'admin'
-
-export type AuthUser = {
-  id: string
-  _id?: string
-  name: string
-  email: string
-  role: Role
-  phone?: string
-  verificationStatus?: string
-  verificationRejectReason?: string
-  businessName?: string
-  shopSlug?: string
-  shopLink?: string
-  businessDescription?: string
-  updatedAt?: string
-}
-
-type AuthState = {
-  user: AuthUser | null
-  token: string | null
-  loading: boolean
-  login: (email: string, password: string, persist?: boolean) => Promise<AuthUser>
-  register: (payload: Record<string, string>) => Promise<AuthUser>
-  logout: () => void
-  refresh: () => Promise<AuthUser | null>
-  updateProfile: (payload: Record<string, string>) => Promise<AuthUser>
-  changeEmail: (email: string, password: string) => Promise<AuthUser>
-  changePassword: (password: string) => Promise<void>
-}
-
-const AuthContext = createContext<AuthState | null>(null)
+import { AuthContext, type AuthState, type AuthUser } from '@/context/auth'
 
 function asUser(u: AuthUser): AuthUser {
   return { ...u, id: u.id || String(u._id) }
@@ -108,16 +76,10 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       setUser(next)
       return next
     },
-    async changePassword(password) {
-      await api.patch('/auth/password', { password })
+    async changePassword(currentPassword, password) {
+      await api.patch('/auth/password', { currentPassword, password })
     },
   }), [user, token, loading])
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>
-}
-
-export function useAuth() {
-  const ctx = useContext(AuthContext)
-  if (!ctx) throw new Error('useAuth outside provider')
-  return ctx
 }

@@ -98,7 +98,7 @@ export function RetailerOrders() {
     const res = await api.post<{ payment: { redirectUrl: string } }>(`/orders/${id}/pay`, {})
     const url = res.payment?.redirectUrl
     if (!url) throw new Error('No payment URL')
-    window.location.href = url
+    window.location.assign(url)
   }
 
   return (

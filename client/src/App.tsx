@@ -1,6 +1,6 @@
 import { lazy, Suspense } from 'react'
 import { BrowserRouter, Navigate, Route, Routes } from 'react-router-dom'
-import { useAuth } from '@/context/AuthContext'
+import { useAuth } from '@/context/auth'
 import {
   LayoutDashboard,
   Package,
@@ -21,7 +21,8 @@ import {
 import { AuthProvider } from '@/context/AuthContext'
 import { CartProvider } from '@/context/CartContext'
 import { NotificationProvider } from '@/context/NotificationContext'
-import { Protected, PublicOnly, VerifiedSupplier, homeForRole } from '@/components/Protected'
+import { Protected, PublicOnly, VerifiedSupplier } from '@/components/Protected'
+import { homeForRole } from '@/lib/homeForRole'
 import { RetailerLayout } from '@/layouts/RetailerLayout'
 import { SidebarLayout } from '@/layouts/SidebarLayout'
 import { Landing, Legal, NotFound } from '@/pages/Landing'

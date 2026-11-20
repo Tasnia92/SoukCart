@@ -2,8 +2,8 @@ import { Suspense, useEffect, useState, type FormEvent } from 'react'
 import { Link, NavLink, Outlet, useNavigate, useSearchParams } from 'react-router-dom'
 import { Bell, Menu, ShoppingCart, Search, Home, Package, Truck, LifeBuoy, UserRound, X } from 'lucide-react'
 import { Brand } from '@/components/Brand'
-import { useCart } from '@/context/CartContext'
-import { useNotifications } from '@/context/NotificationContext'
+import { useCart } from '@/context/cart'
+import { useNotifications } from '@/context/notifications'
 import { cn } from '@/lib/utils'
 
 const nav = [
@@ -17,10 +17,13 @@ const nav = [
 function SearchField({ className = '' }: { className?: string }) {
   const navigate = useNavigate()
   const [params] = useSearchParams()
-  const [q, setQ] = useState(params.get('q') || '')
-  useEffect(() => {
-    setQ(params.get('q') || '')
-  }, [params])
+  const urlQ = params.get('q') || ''
+  const [q, setQ] = useState(urlQ)
+  const [prevUrlQ, setPrevUrlQ] = useState(urlQ)
+  if (urlQ !== prevUrlQ) {
+    setPrevUrlQ(urlQ)
+    setQ(urlQ)
+  }
   function go(e: FormEvent) {
     e.preventDefault()
     const fd = new FormData(e.currentTarget as HTMLFormElement)

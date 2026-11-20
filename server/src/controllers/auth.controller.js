@@ -109,10 +109,16 @@ export const changeEmail = asyncHandler(async (req, res) => {
 });
 
 export const changePassword = asyncHandler(async (req, res) => {
+  const currentPassword = String(req.body.currentPassword || '');
   const password = String(req.body.password || '');
+  if (!currentPassword) {
+    return res.status(400).json({ message: 'Enter your current password to change it' });
+  }
   if (password.length < 6) return res.status(400).json({ message: 'Password must be at least 6 characters' });
   const user = await User.findById(req.user._id).select('+password');
   if (!user) return res.status(404).json({ message: 'Not found' });
+  const ok = await bcrypt.compare(currentPassword, user.password);
+  if (!ok) return res.status(401).json({ message: 'Current password is incorrect' });
   user.password = await bcrypt.hash(password, 10);
   await user.save();
   res.json({ ok: true });

@@ -1,5 +1,6 @@
 import { Navigate } from 'react-router-dom'
-import { useAuth, type Role, type AuthUser } from '@/context/AuthContext'
+import { useAuth, type Role } from '@/context/auth'
+import { homeForRole } from '@/lib/homeForRole'
 import type { ReactNode } from 'react'
 
 export function Protected({ roles, children }: { roles?: Role[]; children: ReactNode }) {
@@ -8,12 +9,6 @@ export function Protected({ roles, children }: { roles?: Role[]; children: React
   if (!user) return <Navigate to="/login" replace />
   if (roles && !roles.includes(user.role)) return <Navigate to="/login" replace />
   return children
-}
-
-export function homeForRole(user: AuthUser) {
-  if (user.role === 'admin') return '/admin'
-  if (user.role === 'supplier') return user.verificationStatus === 'approved' ? '/supplier' : '/supplier/verification'
-  return '/retailer/products'
 }
 
 /**

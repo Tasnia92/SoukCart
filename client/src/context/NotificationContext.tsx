@@ -1,16 +1,8 @@
-import { createContext, useCallback, useContext, useMemo, useState, type ReactNode } from 'react'
+import { useCallback, useMemo, useState, type ReactNode } from 'react'
 import { api } from '@/services/api'
-import { useAuth } from '@/context/AuthContext'
+import { useAuth } from '@/context/auth'
+import { NotificationContext, type NotificationState } from '@/context/notifications'
 import { usePoll } from '@/lib/poll'
-
-type NotificationState = {
-  unread: number
-  refresh: () => Promise<void>
-  markRead: (id: string) => Promise<void>
-  markAllRead: () => Promise<void>
-}
-
-const NotificationContext = createContext<NotificationState | null>(null)
 
 export function NotificationProvider({ children }: { children: ReactNode }) {
   const { token } = useAuth()
@@ -45,10 +37,4 @@ export function NotificationProvider({ children }: { children: ReactNode }) {
   }), [unread, refresh])
 
   return <NotificationContext.Provider value={value}>{children}</NotificationContext.Provider>
-}
-
-export function useNotifications() {
-  const ctx = useContext(NotificationContext)
-  if (!ctx) throw new Error('useNotifications outside provider')
-  return ctx
 }

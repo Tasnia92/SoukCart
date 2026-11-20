@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useState } from 'react'
 import { Link, useSearchParams } from 'react-router-dom'
 import { Button, Card } from '@/components/ui'
-import { useCart } from '@/context/CartContext'
+import { useCart } from '@/context/cart'
 import { api } from '@/services/api'
 import { money, cn } from '@/lib/utils'
 

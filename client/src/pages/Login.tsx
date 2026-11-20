@@ -3,7 +3,7 @@ import { Link, useNavigate } from 'react-router-dom'
 import { Mail, Lock, Eye, EyeOff } from 'lucide-react'
 import { AuthShell, RoleTabs } from '@/components/AuthShell'
 import { Button, Input, Label } from '@/components/ui'
-import { useAuth, type AuthUser } from '@/context/AuthContext'
+import { useAuth, type AuthUser } from '@/context/auth'
 
 function homeFor(user: AuthUser) {
   if (user.role === 'admin') return '/admin'

@@ -1,23 +1,26 @@
-import { useEffect, useState } from 'react'
+import { useCallback, useEffect, useState } from 'react'
 import { Link } from 'react-router-dom'
 import { Package } from 'lucide-react'
 import { Badge, Button, Card, EmptyState } from '@/components/ui'
 import { api } from '@/services/api'
-import { useNotifications } from '@/context/NotificationContext'
+import { useNotifications } from '@/context/notifications'
 
 export function NotificationsInbox({ heading = 'Notifications' }: { heading?: string }) {
   const [items, setItems] = useState<any[]>([])
   const { refresh, markRead, markAllRead } = useNotifications()
 
-  async function load() {
-    const d = await api.get<{ notifications: any[] }>('/notifications')
-    setItems(d.notifications || [])
-    await refresh()
-  }
+  const load = useCallback(
+    () =>
+      api.get<{ notifications: any[] }>('/notifications').then((d) => {
+        setItems(d.notifications || [])
+        return refresh()
+      }),
+    [refresh],
+  )
 
   useEffect(() => {
     void load()
-  }, [])
+  }, [load])
 
   return (
     <div>

@@ -542,10 +542,11 @@ export function AdminPayouts() {
   const [ratePct, setRatePct] = useState('10')
   const [busy, setBusy] = useState(false)
   const [msg, setMsg] = useState('')
-  async function load() {
-    const d = await api.get('/admin/payouts')
-    setData(d)
-    setRatePct(String(Math.round(Number((d as any).commissionRate || 0) * 1000) / 10))
+  function load() {
+    return api.get('/admin/payouts').then((d) => {
+      setData(d)
+      setRatePct(String(Math.round(Number((d as any).commissionRate || 0) * 1000) / 10))
+    })
   }
   useEffect(() => { void load() }, [])
   async function saveRate(e: FormEvent) {
@@ -675,7 +676,7 @@ export function AdminDisputes() {
   const [reply, setReply] = useState('')
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState('')
-  async function load() { setItems((await api.get<{ complaints: any[] }>('/admin/complaints')).complaints) }
+  function load() { return api.get<{ complaints: any[] }>('/admin/complaints').then((d) => setItems(d.complaints)) }
   useEffect(() => { void load() }, [])
   async function refreshViewing(id: string) {
     const d = await api.get<{ complaints: any[] }>('/admin/complaints')
@@ -847,7 +848,7 @@ export function AdminProducts() {
   const [q, setQ] = useState('')
   const [sort, setSort] = useState('newest')
   const [preview, setPreview] = useState<string | null>(null)
-  async function load() { setProducts((await api.get<{ products: any[] }>('/products')).products) }
+  function load() { return api.get<{ products: any[] }>('/products').then((d) => setProducts(d.products)) }
   useEffect(() => { void load() }, [])
   const stats = useMemo(() => ({
     total: products.length,
@@ -974,7 +975,7 @@ export function AdminCategories() {
   const [editing, setEditing] = useState<string | null>(null)
   const [editName, setEditName] = useState('')
   const [error, setError] = useState('')
-  async function load() { setCats((await api.get<{ categories: any[] }>('/products/categories?all=1')).categories) }
+  function load() { return api.get<{ categories: any[] }>('/products/categories?all=1').then((d) => setCats(d.categories)) }
   useEffect(() => { void load() }, [])
   async function add(e: FormEvent) {
     e.preventDefault()
@@ -1054,7 +1055,7 @@ export function AdminVerifications() {
   const navigate = useNavigate()
   const [users, setUsers] = useState<any[]>([])
   const [query, setQuery] = useState('')
-  async function load() { setUsers((await api.get<{ users: any[] }>('/admin/verifications')).users) }
+  function load() { return api.get<{ users: any[] }>('/admin/verifications').then((d) => setUsers(d.users)) }
   useEffect(() => { void load() }, [])
   const pending = users.filter((u) => u.verificationStatus === 'pending').length
   const approved = users.filter((u) => u.verificationStatus === 'approved').length
@@ -1216,7 +1217,7 @@ export function AdminUsers() {
   const [open, setOpen] = useState(false)
   const [form, setForm] = useState({ name: '', email: '', password: '', role: 'retailer' })
   const [err, setErr] = useState('')
-  async function load() { setUsers((await api.get<{ users: any[] }>('/admin/users')).users) }
+  function load() { return api.get<{ users: any[] }>('/admin/users').then((d) => setUsers(d.users)) }
   useEffect(() => { void load() }, [])
   async function create(e: FormEvent) {
     e.preventDefault()

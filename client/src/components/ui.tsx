@@ -25,13 +25,10 @@ export function DropdownMenu({
   const itemCount = (Array.isArray(children) ? children : [children]).filter(Boolean).length
   const menuHeight = Math.min(itemCount, 6) * 32 + 16
 
-  useEffect(() => {
-    if (!open) {
-      setPos(null)
-      return
-    }
+  /** Places the fixed menu next to the trigger, flipping up when there's no room below. */
+  function measure() {
     const btn = triggerRef.current
-    if (!btn) return
+    if (!btn) return null
     const r = btn.getBoundingClientRect()
     const gap = 6
     const menuWidth = 170
@@ -42,8 +39,17 @@ export function DropdownMenu({
     const top = fitsBelow || !fitsAbove ? topBelow : topAbove
     const left = align === 'right' ? Math.max(8, r.right - menuWidth) : Math.max(8, r.left)
     const viewport = window.visualViewport?.width ?? window.innerWidth
-    setPos({ top, left: align === 'right' ? Math.min(left, viewport - menuWidth - 8) : left })
-  }, [open, align, children])
+    return { top, left: align === 'right' ? Math.min(left, viewport - menuWidth - 8) : left }
+  }
+
+  function toggle() {
+    if (open) {
+      setOpen(false)
+      return
+    }
+    setPos(measure())
+    setOpen(true)
+  }
 
   useEffect(() => {
     if (!open) return
@@ -73,7 +79,7 @@ export function DropdownMenu({
         type="button"
         aria-haspopup="menu"
         aria-expanded={open}
-        onClick={() => setOpen((v) => !v)}
+        onClick={toggle}
       >
         {button}
       </button>

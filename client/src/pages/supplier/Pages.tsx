@@ -7,7 +7,7 @@ import { NotificationsInbox } from '@/components/NotificationsInbox'
 import { Brand } from '@/components/Brand'
 import { api } from '@/services/api'
 import { money, cn, statusLabel, canCancelStatus, downloadCsv } from '@/lib/utils'
-import { useAuth } from '@/context/AuthContext'
+import { useAuth } from '@/context/auth'
 import { usePoll } from '@/lib/poll'
 
 /** Client-side mirror of server `toShopSlug` for names — lowercase alnum with dashes. */
@@ -48,10 +48,11 @@ export function SupplierDashboard() {
   const { user } = useAuth()
   const [data, setData] = useState<any>(null)
   const [updated, setUpdated] = useState<Date | null>(null)
-  async function load() {
-    const d = await api.get('/supplier/dashboard')
-    setData(d)
-    setUpdated(new Date())
+  function load() {
+    return api.get('/supplier/dashboard').then((d) => {
+      setData(d)
+      setUpdated(new Date())
+    })
   }
   useEffect(() => { void load() }, [])
   if (!data) return <p className="text-muted">Loading…</p>
@@ -212,7 +213,7 @@ export function SupplierProducts() {
   const [category, setCategory] = useState('')
   const [sort, setSort] = useState('name')
   const [menu, setMenu] = useState<string | null>(null)
-  async function load() { setProducts((await api.get<{ products: any[] }>('/products?mine=1')).products) }
+  function load() { return api.get<{ products: any[] }>('/products?mine=1').then((d) => setProducts(d.products)) }
   useEffect(() => { void load() }, [])
   const cats = [...new Set(products.map((p) => p.category?.name).filter(Boolean))]
   const filtered = products.filter((p) => {
@@ -501,12 +502,13 @@ export function SupplierInventory() {
   const [bulkMsg, setBulkMsg] = useState('')
   const [bulkErr, setBulkErr] = useState('')
   const selectAllRef = useRef<HTMLInputElement>(null)
-  async function load() {
-    const d = await api.get<{ products: any[] }>('/supplier/inventory')
-    setProducts(d.products)
-    const m: Record<string,string> = {}
-    d.products.forEach((p:any)=>{ m[p._id]=String(p.stock) })
-    setDraft(m)
+  function load() {
+    return api.get<{ products: any[] }>('/supplier/inventory').then((d) => {
+      setProducts(d.products)
+      const m: Record<string,string> = {}
+      d.products.forEach((p:any)=>{ m[p._id]=String(p.stock) })
+      setDraft(m)
+    })
   }
   useEffect(() => { void load() }, [])
   const out = products.filter((p)=>p.stock<=0).length
@@ -786,7 +788,7 @@ export function SupplierSettings() {
     description: user?.businessDescription || '',
     shopLink: user?.shopSlug || user?.shopLink || '',
   })
-  const [pw, setPw] = useState({ a: '', b: '' })
+  const [pw, setPw] = useState({ cur: '', a: '', b: '' })
   const [email, setEmail] = useState(user?.email || '')
   const [emailPw, setEmailPw] = useState('')
   const [emailSaved, setEmailSaved] = useState('')
@@ -796,7 +798,9 @@ export function SupplierSettings() {
   const [pwMsg, setPwMsg] = useState('')
   const approved = user?.verificationStatus === 'approved'
 
-  useEffect(() => {
+  const [prevUser, setPrevUser] = useState(user)
+  if (user !== prevUser) {
+    setPrevUser(user)
     setProfile({
       businessName: user?.businessName || user?.name || '',
       description: user?.businessDescription || '',
@@ -805,7 +809,7 @@ export function SupplierSettings() {
     setEmail(user?.email || '')
     setEmailPw('')
     setEmailSaved('')
-  }, [user])
+  }
 
   return (
     <div className="max-w-3xl space-y-4">
@@ -901,6 +905,7 @@ export function SupplierSettings() {
         <div className="font-semibold">Password</div>
         <p className="text-sm text-muted">Update the password for this supplier account.</p>
         <div className="grid md:grid-cols-2 gap-3">
+          <div className="md:col-span-2"><Label htmlFor="sup-pw-cur">Current password *</Label><Input id="sup-pw-cur" type="password" value={pw.cur} onChange={(e)=>setPw({...pw,cur:e.target.value})} /></div>
           <div><Label htmlFor="sup-pw-a">New password *</Label><Input id="sup-pw-a" type="password" value={pw.a} onChange={(e)=>setPw({...pw,a:e.target.value})} /></div>
           <div><Label htmlFor="sup-pw-b">Confirm password *</Label><Input id="sup-pw-b" type="password" value={pw.b} onChange={(e)=>setPw({...pw,b:e.target.value})} /></div>
         </div>
@@ -909,8 +914,8 @@ export function SupplierSettings() {
           setPwMsg('')
           if (pw.a !== pw.b) { setPwMsg('Passwords do not match'); return }
           try {
-            await changePassword(pw.a)
-            setPw({ a: '', b: '' })
+            await changePassword(pw.cur, pw.a)
+            setPw({ cur: '', a: '', b: '' })
             setPwMsg('Password updated')
           } catch (e) {
             setPwMsg(e instanceof Error ? e.message : 'Update failed')
@@ -937,7 +942,9 @@ export function SupplierVerification() {
   /** True once the user edits the shop link by hand; auto-fill from the name stops. */
   const [slugDirty, setSlugDirty] = useState(() => Boolean(user?.shopSlug || user?.shopLink))
 
-  useEffect(() => {
+  const [prevUser, setPrevUser] = useState(user)
+  if (user !== prevUser) {
+    setPrevUser(user)
     setForm((f) => ({
       ...f,
       businessName: user?.businessName || f.businessName,
@@ -948,7 +955,7 @@ export function SupplierVerification() {
       businessDescription: user?.businessDescription || f.businessDescription,
     }))
     if (user?.shopSlug || user?.shopLink) setSlugDirty(true)
-  }, [user])
+  }
 
   async function submit(e: FormEvent) {
     e.preventDefault()

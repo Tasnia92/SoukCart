@@ -1,28 +1,6 @@
-import { createContext, useContext, useEffect, useMemo, useState, type ReactNode } from 'react'
+import { useEffect, useMemo, useState, type ReactNode } from 'react'
 
-export type CartItem = {
-  productId: string
-  name: string
-  price: number
-  unit: string
-  moq: number
-  stock?: number
-  imageUrl?: string
-  supplierId: string
-  quantity: number
-}
-
-type CartState = {
-  items: CartItem[]
-  add: (item: Omit<CartItem, 'quantity'>, qty?: number) => void
-  setQty: (productId: string, quantity: number) => void
-  remove: (productId: string) => void
-  clear: () => void
-  count: number
-  subtotal: number
-}
-
-const CartContext = createContext<CartState | null>(null)
+import { CartContext, type CartItem, type CartState } from '@/context/cart'
 
 const STORAGE_KEY = 'soukcart_cart'
 const STORAGE_VERSION = 1
@@ -95,10 +73,4 @@ export function CartProvider({ children }: { children: ReactNode }) {
   }), [items, actions])
 
   return <CartContext.Provider value={value}>{children}</CartContext.Provider>
-}
-
-export function useCart() {
-  const ctx = useContext(CartContext)
-  if (!ctx) throw new Error('useCart outside provider')
-  return ctx
 }

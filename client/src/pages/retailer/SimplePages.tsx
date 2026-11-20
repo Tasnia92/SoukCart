@@ -1,7 +1,7 @@
 import { Fragment, useCallback, useEffect, useState, type FormEvent } from 'react'
 import { Check, ChevronDown, Download, Home, Printer, Truck, type LucideIcon } from 'lucide-react'
 import { Button, Card, EmptyState, Input, Label, Badge } from '@/components/ui'
-import { useAuth } from '@/context/AuthContext'
+import { useAuth } from '@/context/auth'
 import { api } from '@/services/api'
 import { NotificationsInbox } from '@/components/NotificationsInbox'
 import { PrintInvoiceModal, type InvoiceOrder } from '@/components/Invoice'
@@ -169,9 +169,8 @@ export function RetailerHelp() {
   const [ok, setOk] = useState('')
   const [err, setErr] = useState('')
 
-  async function load() {
-    const c = await api.get<{ complaints: any[] }>('/complaints/mine')
-    setMine(c.complaints)
+  function load() {
+    return api.get<{ complaints: any[] }>('/complaints/mine').then((c) => setMine(c.complaints))
   }
   useEffect(() => { void load() }, [])
 
@@ -261,11 +260,13 @@ export function RetailerSettings() {
     }
   })
   const [draft, setDraft] = useState({ label: '', line: '', phone: '' })
-  const [pw, setPw] = useState({ a: '', b: '' })
+  const [pw, setPw] = useState({ cur: '', a: '', b: '' })
   const [pwMsg, setPwMsg] = useState('')
   const [pwErr, setPwErr] = useState('')
 
-  useEffect(() => {
+  const [prevUser, setPrevUser] = useState(user)
+  if (user !== prevUser) {
+    setPrevUser(user)
     setProfile({
       name: user?.name || '',
       email: user?.email || '',
@@ -278,7 +279,7 @@ export function RetailerSettings() {
     } catch {
       setAddresses([])
     }
-  }, [user])
+  }
 
   function saveAddresses(next: Address[]) {
     setAddresses(next)
@@ -314,8 +315,8 @@ export function RetailerSettings() {
       return
     }
     try {
-      await changePassword(pw.a)
-      setPw({ a: '', b: '' })
+      await changePassword(pw.cur, pw.a)
+      setPw({ cur: '', a: '', b: '' })
       setPwMsg('Password updated')
       setTimeout(() => setPwMsg(''), 1200)
     } catch (err) {
@@ -390,6 +391,7 @@ export function RetailerSettings() {
         )}
         {tab === 'password' && (
           <form className="space-y-3" onSubmit={savePassword}>
+            <div><Label htmlFor="pw-cur">Current password</Label><Input id="pw-cur" type="password" value={pw.cur} onChange={(e) => setPw({ ...pw, cur: e.target.value })} required /></div>
             <div><Label htmlFor="pw-new">New password</Label><Input id="pw-new" type="password" value={pw.a} onChange={(e) => setPw({ ...pw, a: e.target.value })} required minLength={6} /></div>
             <div><Label htmlFor="pw-confirm">Confirm password</Label><Input id="pw-confirm" type="password" value={pw.b} onChange={(e) => setPw({ ...pw, b: e.target.value })} required minLength={6} /></div>
             {pwMsg ? <p className="text-sm text-primary">{pwMsg}</p> : null}

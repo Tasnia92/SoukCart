@@ -1,8 +1,8 @@
 import { useEffect, useMemo, useState } from 'react'
 import { Link, useSearchParams } from 'react-router-dom'
 import { Button, Card, EmptyState, Input, Label } from '@/components/ui'
-import { useCart } from '@/context/CartContext'
-import { useAuth } from '@/context/AuthContext'
+import { useCart } from '@/context/cart'
+import { useAuth } from '@/context/auth'
 import { api } from '@/services/api'
 import { money } from '@/lib/utils'
 

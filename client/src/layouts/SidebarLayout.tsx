@@ -1,4 +1,4 @@
-import { Suspense, useEffect, useLayoutEffect, useMemo, useState } from 'react'
+import { Suspense, useMemo, useState } from 'react'
 import { Link, NavLink, Outlet, useLocation } from 'react-router-dom'
 import {
   Bell,
@@ -10,8 +10,8 @@ import {
   type LucideIcon,
 } from 'lucide-react'
 import { Brand } from '@/components/Brand'
-import { useAuth } from '@/context/AuthContext'
-import { useNotifications } from '@/context/NotificationContext'
+import { useAuth } from '@/context/auth'
+import { useNotifications } from '@/context/notifications'
 import { applySidebarSide, cn, type SidebarSide } from '@/lib/utils'
 
 export type SideNavItem = {
@@ -37,18 +37,13 @@ export function SidebarLayout({
   const { unread: bellCount } = useNotifications()
   const [collapsed, setCollapsed] = useState(false)
   const [mobileOpen, setMobileOpen] = useState(false)
-  const [side, setSide] = useState<SidebarSide>(() =>
-    typeof document !== 'undefined' && document.documentElement.dataset.sidebar === 'right' ? 'right' : 'left',
-  )
+  const [side] = useState<SidebarSide>(applySidebarSide)
   const location = useLocation()
-
-  useLayoutEffect(() => {
-    setSide(applySidebarSide())
-  }, [])
-
-  useEffect(() => {
+  const [prevPath, setPrevPath] = useState(location.pathname)
+  if (location.pathname !== prevPath) {
+    setPrevPath(location.pathname)
     setMobileOpen(false)
-  }, [location.pathname])
+  }
 
   const pageName = useMemo(() => {
     const hit = [...items].reverse().find((i) =>

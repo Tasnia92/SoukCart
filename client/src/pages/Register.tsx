@@ -3,7 +3,7 @@ import { Link, useNavigate, useSearchParams } from 'react-router-dom'
 import { Mail, Lock, User, Eye, EyeOff } from 'lucide-react'
 import { AuthShell, RoleTabs } from '@/components/AuthShell'
 import { Button, Input, Label } from '@/components/ui'
-import { useAuth } from '@/context/AuthContext'
+import { useAuth } from '@/context/auth'
 
 export function Register() {
   const { register } = useAuth()

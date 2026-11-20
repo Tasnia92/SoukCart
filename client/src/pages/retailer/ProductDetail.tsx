@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react'
 import { Link, useParams } from 'react-router-dom'
 import { Button, Card } from '@/components/ui'
-import { useCart } from '@/context/CartContext'
+import { useCart } from '@/context/cart'
 import { api } from '@/services/api'
 import { money } from '@/lib/utils'
 
@@ -12,12 +12,16 @@ export function RetailerProductDetail() {
   const [qty, setQty] = useState(1)
   const [error, setError] = useState('')
   const { add } = useCart()
-
-  useEffect(() => {
-    let ignore = false
+  const [prevId, setPrevId] = useState(id)
+  if (id !== prevId) {
+    setPrevId(id)
     setError('')
     setProduct(null)
     setRelated([])
+  }
+
+  useEffect(() => {
+    let ignore = false
     // Start both requests together; the catalog doesn't depend on the product.
     const productP = api.get<{ product: any }>(`/products/${id}`)
     const catalogP = api
