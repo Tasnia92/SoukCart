@@ -25,7 +25,7 @@ export function AuthShell({
         <img src="/login-bg.png" alt="" aria-hidden className="absolute inset-0 h-full w-full object-cover object-[62%_center]" />
         <div className="relative">
           <p className="text-xs font-semibold tracking-[0.12em] uppercase text-white/90">Why SoukCart</p>
-          <h2 className="mt-3 text-4xl font-bold leading-tight tracking-tight text-balance max-w-md">{headline}</h2>
+          <h2 className="mt-3 text-4xl font-bold text-white leading-tight tracking-tight text-balance max-w-md">{headline}</h2>
           <p className="mt-4 text-white/90 max-w-md text-[15px] leading-relaxed text-pretty">{body}</p>
         </div>
       </div>

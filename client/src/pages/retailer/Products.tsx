@@ -47,7 +47,7 @@ export function RetailerProducts() {
 
   const filtered = useMemo(() => {
     let list = [...products]
-    if (category !== 'all') list = list.filter((p) => (p.category?.name || 'Uncategorized') === category)
+    if (category !== 'all' && !q) list = list.filter((p) => (p.category?.name || 'Uncategorized') === category)
     if (q) {
       list = list.filter((p) =>
         p.name.toLowerCase().includes(q)
@@ -75,29 +75,31 @@ export function RetailerProducts() {
           <option value="price-desc">Price high–low</option>
         </select>
       </div>
-      <div className="flex flex-wrap gap-2 mb-5">
-        <button
-          onClick={() => setCategory('all')}
-          className={cn(
-            'rounded-full px-3 py-1.5 text-sm border',
-            category === 'all' ? 'bg-ink text-white border-ink' : 'bg-subtle border-transparent text-foreground',
-          )}
-        >
-          All ({products.length})
-        </button>
-        {categories.map(([name, count]) => (
+      {!q && (
+        <div className="flex flex-wrap gap-2 mb-5">
           <button
-            key={name}
-            onClick={() => setCategory(name)}
+            onClick={() => setCategory('all')}
             className={cn(
               'rounded-full px-3 py-1.5 text-sm border',
-              category === name ? 'bg-ink text-white border-ink' : 'bg-subtle border-transparent text-foreground',
+              category === 'all' ? 'bg-ink text-white border-ink' : 'bg-subtle border-transparent text-foreground',
             )}
           >
-            {name} ({count})
+            All ({products.length})
           </button>
-        ))}
-      </div>
+          {categories.map(([name, count]) => (
+            <button
+              key={name}
+              onClick={() => setCategory(name)}
+              className={cn(
+                'rounded-full px-3 py-1.5 text-sm border',
+                category === name ? 'bg-ink text-white border-ink' : 'bg-subtle border-transparent text-foreground',
+              )}
+            >
+              {name} ({count})
+            </button>
+          ))}
+        </div>
+      )}
       <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4">
         {filtered.map((p) => (
           <Card key={p._id} className="overflow-hidden flex flex-col rounded-[12px]">
