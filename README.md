@@ -36,12 +36,7 @@ The client runs at http://localhost:5173 and the API at http://localhost:5001.
 
 ## Admin login
 
-Sign in at `/admin`.
-
-- Email: `admin@soukcart.com`
-- Password: `admin123456`
-
-Change this password after the first login.
+Sign in at `/admin`. The seed script creates the admin account. Its credentials are in `server/src/seed.js`.
 
 ## Scripts
 
