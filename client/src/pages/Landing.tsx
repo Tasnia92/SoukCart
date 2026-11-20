@@ -39,11 +39,11 @@ export function Landing() {
   }
 
   return (
-    <div className="min-h-screen bg-white text-foreground">
+    <div className="min-h-dvh bg-white text-foreground">
       <header className="border-b border-border/60 relative z-10 bg-white">
         <div className="mx-auto max-w-[1120px] px-4 h-[68px] flex items-center justify-between gap-4">
           <Brand />
-          <nav className="hidden md:flex items-center gap-8 text-[14px] text-[#4b5563]">
+          <nav className="hidden md:flex items-center gap-8 text-[14px] text-ink-soft">
             <a href="#how" className="hover:text-foreground">How It Works</a>
             <a href="#how-suppliers" className="hover:text-foreground">For Suppliers</a>
             <a href="#how-retailers" className="hover:text-foreground">For Retailers</a>
@@ -69,7 +69,7 @@ export function Landing() {
         style={{ minHeight: 'calc(100dvh - 68px)' }}
       >
         <div
-          className="hidden md:block absolute inset-0"
+          className="hidden lg:block absolute inset-0"
           style={{
             backgroundImage:
               'linear-gradient(90deg, #fff 0%, #fff 42%, transparent 62%), url(/brand/hero-bg.jpg)',
@@ -90,7 +90,7 @@ export function Landing() {
             </p>
             <div className="mt-8 flex flex-wrap gap-3">
               <Link to="/register?role=retailer"><Button className="h-12 px-6">Join as Retailer →</Button></Link>
-              <Link to="/register?role=supplier"><Button variant="secondary" className="h-12 px-6 bg-white border-[#c9c9c9] text-[#242526]">Join as Supplier →</Button></Link>
+              <Link to="/register?role=supplier"><Button variant="secondary" className="h-12 px-6 bg-white border-border-strong text-ink">Join as Supplier →</Button></Link>
             </div>
           </div>
         </div>
@@ -104,7 +104,7 @@ export function Landing() {
             { Icon: Truck, t: 'Reliable Delivery', d: 'On-time, every time' },
           ].map(({ Icon, t, d }) => (
             <div key={t} className="flex flex-col items-center text-center gap-3">
-              <span className="h-14 w-14 rounded-2xl border border-[#f2ccc1] bg-white flex items-center justify-center text-primary">
+              <span className="h-14 w-14 rounded-2xl border border-brand-200 bg-white flex items-center justify-center text-primary">
                 <Icon size={26} />
               </span>
               <div>
@@ -128,7 +128,7 @@ export function Landing() {
           <div className="grid md:grid-cols-2 gap-8">
             <div id="how-suppliers">
               <div className="flex items-center gap-3 mb-5">
-                <span className="h-12 w-12 rounded-2xl border border-[#f2ccc1] bg-white flex items-center justify-center text-primary">
+                <span className="h-12 w-12 rounded-2xl border border-brand-200 bg-white flex items-center justify-center text-primary">
                   <Grid2x2 size={22} />
                 </span>
                 <div className="text-xl font-semibold">For Suppliers</div>
@@ -136,7 +136,7 @@ export function Landing() {
               <div className="space-y-3">
                 {supplierSteps.map(({ title, Icon }, i) => (
                   <div key={title} className="rounded-xl border border-border bg-white p-4 flex items-center gap-4">
-                    <span className="h-12 w-12 rounded-2xl border border-[#f2ccc1] bg-white flex items-center justify-center text-primary shrink-0">
+                    <span className="h-12 w-12 rounded-2xl border border-brand-200 bg-white flex items-center justify-center text-primary shrink-0">
                       <Icon size={22} />
                     </span>
                     <div className="flex-1 font-semibold text-lg">{title}</div>
@@ -147,7 +147,7 @@ export function Landing() {
             </div>
             <div id="how-retailers">
               <div className="flex items-center gap-3 mb-5">
-                <span className="h-12 w-12 rounded-2xl border border-[#f2ccc1] bg-white flex items-center justify-center text-primary">
+                <span className="h-12 w-12 rounded-2xl border border-brand-200 bg-white flex items-center justify-center text-primary">
                   <ClipboardList size={22} />
                 </span>
                 <div className="text-xl font-semibold">For Retailers</div>
@@ -155,7 +155,7 @@ export function Landing() {
               <div className="space-y-3">
                 {retailerSteps.map(({ title, Icon }, i) => (
                   <div key={title} className="rounded-xl border border-border bg-white p-4 flex items-center gap-4">
-                    <span className="h-12 w-12 rounded-2xl border border-[#f2ccc1] bg-white flex items-center justify-center text-primary shrink-0">
+                    <span className="h-12 w-12 rounded-2xl border border-brand-200 bg-white flex items-center justify-center text-primary shrink-0">
                       <Icon size={22} />
                     </span>
                     <div className="flex-1 font-semibold text-lg">{title}</div>
@@ -170,7 +170,7 @@ export function Landing() {
 
       <section id="pricing" aria-label="SoukCart brand">
         <div className="mx-auto max-w-[1120px] px-4 py-10">
-          <div className="relative overflow-hidden rounded-xl bg-[#FBF1E7]">
+          <div className="relative overflow-hidden rounded-xl bg-cream">
             <div className="px-6 py-10 lg:absolute lg:inset-0 lg:flex lg:items-center lg:py-0">
               <div className="max-w-[400px]">
                 <p className="text-[12px] font-semibold tracking-[0.1em] uppercase text-primary">Ready to grow together?</p>
@@ -185,8 +185,8 @@ export function Landing() {
       </section>
 
       <footer className="border-t border-border">
-        <div className="mx-auto max-w-[1120px] px-4 py-12 grid md:grid-cols-5 gap-8 text-sm">
-          <div className="md:col-span-1">
+        <div className="mx-auto max-w-[1120px] px-4 py-12 grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-8 text-sm">
+          <div className="col-span-2 sm:col-span-3 lg:col-span-1">
             <Brand markHeight={24} />
             <p className="text-muted mt-3 text-[13px]">B2B marketplace connecting grocery suppliers and retailers.</p>
           </div>
@@ -211,7 +211,7 @@ export function Landing() {
               <li><Link to="/legal#refund">Refund Policy</Link></li>
             </ul>
           </div>
-          <div>
+          <div className="col-span-2 sm:col-span-3 lg:col-span-1">
             <div className="font-semibold mb-2">Subscribe to our newsletter</div>
             <p className="text-muted text-[13px] mb-3">Get updates on new features, offers and more.</p>
             <form onSubmit={subscribe} className="flex gap-2">
@@ -221,7 +221,7 @@ export function Landing() {
                 value={email}
                 onChange={(e) => setEmail(e.target.value)}
                 placeholder="Enter your email"
-                className="flex-1 h-10 rounded-lg border border-border bg-[#f7f8f8] px-3 text-base sm:text-sm"
+                className="flex-1 min-w-0 h-10 rounded-lg border border-border bg-field px-3 text-base sm:text-sm"
               />
               <Button type="submit" className="h-10 px-4 whitespace-nowrap" aria-label="Subscribe">Subscribe</Button>
             </form>
@@ -243,7 +243,7 @@ export function Landing() {
 
 export function Legal() {
   return (
-    <div className="min-h-screen bg-white">
+    <div className="min-h-dvh bg-white">
       <header className="border-b border-border">
         <div className="mx-auto max-w-3xl px-4 h-16 flex items-center">
           <Brand />
@@ -271,7 +271,7 @@ export function Legal() {
 
 export function NotFound() {
   return (
-    <div className="min-h-screen flex flex-col items-center justify-center px-4 text-center">
+    <div className="min-h-dvh flex flex-col items-center justify-center px-4 text-center">
       <p className="text-sm text-muted">404</p>
       <h1 className="text-3xl font-bold mt-1">Page not found</h1>
       <p className="text-muted mt-2 max-w-md">That URL does not exist. Head back to the homepage or sign in to your workspace.</p>

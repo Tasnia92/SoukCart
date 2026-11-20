@@ -21,7 +21,7 @@ function slugFromName(name: string) {
 
 function ImagePicker({ url, onUrl, onError }: { url: string; onUrl: (u: string) => void; onError: (m: string) => void }) {
   return (
-    <label className="mt-1 flex flex-col items-center justify-center gap-2 rounded-2xl border-2 border-dashed border-[#f2ccc1] bg-[#fff4ef] min-h-[140px] cursor-pointer px-4 text-center overflow-hidden">
+    <label className="mt-1 flex flex-col items-center justify-center gap-2 rounded-2xl border-2 border-dashed border-brand-200 bg-brand-50 min-h-[140px] cursor-pointer px-4 text-center overflow-hidden">
       {url ? <img src={url} alt="Product" className="h-28 w-full object-contain" /> : <ImagePlus className="text-primary" />}
       <span className="text-sm font-medium">{url ? 'Change image' : 'Drop image or click to upload'}</span>
       <span className="text-xs text-muted">PNG or JPG, up to 5 MB.</span>
@@ -143,7 +143,7 @@ export function SupplierOrders() {
   })
   return (
     <div>
-      <div className="flex items-center justify-between mb-4">
+      <div className="flex flex-wrap items-center justify-between gap-3 mb-4">
         <h2 className="text-2xl font-semibold">Orders</h2>
         <div className="flex gap-2">
           <Button variant="secondary" onClick={() => downloadCsv('supplier-orders.csv', [
@@ -155,7 +155,7 @@ export function SupplierOrders() {
       </div>
       <div className="flex gap-2 mb-4 flex-wrap">
         {tabs.map((t) => (
-          <button key={t} onClick={() => setTab(t)} className={cn('rounded-full px-3 py-1.5 text-sm', tab === t ? 'bg-[#242526] text-white' : 'bg-[#f3f4f6]')}>{t} {orders.filter((o)=>{
+          <button key={t} onClick={() => setTab(t)} className={cn('rounded-full px-3 py-1.5 text-sm', tab === t ? 'bg-ink text-white' : 'bg-subtle')}>{t} {orders.filter((o)=>{
             if (t==='All') return true
             if (t==='Pending') return o.status==='placed'||o.status==='supplier_approved'
             if (t==='Confirmed') return ['supplier_confirmed','delivery_initiated','shipped','out_for_delivery','delivered'].includes(o.status)
@@ -164,7 +164,7 @@ export function SupplierOrders() {
         ))}
       </div>
       <Card className="overflow-hidden">
-        <table className="w-full text-sm">
+        <div className="overflow-x-auto"><table className="w-full text-sm">
           <thead className="bg-canvas text-muted text-left"><tr>
             <th className="px-3 py-3">Order</th><th className="px-3 py-3">Product</th><th className="px-3 py-3">Retailer</th><th className="px-3 py-3">Type</th><th className="px-3 py-3">Price</th><th className="px-3 py-3">Date</th><th className="px-3 py-3">Status</th><th className="px-3 py-3"></th>
           </tr></thead>
@@ -191,7 +191,7 @@ export function SupplierOrders() {
               </tr>
             ))}
           </tbody>
-        </table>
+        </table></div>
         {!visible.length && <p className="p-8 text-center text-muted">No orders</p>}
       </Card>
       <CancelOrderModal
@@ -225,7 +225,7 @@ export function SupplierProducts() {
   }).sort((a, b) => sort === 'price' ? a.price - b.price : a.name.localeCompare(b.name))
   return (
     <div>
-      <div className="flex items-center justify-between mb-2">
+      <div className="flex flex-wrap items-center justify-between gap-3 mb-2">
         <div>
           <p className="text-xs uppercase tracking-wide text-muted">Catalog</p>
           <h2 className="text-2xl font-semibold">Products</h2>
@@ -235,11 +235,11 @@ export function SupplierProducts() {
       <Card className="p-4 mb-4">
         <div className="flex flex-wrap gap-2 items-center">
           <Input className="max-w-xs" placeholder="Search products" value={q} onChange={(e)=>setQ(e.target.value)} />
-          <select className="h-10 rounded-[8px] border border-border bg-[#f7f8f8] px-3 text-sm" value={category} onChange={(e)=>setCategory(e.target.value)}>
+          <select className="h-10 rounded-[8px] border border-border bg-field px-3 text-sm" value={category} onChange={(e)=>setCategory(e.target.value)}>
             <option value="">All categories</option>
             {cats.map((c)=><option key={c} value={c}>{c}</option>)}
           </select>
-          <select className="h-10 rounded-[8px] border border-border bg-[#f7f8f8] px-3 text-sm" value={sort} onChange={(e)=>setSort(e.target.value)}>
+          <select className="h-10 rounded-[8px] border border-border bg-field px-3 text-sm" value={sort} onChange={(e)=>setSort(e.target.value)}>
             <option value="name">Name A–Z</option>
             <option value="price">Price low–high</option>
           </select>
@@ -250,7 +250,7 @@ export function SupplierProducts() {
             ['rejected', 'Rejected'],
             ['hidden', 'Hidden'],
           ].map(([s, label])=>(
-            <button key={s} onClick={()=>setStatus(s)} className={cn('rounded-full px-3 py-1.5 text-sm', status===s?'bg-[#242526] text-white':'bg-[#f3f4f6]')}>
+            <button key={s} onClick={()=>setStatus(s)} className={cn('rounded-full px-3 py-1.5 text-sm', status===s?'bg-ink text-white':'bg-subtle')}>
               {label}
             </button>
           ))}
@@ -260,7 +260,7 @@ export function SupplierProducts() {
         {filtered.map((p)=>(
           <Card key={p._id} className="overflow-hidden flex flex-col">
             <div className="relative">
-              <img src={p.imageUrl} className="h-36 w-full object-cover bg-canvas" alt={p.name} />
+              <img src={p.imageUrl} className="img-outline h-36 w-full object-cover bg-canvas" alt={p.name} />
               <div className="absolute top-2 right-2">
                 <button type="button" className="p-1 rounded bg-white/90 text-muted" aria-label="Product actions" onClick={()=>setMenu(menu===p._id?null:p._id)}><MoreVertical size={14}/></button>
                 {menu===p._id && (
@@ -274,7 +274,7 @@ export function SupplierProducts() {
               <div className="font-medium text-sm line-clamp-1">{p.name}</div>
               <div className="text-sm"><span className="font-semibold tabular-nums">{money(p.price)}</span> <span className="text-muted text-xs">per {p.unit}</span></div>
               <div className="flex gap-1 flex-wrap">
-                <Badge className={p.status==='approved' && p.isActive!==false ?'bg-[#d1fae5] text-[#047857]': p.status==='pending' ? 'bg-[#fef3c7] text-[#b45309]' : ''}>{p.isActive===false ? 'Hidden' : p.status==='approved'?'Active':p.status==='pending'?'Pending':p.status}</Badge>
+                <Badge className={p.status==='approved' && p.isActive!==false ?'bg-success-soft text-success': p.status==='pending' ? 'bg-warning-soft text-warning' : ''}>{p.isActive===false ? 'Hidden' : p.status==='approved'?'Active':p.status==='pending'?'Pending':p.status}</Badge>
                 <Badge>MOQ {p.moq}</Badge>
                 {p.rejectReason ? <span className="text-[11px] text-danger">{p.rejectReason}</span> : null}
               </div>
@@ -345,19 +345,19 @@ export function SupplierProductNew() {
           <div><Label htmlFor="product-name">Product name *</Label><Input id="product-name" required value={form.name} onChange={(e)=>setForm({...form,name:e.target.value})} /></div>
           <div>
             <Label>Long description</Label>
-            <textarea maxLength={2000} className="w-full min-h-28 rounded-[8px] border border-border bg-[#f7f8f8] p-3 text-sm" value={form.description} onChange={(e)=>setForm({...form,description:e.target.value})} />
+            <textarea maxLength={2000} className="w-full min-h-28 rounded-[8px] border border-border bg-field p-3 text-sm" value={form.description} onChange={(e)=>setForm({...form,description:e.target.value})} />
             <div className="text-xs text-muted text-right mt-1">{form.description.length}/2000</div>
           </div>
           <div className="grid grid-cols-2 gap-3">
             <div><Label htmlFor="product-price">Price per unit (Tk) *</Label><Input id="product-price" required type="number" min="0.01" step="0.01" value={form.price} onChange={(e)=>setForm({...form,price:e.target.value})} /></div>
             <div><Label>Unit *</Label>
-              <select className="w-full h-10 rounded-[8px] border border-border bg-[#f7f8f8] px-3 text-sm" value={form.unit} onChange={(e)=>setForm({...form,unit:e.target.value})}>
+              <select className="w-full h-10 rounded-[8px] border border-border bg-field px-3 text-sm" value={form.unit} onChange={(e)=>setForm({...form,unit:e.target.value})}>
                 {['Piece','kg','can','pouch','box','liter'].map(u=> <option key={u}>{u}</option>)}
               </select>
             </div>
           </div>
           <div><Label>Category</Label>
-            <select className="w-full h-10 rounded-[8px] border border-border bg-[#f7f8f8] px-3 text-sm" value={form.category} onChange={(e)=>setForm({...form,category:e.target.value})}>
+            <select className="w-full h-10 rounded-[8px] border border-border bg-field px-3 text-sm" value={form.category} onChange={(e)=>setForm({...form,category:e.target.value})}>
               <option value="">Select</option>
               {cats.map((c)=><option key={c._id} value={c._id}>{c.name}</option>)}
             </select>
@@ -391,9 +391,13 @@ export function SupplierProductEdit() {
   const [err, setErr] = useState('')
   const [status, setStatus] = useState('')
   useEffect(() => {
-    void api.get<{ categories: any[] }>('/products/categories').then((d) => setCats(d.categories))
-    if (!id) return
+    let ignore = false
+    void api.get<{ categories: any[] }>('/products/categories').then((d) => {
+      if (!ignore) setCats(d.categories)
+    })
+    if (!id) return () => { ignore = true }
     void api.get<{ product: any }>(`/products/${id}`).then((d) => {
+      if (ignore) return
       const p = d.product
       setStatus(p.status)
       setForm({
@@ -407,6 +411,9 @@ export function SupplierProductEdit() {
         imageUrl: p.imageUrl || '',
       })
     })
+    return () => {
+      ignore = true
+    }
   }, [id])
   async function submit(e: FormEvent) {
     e.preventDefault()
@@ -450,18 +457,18 @@ export function SupplierProductEdit() {
           <div><Label htmlFor="product-name">Product name *</Label><Input id="product-name" required value={form.name} onChange={(e)=>setForm({...form,name:e.target.value})} /></div>
           <div>
             <Label>Long description</Label>
-            <textarea maxLength={2000} className="w-full min-h-28 rounded-[8px] border border-border bg-[#f7f8f8] p-3 text-sm" value={form.description} onChange={(e)=>setForm({...form,description:e.target.value})} />
+            <textarea maxLength={2000} className="w-full min-h-28 rounded-[8px] border border-border bg-field p-3 text-sm" value={form.description} onChange={(e)=>setForm({...form,description:e.target.value})} />
           </div>
           <div className="grid grid-cols-2 gap-3">
             <div><Label htmlFor="product-price">Price per unit (Tk) *</Label><Input id="product-price" required type="number" min="0.01" step="0.01" value={form.price} onChange={(e)=>setForm({...form,price:e.target.value})} /></div>
             <div><Label>Unit *</Label>
-              <select className="w-full h-10 rounded-[8px] border border-border bg-[#f7f8f8] px-3 text-sm" value={form.unit} onChange={(e)=>setForm({...form,unit:e.target.value})}>
+              <select className="w-full h-10 rounded-[8px] border border-border bg-field px-3 text-sm" value={form.unit} onChange={(e)=>setForm({...form,unit:e.target.value})}>
                 {['Piece','kg','can','pouch','box','liter'].map(u=> <option key={u}>{u}</option>)}
               </select>
             </div>
           </div>
           <div><Label>Category</Label>
-            <select className="w-full h-10 rounded-[8px] border border-border bg-[#f7f8f8] px-3 text-sm" value={form.category} onChange={(e)=>setForm({...form,category:e.target.value})}>
+            <select className="w-full h-10 rounded-[8px] border border-border bg-field px-3 text-sm" value={form.category} onChange={(e)=>setForm({...form,category:e.target.value})}>
               <option value="">Select</option>
               {cats.map((c)=><option key={c._id} value={c._id}>{c.name}</option>)}
             </select>
@@ -584,14 +591,14 @@ export function SupplierInventory() {
           {bulkErr ? <p className="text-sm text-danger mt-2">{bulkErr}</p> : null}
           {bulkMsg ? <p className="text-sm text-primary mt-2">{bulkMsg}</p> : null}
         </div>
-        <table className="w-full text-sm">
+        <div className="overflow-x-auto"><table className="w-full text-sm">
           <thead className="bg-canvas text-muted text-left"><tr>
             <th className="px-4 py-3 w-10"><input type="checkbox" ref={selectAllRef} checked={allSelected} onChange={(e)=>setSelected(e.target.checked ? new Set(products.map((p)=>p._id)) : new Set())} title="Select all" aria-label="Select all products" /></th>
             <th className="px-4 py-3">Product</th><th className="px-4 py-3">Stock</th><th className="px-4 py-3">MOQ</th><th className="px-4 py-3">Update</th>
           </tr></thead>
           <tbody>
             {products.map((p)=>(
-              <tr key={p._id} className={cn('border-t border-border', selected.has(p._id) && 'bg-[#fff4ef]')}>
+              <tr key={p._id} className={cn('border-t border-border', selected.has(p._id) && 'bg-brand-50')}>
                 <td className="px-4 py-3"><input type="checkbox" checked={selected.has(p._id)} onChange={()=>toggleRow(p._id)} aria-label={`Select ${p.name}`} /></td>
                 <td className="px-4 py-3">{p.name}</td>
                 <td className="px-4 py-3"><Input className="w-24 h-8" value={draft[p._id]||''} onChange={(e)=>setDraft({...draft,[p._id]:e.target.value})} /></td>
@@ -600,7 +607,7 @@ export function SupplierInventory() {
               </tr>
             ))}
           </tbody>
-        </table>
+        </table></div>
       </Card>
     </div>
   )
@@ -690,9 +697,9 @@ export function SupplierEarnings() {
   })
 
   function statusBadge(status: LedgerRow['status']) {
-    if (status === 'paid') return <Badge className="bg-[#d1fae5] text-[#047857]">Paid</Badge>
-    if (status === 'pending') return <Badge className="bg-[#fef3c7] text-[#b45309]">Pending</Badge>
-    if (status === 'failed') return <Badge className="bg-[#f6b2be] text-[#e84461]">Failed</Badge>
+    if (status === 'paid') return <Badge className="bg-success-soft text-success">Paid</Badge>
+    if (status === 'pending') return <Badge className="bg-warning-soft text-warning">Pending</Badge>
+    if (status === 'failed') return <Badge className="bg-danger-soft text-danger-ink">Failed</Badge>
     return <Badge>Awaiting COD</Badge>
   }
 
@@ -709,11 +716,11 @@ export function SupplierEarnings() {
           <div className="font-medium">Payout ledger</div>
           <div className="flex gap-2 text-sm">
             {(['All', 'Pending', 'Paid'] as const).map((c) => (
-              <button key={c} type="button" onClick={() => setChip(c)} className={cn('px-3 py-1 rounded-full', chip === c ? 'bg-[#242526] text-white' : 'bg-[#f3f4f6]')}>{c}</button>
+              <button key={c} type="button" onClick={() => setChip(c)} className={cn('px-3 py-1 rounded-full', chip === c ? 'bg-ink text-white' : 'bg-subtle')}>{c}</button>
             ))}
           </div>
         </div>
-        <table className="w-full text-sm">
+        <div className="overflow-x-auto"><table className="w-full text-sm">
           <thead className="bg-canvas text-muted text-left"><tr><th className="px-4 py-3">Order / Payout</th><th className="px-4 py-3">Amount</th><th className="px-4 py-3">Date</th><th className="px-4 py-3">Status</th></tr></thead>
           <tbody>
             {visible.map((r) => (
@@ -729,7 +736,7 @@ export function SupplierEarnings() {
             ))}
             {!visible.length && <tr><td colSpan={4} className="p-8 text-center text-muted">No ledger entries yet</td></tr>}
           </tbody>
-        </table>
+        </table></div>
       </Card>
     </div>
   )
@@ -740,7 +747,7 @@ export function SupplierRetailers() {
   useEffect(() => { void api.get<{ retailers: any[] }>('/supplier/retailers').then((d) => setRetailers(d.retailers)) }, [])
   return (
     <div>
-      <div className="flex items-center justify-between mb-4">
+      <div className="flex flex-wrap items-center justify-between gap-3 mb-4">
         <h2 className="text-2xl font-semibold">Retailers.</h2>
         <Button variant="secondary" onClick={() => downloadCsv('retailers.csv', [
           ['Retailer', 'Email', 'Orders', 'Gross', 'Last order'],
@@ -748,7 +755,7 @@ export function SupplierRetailers() {
         ])}>Export CSV</Button>
       </div>
       <Card className="overflow-hidden">
-        <table className="w-full text-sm">
+        <div className="overflow-x-auto"><table className="w-full text-sm">
           <thead className="bg-canvas text-muted text-left"><tr><th className="px-4 py-3">Retailer</th><th className="px-4 py-3">Email</th><th className="px-4 py-3">Orders</th><th className="px-4 py-3">Gross</th><th className="px-4 py-3">Last order</th></tr></thead>
           <tbody>
             {retailers.map((r)=>(
@@ -762,7 +769,7 @@ export function SupplierRetailers() {
             ))}
             {!retailers.length && <tr><td colSpan={5} className="p-8 text-center text-muted">No retailers yet</td></tr>}
           </tbody>
-        </table>
+        </table></div>
       </Card>
     </div>
   )
@@ -813,7 +820,7 @@ export function SupplierSettings() {
           <p className="text-sm text-muted mt-1">Public shop details retailers see across your catalog listings.</p>
         </div>
         <div><Label>Shop name *</Label><Input value={profile.businessName} onChange={(e)=>setProfile({...profile,businessName:e.target.value})} /></div>
-        <div><Label>Description *</Label><textarea className="w-full min-h-24 rounded-[8px] border border-border bg-[#f7f8f8] p-3 text-sm" value={profile.description} onChange={(e)=>setProfile({...profile,description:e.target.value})} /></div>
+        <div><Label>Description *</Label><textarea className="w-full min-h-24 rounded-[8px] border border-border bg-field p-3 text-sm" value={profile.description} onChange={(e)=>setProfile({...profile,description:e.target.value})} /></div>
         <div>
           <Label>Shop link *</Label>
           <Input value={profile.shopLink} onChange={(e)=>setProfile({...profile,shopLink:e.target.value})} />
@@ -963,7 +970,7 @@ export function SupplierVerification() {
   }
 
   return (
-    <div className="min-h-screen bg-[#f7f8f8] flex flex-col items-center p-6 relative">
+    <div className="min-h-dvh bg-field flex flex-col items-center p-6 relative">
       <div className="w-full max-w-xl mt-8">
         <Brand />
         <h1 className="text-3xl font-bold mt-8">Verification</h1>
@@ -992,11 +999,11 @@ export function SupplierVerification() {
               }} />
               <p className="text-xs text-muted mt-1">Auto-generated from your business name (editable) — soukcart.com/@{form.shopLink || 'your-shop'}</p>
             </div>
-            <div><Label>Description</Label><textarea className="w-full min-h-24 rounded-[8px] border border-border bg-[#f7f8f8] p-3 text-sm" value={form.businessDescription} onChange={(e)=>setForm({...form,businessDescription:e.target.value})} /></div>
+            <div><Label>Description</Label><textarea className="w-full min-h-24 rounded-[8px] border border-border bg-field p-3 text-sm" value={form.businessDescription} onChange={(e)=>setForm({...form,businessDescription:e.target.value})} /></div>
             <div>
               <Label>NID document (required for approval)</Label>
               <div className="mt-1 flex items-center gap-3">
-                <label className="inline-flex items-center justify-center h-10 px-4 rounded-[8px] bg-[#fff4ef] border border-[#f2ccc1] text-sm font-medium cursor-pointer">
+                <label className="inline-flex items-center justify-center h-10 px-4 rounded-[8px] bg-brand-50 border border-brand-200 text-sm font-medium cursor-pointer">
                   Choose File
                   <input type="file" accept="image/png,image/jpeg" className="hidden" onChange={async (e)=>{
                     const f = e.target.files?.[0]

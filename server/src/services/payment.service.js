@@ -23,7 +23,7 @@ function cfg() {
     storePasswd: process.env.SSLCOMMERZ_STORE_PASSWD || '',
     initUrl: `${SSL_API_BASE}/gwprocess/v4/api.php`,
     validateUrl: `${SSL_API_BASE}/validator/api/validationserverAPI.php`,
-    serverUrl: (process.env.SERVER_URL || `http://localhost:${process.env.PORT || 5000}`).replace(/\/$/, ''),
+    serverUrl: (process.env.SERVER_URL || `http://localhost:${process.env.PORT || 5001}`).replace(/\/$/, ''),
     clientUrl: (process.env.CLIENT_URL || 'http://localhost:5173').replace(/\/$/, ''),
   };
 }
@@ -50,7 +50,7 @@ export async function createSslCommerzSession(order, retailer, { forceNew = fals
   }
 
   const tranId = forceNew || !order.sslTranId
-    ? `NEK-${order.orderNumber}-${Date.now()}`
+    ? `${order.orderNumber}-${Date.now()}`
     : order.sslTranId;
   const totalAmount = Number(order.amountDueNow || DELIVERY_FEE).toFixed(2);
 
@@ -155,6 +155,7 @@ export async function activateOrderAfterPayment(order, sslData = {}) {
 
   order.deliveryFeePaid = true;
   order.deliveryPaymentStatus = 'paid';
+  order.deliveryFeePaidAt = new Date();
   if (order.paymentMethod === 'online') {
     order.productAmountPaid = true;
     order.paymentStatus = 'paid';

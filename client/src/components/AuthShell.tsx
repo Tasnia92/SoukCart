@@ -12,7 +12,7 @@ export function AuthShell({
   body?: string
 }) {
   return (
-    <div className="min-h-screen grid md:grid-cols-2 lg:grid-cols-[44%_56%] bg-[#f7f8f8]">
+    <div className="min-h-dvh grid md:grid-cols-2 lg:grid-cols-[44%_56%] bg-field">
       <div className="relative flex flex-col px-6 py-8 md:px-10">
         <Brand />
         <div className="flex-1 flex items-center justify-center py-8">
@@ -41,7 +41,7 @@ export function RoleTabs({
   onChange: (r: 'retailer' | 'supplier') => void
 }) {
   return (
-    <div className="grid grid-cols-2 gap-1 p-1 rounded-full bg-[#f1f3f3]">
+    <div className="grid grid-cols-2 gap-1 p-1 rounded-full bg-subtle">
       {([
         { id: 'retailer' as const, title: 'Retailer', sub: 'Buy for my shop', Icon: Store },
         { id: 'supplier' as const, title: 'Supplier', sub: 'Sell on SoukCart', Icon: Package },

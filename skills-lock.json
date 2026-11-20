@@ -1,11 +1,46 @@
 {
-  "version": 1,
+  "version": 2,
   "skills": {
     "agent-browser": {
       "source": "vercel-labs/agent-browser",
       "sourceType": "github",
       "skillPath": "skills/agent-browser/SKILL.md",
-      "computedHash": "80161e6836b3b40f4e83730a290deb40ac14d877d38c97ad5f6d71be37ce74c3"
+      "computedHash": ""
+    },
+    "better-colors": {
+      "source": "jakubkrehel/skills",
+      "commit": "547d415dc10a23e66088eba5aa6664e6e772432c",
+      "sourceType": "github",
+      "skillPath": "skills/better-colors/SKILL.md",
+      "computedHash": "6bd97cb922230031c416da89e3e30f31856e7c397d4595c951cced9350a2e0c6"
+    },
+    "better-layout": {
+      "source": "jakubkrehel/skills",
+      "commit": "547d415dc10a23e66088eba5aa6664e6e772432c",
+      "sourceType": "github",
+      "skillPath": "skills/better-layout/SKILL.md",
+      "computedHash": "132862dbdc0ca8cc2016257f2db6f0845bc13d0f66cd715b57a62f8529e9bc4c"
+    },
+    "better-typography": {
+      "source": "jakubkrehel/skills",
+      "commit": "547d415dc10a23e66088eba5aa6664e6e772432c",
+      "sourceType": "github",
+      "skillPath": "skills/better-typography/SKILL.md",
+      "computedHash": "46b9c3a581e240b1e3e9f2a34469bfd8fceb075149cadb6ff670e4ee74ab7622"
+    },
+    "better-ui": {
+      "source": "jakubkrehel/skills",
+      "commit": "547d415dc10a23e66088eba5aa6664e6e772432c",
+      "sourceType": "github",
+      "skillPath": "skills/better-ui/SKILL.md",
+      "computedHash": "1b0a17b7b2675ed2bf79ca7120fbc3c37b0f3955d1750293b215ebb6edb5bab3"
+    },
+    "vercel-react-best-practices": {
+      "source": "vercel-labs/agent-skills",
+      "commit": "1a2c79d4e6c4a2283dc2c614b6538cbe1ed5ca62",
+      "sourceType": "github",
+      "skillPath": "skills/react-best-practices/SKILL.md",
+      "computedHash": "7991ed4fbecdac23f47c1a40c243e00a212a9e7f3604db93959b3ae11dffe299"
     }
   }
 }

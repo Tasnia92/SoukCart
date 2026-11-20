@@ -1,3 +1,4 @@
+import { lazy, Suspense } from 'react'
 import { BrowserRouter, Navigate, Route, Routes } from 'react-router-dom'
 import { useAuth } from '@/context/AuthContext'
 import {
@@ -15,6 +16,7 @@ import {
   MessageSquareWarning,
   Tags,
   ShieldCheck,
+  Truck,
 } from 'lucide-react'
 import { AuthProvider } from '@/context/AuthContext'
 import { CartProvider } from '@/context/CartContext'
@@ -25,42 +27,52 @@ import { SidebarLayout } from '@/layouts/SidebarLayout'
 import { Landing, Legal, NotFound } from '@/pages/Landing'
 import { Login, AdminLogin } from '@/pages/Login'
 import { Register } from '@/pages/Register'
-import { RetailerProducts } from '@/pages/retailer/Products'
-import { RetailerProductDetail } from '@/pages/retailer/ProductDetail'
-import { RetailerCart } from '@/pages/retailer/Cart'
-import { RetailerOrders } from '@/pages/retailer/Orders'
-import {
-  RetailerHelp,
-  RetailerNotifications,
-  RetailerSettings,
-  RetailerTracking,
-} from '@/pages/retailer/SimplePages'
-import {
-  SupplierDashboard,
-  SupplierEarnings,
-  SupplierInventory,
-  SupplierNotifications,
-  SupplierOrders,
-  SupplierProductNew,
-  SupplierProductEdit,
-  SupplierProducts,
-  SupplierRetailers,
-  SupplierSettings,
-  SupplierVerification,
-} from '@/pages/supplier/Pages'
-import {
-  AdminCategories,
-  AdminDisputes,
-  AdminHome,
-  AdminNotifications,
-  AdminOrders,
-  AdminPayouts,
-  AdminProducts,
-  AdminRefunds,
-  AdminUsers,
-  AdminVerificationDetail,
-  AdminVerifications,
-} from '@/pages/admin/Pages'
+// Role workspaces are code-split so each role only downloads its own pages.
+// Several lazy() calls on one module share a single chunk and a single request.
+const loadRetailerProducts = () => import('@/pages/retailer/Products')
+const RetailerProducts = lazy(() => loadRetailerProducts().then((m) => ({ default: m.RetailerProducts })))
+
+const loadRetailerProductDetail = () => import('@/pages/retailer/ProductDetail')
+const RetailerProductDetail = lazy(() => loadRetailerProductDetail().then((m) => ({ default: m.RetailerProductDetail })))
+
+const loadRetailerCart = () => import('@/pages/retailer/Cart')
+const RetailerCart = lazy(() => loadRetailerCart().then((m) => ({ default: m.RetailerCart })))
+
+const loadRetailerOrders = () => import('@/pages/retailer/Orders')
+const RetailerOrders = lazy(() => loadRetailerOrders().then((m) => ({ default: m.RetailerOrders })))
+
+const loadRetailerSimplePages = () => import('@/pages/retailer/SimplePages')
+const RetailerHelp = lazy(() => loadRetailerSimplePages().then((m) => ({ default: m.RetailerHelp })))
+const RetailerNotifications = lazy(() => loadRetailerSimplePages().then((m) => ({ default: m.RetailerNotifications })))
+const RetailerSettings = lazy(() => loadRetailerSimplePages().then((m) => ({ default: m.RetailerSettings })))
+const RetailerTracking = lazy(() => loadRetailerSimplePages().then((m) => ({ default: m.RetailerTracking })))
+
+const loadSupplierPages = () => import('@/pages/supplier/Pages')
+const SupplierDashboard = lazy(() => loadSupplierPages().then((m) => ({ default: m.SupplierDashboard })))
+const SupplierEarnings = lazy(() => loadSupplierPages().then((m) => ({ default: m.SupplierEarnings })))
+const SupplierInventory = lazy(() => loadSupplierPages().then((m) => ({ default: m.SupplierInventory })))
+const SupplierNotifications = lazy(() => loadSupplierPages().then((m) => ({ default: m.SupplierNotifications })))
+const SupplierOrders = lazy(() => loadSupplierPages().then((m) => ({ default: m.SupplierOrders })))
+const SupplierProductNew = lazy(() => loadSupplierPages().then((m) => ({ default: m.SupplierProductNew })))
+const SupplierProductEdit = lazy(() => loadSupplierPages().then((m) => ({ default: m.SupplierProductEdit })))
+const SupplierProducts = lazy(() => loadSupplierPages().then((m) => ({ default: m.SupplierProducts })))
+const SupplierRetailers = lazy(() => loadSupplierPages().then((m) => ({ default: m.SupplierRetailers })))
+const SupplierSettings = lazy(() => loadSupplierPages().then((m) => ({ default: m.SupplierSettings })))
+const SupplierVerification = lazy(() => loadSupplierPages().then((m) => ({ default: m.SupplierVerification })))
+
+const loadAdminPages = () => import('@/pages/admin/Pages')
+const AdminCategories = lazy(() => loadAdminPages().then((m) => ({ default: m.AdminCategories })))
+const AdminDisputes = lazy(() => loadAdminPages().then((m) => ({ default: m.AdminDisputes })))
+const AdminHome = lazy(() => loadAdminPages().then((m) => ({ default: m.AdminHome })))
+const AdminNotifications = lazy(() => loadAdminPages().then((m) => ({ default: m.AdminNotifications })))
+const AdminOrders = lazy(() => loadAdminPages().then((m) => ({ default: m.AdminOrders })))
+const AdminPayouts = lazy(() => loadAdminPages().then((m) => ({ default: m.AdminPayouts })))
+const AdminProducts = lazy(() => loadAdminPages().then((m) => ({ default: m.AdminProducts })))
+const AdminDeliveryFees = lazy(() => loadAdminPages().then((m) => ({ default: m.AdminDeliveryFees })))
+const AdminRefunds = lazy(() => loadAdminPages().then((m) => ({ default: m.AdminRefunds })))
+const AdminUsers = lazy(() => loadAdminPages().then((m) => ({ default: m.AdminUsers })))
+const AdminVerificationDetail = lazy(() => loadAdminPages().then((m) => ({ default: m.AdminVerificationDetail })))
+const AdminVerifications = lazy(() => loadAdminPages().then((m) => ({ default: m.AdminVerifications })))
 
 const supplierNav = [
   { to: '/supplier', label: 'Dashboard', Icon: LayoutDashboard, end: true },
@@ -76,6 +88,7 @@ const supplierNav = [
 const adminNav = [
   { to: '/admin', label: 'Home', Icon: Home, end: true },
   { to: '/admin/orders', label: 'Orders', Icon: Package },
+  { to: '/admin/delivery-fees', label: 'Delivery fees', Icon: Truck },
   { to: '/admin/refunds', label: 'Refund', Icon: RotateCcw },
   { to: '/admin/payouts', label: 'Payouts', Icon: Wallet },
   { to: '/admin/disputes', label: 'Disputes', Icon: MessageSquareWarning },
@@ -85,6 +98,10 @@ const adminNav = [
   { to: '/admin/users', label: 'Users', Icon: Users },
   { to: '/admin/notifications', label: 'Notifications', Icon: Bell },
 ]
+
+function PageLoading() {
+  return <div className="p-10 text-muted">Loading…</div>
+}
 
 /**
  * Gate for everything under /admin. Anonymous visitors see the admin
@@ -101,7 +118,6 @@ function AdminArea() {
       items={adminNav}
       roleLabel="Admin"
       notificationsTo="/admin/notifications"
-      bellCount={3}
       wide
     />
   )
@@ -113,6 +129,7 @@ export default function App() {
       <NotificationProvider>
       <CartProvider>
         <BrowserRouter>
+          <Suspense fallback={<PageLoading />}>
           <Routes>
             <Route path="/" element={<Landing />} />
             <Route path="/login" element={<PublicOnly><Login /></PublicOnly>} />
@@ -175,6 +192,7 @@ export default function App() {
             >
               <Route index element={<AdminHome />} />
               <Route path="orders" element={<AdminOrders />} />
+              <Route path="delivery-fees" element={<AdminDeliveryFees />} />
               <Route path="refunds" element={<AdminRefunds />} />
               <Route path="payouts" element={<AdminPayouts />} />
               <Route path="disputes" element={<AdminDisputes />} />
@@ -188,6 +206,7 @@ export default function App() {
 
             <Route path="*" element={<NotFound />} />
           </Routes>
+          </Suspense>
         </BrowserRouter>
       </CartProvider>
       </NotificationProvider>

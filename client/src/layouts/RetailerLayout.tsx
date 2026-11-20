@@ -1,4 +1,4 @@
-import { useEffect, useState, type FormEvent } from 'react'
+import { Suspense, useEffect, useState, type FormEvent } from 'react'
 import { Link, NavLink, Outlet, useNavigate, useSearchParams } from 'react-router-dom'
 import { Bell, Menu, ShoppingCart, Search, Home, Package, Truck, LifeBuoy, UserRound, X } from 'lucide-react'
 import { Brand } from '@/components/Brand'
@@ -34,10 +34,10 @@ function SearchField({ className = '' }: { className?: string }) {
         value={q}
         onChange={(e) => setQ(e.target.value)}
         placeholder="Search products, suppliers..."
-        className="w-full h-11 rounded-full bg-[#f7f8f8] border border-border pl-4 pr-11 text-base sm:text-sm"
+        className="w-full h-11 rounded-full bg-field border border-border ps-4 pe-11 text-base sm:text-sm"
         aria-label="Search products"
       />
-      <button type="submit" className="absolute right-4 top-1/2 -translate-y-1/2 text-muted" aria-label="Search">
+      <button type="submit" className="absolute end-4 top-1/2 -translate-y-1/2 text-muted" aria-label="Search">
         <Search size={16} />
       </button>
     </form>
@@ -71,7 +71,7 @@ export function RetailerLayout() {
           <div className="flex items-center gap-1">
             <button
               type="button"
-              className="md:hidden p-2 -ml-2 rounded-lg text-foreground hover:bg-canvas"
+              className="lg:hidden p-2 -ms-2 rounded-lg text-foreground hover:bg-canvas"
               aria-label="Open navigation menu"
               aria-expanded={drawerOpen}
               onClick={() => setDrawerOpen(true)}
@@ -82,14 +82,14 @@ export function RetailerLayout() {
           </div>
 
           {/* Desktop nav — centered in the header */}
-          <nav className="hidden md:flex items-center gap-1 absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2">
+          <nav className="hidden lg:flex items-center gap-1 absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2">
             {nav.map(({ to, label, Icon }) => (
               <NavLink
                 key={to}
                 to={to}
                 className={({ isActive }) =>
                   cn(
-                    'px-3 py-1.5 rounded-full text-sm font-medium inline-flex items-center gap-2 text-muted hover:text-foreground hover:bg-canvas transition-colors',
+                    'px-3 py-1.5 rounded-full text-sm font-medium whitespace-nowrap inline-flex items-center gap-2 text-muted hover:text-foreground hover:bg-canvas transition-colors',
                     isActive && 'bg-primary text-white hover:text-white hover:bg-primary',
                   )
                 }
@@ -105,7 +105,7 @@ export function RetailerLayout() {
               <span className="relative">
                 <Bell size={18} />
                 {unread > 0 && (
-                  <span className="absolute -top-1.5 -right-2 h-4 min-w-4 rounded-full bg-danger text-white text-[10px] flex items-center justify-center px-1 tabular-nums">{unread > 99 ? '99+' : unread}</span>
+                  <span className="absolute -top-1.5 -end-2 h-4 min-w-4 rounded-full bg-danger text-white text-[10px] flex items-center justify-center px-1 tabular-nums">{unread > 99 ? '99+' : unread}</span>
                 )}
               </span>
               <span className="text-[11px]">Notifications</span>
@@ -114,7 +114,7 @@ export function RetailerLayout() {
               <span className="relative">
                 <ShoppingCart size={18} />
                 {count > 0 && (
-                  <span className="absolute -top-1.5 -right-2 h-4 min-w-4 rounded-full bg-primary text-white text-[10px] flex items-center justify-center px-1 tabular-nums">{count}</span>
+                  <span className="absolute -top-1.5 -end-2 h-4 min-w-4 rounded-full bg-primary text-white text-[10px] flex items-center justify-center px-1 tabular-nums">{count}</span>
                 )}
               </span>
               <span className="text-[11px]">Cart</span>
@@ -130,14 +130,14 @@ export function RetailerLayout() {
 
       {/* Mobile navigation drawer */}
       {drawerOpen && (
-        <div className="fixed inset-0 z-50 md:hidden">
+        <div className="fixed inset-0 z-50 lg:hidden">
           <div className="absolute inset-0 bg-black/40" onClick={() => setDrawerOpen(false)} aria-hidden="true" />
-          <aside className="absolute left-0 top-0 bottom-0 w-72 max-w-[80vw] bg-white shadow-xl flex flex-col">
+          <aside className="absolute inset-y-0 start-0 w-72 max-w-[80vw] bg-white shadow-xl flex flex-col overflow-y-auto overscroll-contain">
             <div className="flex items-center justify-between p-4 border-b border-border">
               <Brand to="/retailer/products" />
               <button
                 type="button"
-                className="p-2 -mr-2 rounded-lg text-foreground hover:bg-canvas"
+                className="p-2 -me-2 rounded-lg text-foreground hover:bg-canvas"
                 aria-label="Close navigation menu"
                 onClick={() => setDrawerOpen(false)}
               >
@@ -153,7 +153,7 @@ export function RetailerLayout() {
                   className={({ isActive }) =>
                     cn(
                       'flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium text-muted hover:bg-canvas',
-                      isActive && 'bg-[#f2ccc1] text-foreground hover:bg-[#f2ccc1]',
+                      isActive && 'bg-brand-200 text-foreground hover:bg-brand-200',
                     )
                   }
                 >
@@ -165,12 +165,14 @@ export function RetailerLayout() {
           </aside>
         </div>
       )}
-      <main className="flex-1 min-h-dvh mx-auto w-full max-w-6xl px-4 py-6">
-        <Outlet />
+      <main className="flex-1 mx-auto w-full max-w-6xl px-4 py-6">
+        <Suspense fallback={<p className="text-muted">Loading…</p>}>
+          <Outlet />
+        </Suspense>
       </main>
-      <footer className="bg-[#f9fafb] border-t border-border mt-8">
-        <div className="mx-auto max-w-6xl px-4 py-10 grid md:grid-cols-4 gap-6 text-sm">
-          <div>
+      <footer className="bg-canvas border-t border-border mt-8">
+        <div className="mx-auto max-w-6xl px-4 py-10 grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-6 text-sm">
+          <div className="col-span-2 sm:col-span-3 lg:col-span-1">
             <Brand to="/retailer/products" />
             <p className="mt-3 text-muted text-[13px]">Stock up from verified suppliers. Track orders. Grow your shop.</p>
           </div>

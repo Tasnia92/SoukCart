@@ -1,4 +1,4 @@
-import { useEffect, useLayoutEffect, useMemo, useState } from 'react'
+import { Suspense, useEffect, useLayoutEffect, useMemo, useState } from 'react'
 import { Link, NavLink, Outlet, useLocation } from 'react-router-dom'
 import {
   Bell,
@@ -31,7 +31,6 @@ export function SidebarLayout({
   items: SideNavItem[]
   roleLabel: 'Supplier' | 'Admin'
   notificationsTo: string
-  bellCount?: number
   wide?: boolean
 }) {
   const { user, logout } = useAuth()
@@ -62,7 +61,7 @@ export function SidebarLayout({
     <button
       type="button"
       onClick={() => setCollapsed((c) => !c)}
-      className="hidden md:inline-flex p-2 rounded-lg border border-border text-muted hover:bg-canvas"
+      className="hidden lg:inline-flex p-2 rounded-lg border border-border text-muted hover:bg-canvas"
       aria-label="Toggle sidebar"
     >
       {collapsed
@@ -84,20 +83,20 @@ export function SidebarLayout({
       {mobileOpen && (
         <button
           type="button"
-          className="fixed inset-0 z-40 bg-black/40 md:hidden"
+          className="fixed inset-0 z-40 bg-black/40 lg:hidden"
           aria-label="Close menu"
           onClick={() => setMobileOpen(false)}
         />
       )}
       <aside className={cn('dash-sidebar', mobileOpen && 'is-open')}>
-        <div className={cn('px-2 mb-3', collapsed && 'md:px-0 md:flex md:justify-center')}>
-          {!collapsed ? <Brand /> : <Brand className="hidden md:inline-flex" />}
-          {collapsed && <Brand className="md:hidden" />}
+        <div className={cn('px-2 mb-3', collapsed && 'lg:px-0 lg:flex lg:justify-center')}>
+          {!collapsed ? <Brand /> : <Brand markOnly className="hidden lg:inline-flex" />}
+          {collapsed && <Brand className="lg:hidden" />}
           {!collapsed && (
             <p className="mt-3 text-[11px] font-semibold tracking-[0.14em] uppercase text-muted">{roleLabel}</p>
           )}
         </div>
-        <nav className="flex flex-col gap-0.5 min-h-0 flex-1 overflow-y-auto">
+        <nav className="flex flex-col gap-0.5 min-h-0 flex-1 overflow-y-auto overscroll-contain">
           {items.map(({ to, label, Icon, end, badge }) => (
             <NavLink
               key={to}
@@ -106,18 +105,18 @@ export function SidebarLayout({
               title={label}
               className={({ isActive }) =>
                 cn(
-                  'relative rounded-xl px-3 py-2.5 text-sm font-medium text-[#6b7280] hover:bg-nav-wash inline-flex items-center gap-2.5',
-                  collapsed && 'md:justify-center md:px-2',
-                  isActive && 'bg-nav-wash text-[#991B1B]',
+                  'relative rounded-xl px-3 py-2.5 text-sm font-medium text-muted hover:bg-nav-wash inline-flex items-center gap-2.5',
+                  collapsed && 'lg:justify-center lg:px-2',
+                  isActive && 'bg-nav-wash text-brand-700',
                 )
               }
             >
               {({ isActive }) => (
                 <>
-                  <Icon size={18} className={isActive ? 'text-[#991B1B]' : 'text-[#9ca3af]'} />
-                  {(!collapsed || mobileOpen) && <span className={cn(collapsed && 'md:hidden')}>{label}</span>}
+                  <Icon size={18} className={isActive ? 'text-brand-700' : 'text-faint'} />
+                  {(!collapsed || mobileOpen) && <span className={cn(collapsed && 'lg:hidden')}>{label}</span>}
                   {!!badge && badge > 0 && (
-                    <span className={cn('absolute rounded-full bg-danger text-white text-[10px] min-w-4 h-4 px-1 flex items-center justify-center', collapsed ? 'top-1 right-1' : 'right-2')}>
+                    <span className={cn('absolute rounded-full bg-danger text-white text-[10px] min-w-4 h-4 px-1 flex items-center justify-center', collapsed ? 'top-1 end-1' : 'end-2')}>
                       {badge}
                     </span>
                   )}
@@ -127,29 +126,29 @@ export function SidebarLayout({
           ))}
         </nav>
 
-        <div className={cn('mt-auto border-t border-border pt-3', collapsed && 'md:flex md:justify-center')}>
+        <div className={cn('mt-auto border-t border-border pt-3', collapsed && 'lg:flex lg:justify-center')}>
           <button
             type="button"
             onClick={logout}
             title="Log out"
             className={cn(
-              'w-full flex items-center gap-2.5 rounded-xl px-3 py-2.5 text-sm font-medium text-[#6b7280] hover:bg-nav-wash',
-              collapsed && 'md:justify-center md:px-2',
+              'w-full flex items-center gap-2.5 rounded-xl px-3 py-2.5 text-sm font-medium text-muted hover:bg-nav-wash',
+              collapsed && 'lg:justify-center lg:px-2',
             )}
           >
-            <LogOut size={18} className="text-[#9ca3af]" />
-            {(!collapsed || mobileOpen) && <span className={cn(collapsed && 'md:hidden')}>Log out</span>}
+            <LogOut size={18} className="text-faint" />
+            {(!collapsed || mobileOpen) && <span className={cn(collapsed && 'lg:hidden')}>Log out</span>}
           </button>
         </div>
       </aside>
 
-      <div className="min-w-0 flex flex-col min-h-screen">
-        <header className="h-14 bg-white border-b border-border flex items-center justify-between px-4 md:px-6">
+      <div className="min-w-0 flex flex-col min-h-dvh">
+        <header className="h-14 bg-white border-b border-border flex items-center justify-between px-4 lg:px-6">
           <div className="flex items-center gap-3 text-sm">
             <button
               type="button"
               onClick={() => setMobileOpen(true)}
-              className="p-2 rounded-lg border border-border text-muted hover:bg-canvas md:hidden"
+              className="p-2 rounded-lg border border-border text-muted hover:bg-canvas lg:hidden"
               aria-label="Open menu"
             >
               {side === 'right' ? <PanelRight size={16} /> : <PanelLeft size={16} />}
@@ -166,23 +165,25 @@ export function SidebarLayout({
             <Link to={notificationsTo} className="relative p-2 text-muted hover:text-foreground">
               <Bell size={18} />
               {bellCount > 0 && (
-                <span className="absolute -top-0.5 -right-0.5 h-4 min-w-4 rounded-full bg-danger text-white text-[10px] flex items-center justify-center px-1">
+                <span className="absolute -top-0.5 -end-0.5 h-4 min-w-4 rounded-full bg-danger text-white text-[10px] flex items-center justify-center px-1">
                   {bellCount}
                 </span>
               )}
             </Link>
           </div>
         </header>
-        <main className="p-6 flex-1">
+        <main className="p-4 sm:p-6 flex-1 min-w-0">
           {roleLabel === 'Supplier' && user?.verificationStatus && user.verificationStatus !== 'approved' && (
-            <div className="mb-4 rounded-xl border border-[#f2ccc1] bg-[#fff4ef] px-4 py-3 text-sm">
+            <div className="mb-4 rounded-xl border border-brand-200 bg-brand-50 px-4 py-3 text-sm">
               Supplier features are limited until admin approves your application.
               {' '}
               <Link to="/supplier/verification" className="font-medium text-primary">Submit or update verification →</Link>
               {user.verificationRejectReason ? <div className="text-danger mt-1">{user.verificationRejectReason}</div> : null}
             </div>
           )}
-          <Outlet />
+          <Suspense fallback={<p className="text-muted">Loading…</p>}>
+            <Outlet />
+          </Suspense>
         </main>
       </div>
     </div>

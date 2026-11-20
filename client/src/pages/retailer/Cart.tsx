@@ -17,7 +17,7 @@ export function RetailerCart() {
   useEffect(() => {
     if (user?.name && !fullName) setFullName(user.name)
     try {
-      const list = JSON.parse(localStorage.getItem(`nekcart_addresses_${user?.id}`) || '[]') as Array<{ line?: string; phone?: string }>
+      const list = JSON.parse(localStorage.getItem(`soukcart_addresses_${user?.id}`) || '[]') as Array<{ line?: string; phone?: string }>
       if (list[0]?.line && !address) setAddress(list[0].line)
       if (list[0]?.phone && !mobile) setMobile(list[0].phone)
     } catch { /* ignore */ }
@@ -102,7 +102,7 @@ export function RetailerCart() {
   }
 
   return (
-    <div className="grid lg:grid-cols-[1fr_340px] gap-6">
+    <div className="grid lg:grid-cols-[minmax(0,1fr)_340px] gap-6">
       <div>
         <p className="text-xs uppercase tracking-wide text-muted">Cart</p>
         <h2 className="text-2xl font-semibold mb-1">Review your order.</h2>
@@ -110,7 +110,7 @@ export function RetailerCart() {
         <div className="space-y-3">
           {items.map((i) => (
             <Card key={i.productId} className="p-4 flex gap-4 items-center">
-              <img src={i.imageUrl} className="h-16 w-16 rounded-lg object-cover bg-canvas" alt={i.name} />
+              <img src={i.imageUrl} className="img-outline h-16 w-16 rounded-lg object-cover bg-canvas" alt={i.name} />
               <div className="flex-1 min-w-0">
                 <div className="font-medium truncate">{i.name}</div>
                 <div className="text-sm text-muted tabular-nums">{money(i.price)} / {i.unit}</div>
@@ -174,7 +174,7 @@ export function RetailerCart() {
               onChange={(e) => setAddress(e.target.value)}
               placeholder="Shop name, road, area, city"
               rows={3}
-              className="mt-1.5 w-full min-h-[80px] rounded-lg border border-border bg-[#f7f8f8] px-3 py-2 text-sm outline-none focus:border-primary"
+              className="mt-1.5 w-full min-h-[80px] rounded-lg border border-border bg-field px-3 py-2 text-sm outline-none focus:border-primary"
             />
           </div>
         </div>

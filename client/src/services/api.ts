@@ -1,5 +1,5 @@
 const API = '/api'
-const TOKEN_KEY = 'nekcart_token'
+const TOKEN_KEY = 'soukcart_token'
 
 export function getToken() {
   return localStorage.getItem(TOKEN_KEY) || sessionStorage.getItem(TOKEN_KEY)

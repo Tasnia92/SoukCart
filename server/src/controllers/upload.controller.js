@@ -11,7 +11,7 @@ cloudinary.v2.config({
 const storage = new CloudinaryStorage({
   cloudinary: cloudinary.v2,
   params: (_req, file) => ({
-    folder: 'nekcart',
+    folder: 'soukcart',
     allowed_formats: ['png', 'jpg', 'jpeg', 'webp', 'gif'],
     public_id: `${Date.now()}-${String(file.originalname || 'file')
       .replace(/[^\w.\-]+/g, '-')

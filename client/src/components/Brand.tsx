@@ -27,7 +27,7 @@ export function Brand({
         aria-hidden={!markOnly}
       />
       {!markOnly && (
-        <span className={cn('font-bold tracking-tight lowercase text-lg', dark ? 'text-foreground' : 'text-white')}>
+        <span className={cn('font-display font-bold tracking-tight lowercase text-lg', dark ? 'text-foreground' : 'text-white')}>
           soukcart
         </span>
       )}

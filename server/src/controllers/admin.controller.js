@@ -12,7 +12,7 @@ import {
   markPayoutAsPaid,
 } from '../services/payout.service.js';
 import { completeManualRefund } from '../services/refund.service.js';
-import { DEFAULT_COMMISSION_RATE } from '../services/calculations.js';
+import { DEFAULT_COMMISSION_RATE, DELIVERY_FEE } from '../services/calculations.js';
 import { asyncHandler } from '../utils/asyncHandler.js';
 import { notifyUser } from '../services/notify.js';
 
@@ -70,25 +70,13 @@ export const dashboard = asyncHandler(async (_req, res) => {
   ]);
   const tz = Intl.DateTimeFormat().resolvedOptions().timeZone || '+06:00';
   const deliveredDateExpr = { $ifNull: ['$deliveredAt', '$createdAt'] };
-  // Order value recognition date:
-  // - Fully prepaid online orders count from the moment delivery is initiated.
-  // - COD orders count once the order is delivered.
-  const orderValueDateExpr = {
-    $cond: [
-      { $eq: ['$paymentMethod', 'online'] },
-      { $ifNull: ['$deliveryInitiatedAt', { $ifNull: ['$deliveredAt', '$createdAt'] }] },
-      { $ifNull: ['$deliveredAt', '$createdAt'] },
-    ],
-  };
+  // Order value counts the moment a payment is received (delivery fee for COD,
+  // fee + goods for online) and leaves out cancelled/refunded orders.
+  // Merchandise (subtotal) and delivery fees are reported separately.
+  const orderValueDateExpr = { $ifNull: ['$deliveryFeePaidAt', '$createdAt'] };
   const orderValueMatch = {
-    $or: [
-      { paymentMethod: { $ne: 'online' }, status: 'delivered' },
-      {
-        paymentMethod: 'online',
-        $or: [{ paymentStatus: 'paid' }, { productAmountPaid: true }],
-        status: { $in: ['delivery_initiated', 'shipped', 'out_for_delivery', 'delivered'] },
-      },
-    ],
+    deliveryFeePaid: true,
+    status: { $nin: ['cancelled', 'supplier_cancelled', 'refunded'] },
   };
   const revenue = await Order.aggregate([
     { $match: { status: 'delivered' } },
@@ -151,11 +139,12 @@ export const dashboard = asyncHandler(async (_req, res) => {
       $group: {
         _id: { $dateToString: { format: '%Y-%m', date: orderValueDateExpr, timezone: tz } },
         subtotal: { $sum: '$subtotal' },
+        deliveryFees: { $sum: { $ifNull: ['$deliveryFee', DELIVERY_FEE] } },
         orders: { $sum: 1 },
       },
     },
   ]);
-  const emptyOrderValue = { subtotal: 0, orders: 0 };
+  const emptyOrderValue = { subtotal: 0, deliveryFees: 0, orders: 0 };
   const orderValue = {
     thisMonth: orderValueAgg.find((m) => m._id === monthKey(now)) || emptyOrderValue,
     prevMonth: orderValueAgg.find((m) => m._id === monthKey(prevMonthStart)) || emptyOrderValue,

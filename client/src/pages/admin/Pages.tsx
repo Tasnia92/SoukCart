@@ -28,13 +28,13 @@ import { money, cn, statusLabel } from '@/lib/utils'
 import { usePoll } from '@/lib/poll'
 
 function statusTone(status: string) {
-  if (String(status).includes('cancel')) return 'bg-[#f6b2be] text-[#e84461]'
-  if (status === 'delivered') return 'bg-[#d1fae5] text-[#047857]'
-  if (status === 'out_for_delivery') return 'bg-[#dbeafe] text-[#1d4ed8]'
-  if (status === 'placed' || status === 'pending') return 'bg-[#fef3c7] text-[#b45309]'
-  if (status === 'approved') return 'bg-[#d1fae5] text-[#047857]'
-  if (status === 'resolved') return 'bg-[#d1fae5] text-[#047857]'
-  return 'bg-[#f3f4f6]'
+  if (String(status).includes('cancel')) return 'bg-danger-soft text-danger-ink'
+  if (status === 'delivered') return 'bg-success-soft text-success'
+  if (status === 'out_for_delivery') return 'bg-info-soft text-info'
+  if (status === 'placed' || status === 'pending') return 'bg-warning-soft text-warning'
+  if (status === 'approved') return 'bg-success-soft text-success'
+  if (status === 'resolved') return 'bg-success-soft text-success'
+  return 'bg-subtle'
 }
 
 function pctDelta(cur: number, prev: number): number | null {
@@ -49,7 +49,7 @@ function dayLabel(iso: string) {
 export function AdminHome() {
   const [stats, setStats] = useState<any>(null)
   const load = () => api.get<{ stats: any }>('/admin/dashboard').then((d) => setStats(d.stats))
-  useEffect(() => { void load() }, [])
+  usePoll(() => void load(), [])
   if (!stats) return <p className="text-muted">Loading…</p>
   const trend = stats.trend || []
   const monthly = stats.monthly
@@ -65,7 +65,8 @@ export function AdminHome() {
       note: `${money(orderValue?.prevMonth?.subtotal)} previous month`,
       value: money(orderValue?.thisMonth?.subtotal),
       delta: pctDelta(orderValue?.thisMonth?.subtotal, orderValue?.prevMonth?.subtotal),
-      to: '/admin/orders',
+      foot: `Products only · ${money(orderValue?.thisMonth?.deliveryFees)} delivery fees separate`,
+      to: '/admin/delivery-fees',
     },
     {
       Icon: Wallet,
@@ -145,7 +146,7 @@ export function AdminHome() {
           <div className="absolute inset-0 flex items-end gap-1.5 sm:gap-2">
             {trend.map((day: any) => (
               <div key={day.date} className="relative flex-1 h-full flex items-end group">
-                <span className="absolute left-1/2 -translate-x-1/2 -translate-y-full top-0 opacity-0 group-hover:opacity-100 transition bg-foreground text-white text-[10px] rounded-md px-2 py-1 whitespace-nowrap pointer-events-none z-10">
+                <span className="absolute left-1/2 -translate-x-1/2 -translate-y-full top-0 opacity-0 group-hover:opacity-100 transition-opacity bg-foreground text-white text-[10px] rounded-md px-2 py-1 whitespace-nowrap pointer-events-none z-10">
                   {day.count} orders · {money(day.value)}
                 </span>
                 <div
@@ -221,7 +222,7 @@ export function AdminOrders() {
   }, [orders, q, sort, tab])
   return (
     <div>
-      <div className="flex items-center justify-between mb-4">
+      <div className="flex flex-wrap items-center justify-between gap-3 mb-4">
         <h2 className="text-2xl font-semibold">Orders</h2>
         <Button variant="secondary" onClick={() => void load()}>Refresh</Button>
       </div>
@@ -239,7 +240,7 @@ export function AdminOrders() {
         <select
           value={sort}
           onChange={(e) => setSort(e.target.value)}
-          className="h-10 rounded-[8px] border border-border bg-[#f7f8f8] px-3 text-sm outline-none focus:ring-2 focus:ring-primary/30"
+          className="h-10 rounded-[8px] border border-border bg-field px-3 text-sm outline-none focus:ring-2 focus:ring-primary/30"
           aria-label="Sort orders"
         >
           <option value="newest">Newest first</option>
@@ -250,13 +251,13 @@ export function AdminOrders() {
       </div>
       <div className="flex flex-wrap gap-2 mb-4">
         {tabs.map((t) => (
-          <button key={t} onClick={() => setTab(t)} className={cn('rounded-full px-3 py-1.5 text-sm', tab === t ? 'bg-[#242526] text-white' : 'bg-[#f3f4f6]')}>{t}</button>
+          <button key={t} onClick={() => setTab(t)} className={cn('rounded-full px-3 py-1.5 text-sm', tab === t ? 'bg-ink text-white' : 'bg-subtle')}>{t}</button>
         ))}
       </div>
       <Card className="overflow-hidden">
-        <table className="w-full text-sm">
+        <div className="overflow-x-auto"><table className="w-full text-sm">
           <thead className="bg-canvas text-muted text-left"><tr>
-            <th className="px-3 py-3">Order</th><th className="px-3 py-3">Retailer</th><th className="px-3 py-3">Supplier</th><th className="px-3 py-3">Products</th><th className="px-3 py-3">Total</th><th className="px-3 py-3">Status</th><th className="px-3 py-3"></th>
+            <th className="px-3 py-3">Order</th><th className="px-3 py-3">Retailer</th><th className="px-3 py-3">Supplier</th><th className="px-3 py-3">Products</th><th className="px-3 py-3">Products total</th><th className="px-3 py-3">Delivery fee</th><th className="px-3 py-3">Status</th><th className="px-3 py-3"></th>
           </tr></thead>
           <tbody>
             {visible.map((o) => {
@@ -281,6 +282,10 @@ export function AdminOrders() {
                   )}
                 </td>
                 <td className="px-3 py-3 tabular-nums">{money(o.subtotal)}</td>
+                <td className="px-3 py-3">
+                  <div className="tabular-nums">{money(o.deliveryFee ?? 120)}</div>
+                  <Badge className={feeTone(feeState(o))}>{feeLabel(feeState(o))}</Badge>
+                </td>
                 <td className="px-3 py-3"><Badge className={statusTone(o.status)}>{statusLabel(o.status)}</Badge></td>
                 <td className="px-3 py-3 text-right">
                   <div className="flex gap-1 justify-end flex-wrap">
@@ -296,8 +301,107 @@ export function AdminOrders() {
               </tr>
             )})}
           </tbody>
-        </table>
+        </table></div>
         {!visible.length && <p className="p-8 text-center text-muted">No matching orders</p>}
+      </Card>
+    </div>
+  )
+}
+
+type FeeState = 'paid' | 'unpaid' | 'refunded' | 'cancelled'
+
+/** Delivery fee state of one order, as admin sees it. */
+function feeState(o: any): FeeState {
+  const cancelled = String(o.status).includes('cancel') || o.status === 'refunded'
+  if (o.deliveryFeePaid && cancelled && o.manualRefundStatus !== 'none') return 'refunded'
+  if (o.deliveryFeePaid) return 'paid'
+  return cancelled ? 'cancelled' : 'unpaid'
+}
+
+function feeLabel(s: FeeState) {
+  if (s === 'paid') return 'Paid'
+  if (s === 'refunded') return 'Refunded'
+  if (s === 'cancelled') return 'Not paid · cancelled'
+  return 'Not paid'
+}
+
+function feeTone(s: FeeState) {
+  if (s === 'paid') return 'bg-success-soft text-success'
+  if (s === 'unpaid') return 'bg-warning-soft text-warning'
+  if (s === 'refunded') return 'bg-info-soft text-info'
+  return 'bg-subtle'
+}
+
+export function AdminDeliveryFees() {
+  const [orders, setOrders] = useState<any[]>([])
+  const [tab, setTab] = useState<'All' | 'Paid' | 'Not paid' | 'Refunded'>('All')
+  const [q, setQ] = useState('')
+  async function load() { setOrders((await api.get<{ orders: any[] }>('/orders')).orders) }
+  usePoll(() => void load(), [])
+
+  const fee = (o: any) => Number(o.deliveryFee ?? 120)
+  const sum = (state: FeeState) => orders.filter((o) => feeState(o) === state).reduce((s, o) => s + fee(o), 0)
+  const count = (state: FeeState) => orders.filter((o) => feeState(o) === state).length
+
+  const visible = useMemo(() => {
+    const term = q.trim().toLowerCase()
+    return orders.filter((o) => {
+      const st = feeState(o)
+      if (tab === 'Paid' && st !== 'paid') return false
+      if (tab === 'Not paid' && st !== 'unpaid') return false
+      if (tab === 'Refunded' && st !== 'refunded') return false
+      if (!term) return true
+      return [o.orderNumber, o.retailer?.name, o.retailer?.businessName, o.retailer?.email, o.recipientMobile]
+        .filter(Boolean).join(' ').toLowerCase().includes(term)
+    })
+  }, [orders, q, tab])
+
+  return (
+    <div>
+      <div className="flex flex-wrap items-center justify-between gap-3 mb-4">
+        <h2 className="text-2xl font-semibold">Delivery fees</h2>
+        <Button variant="secondary" onClick={() => void load()}>Refresh</Button>
+      </div>
+      <p className="text-sm text-muted mb-4">Every order pays its delivery fee through SSLCommerz before suppliers can confirm it. This page shows which retailers have paid.</p>
+      <div className="grid sm:grid-cols-3 gap-4 mb-6">
+        <StatCard Icon={CheckCircle2} title="Collected" value={money(sum('paid'))} foot={`${count('paid')} orders paid`} />
+        <StatCard Icon={Clock} title="Not paid yet" value={money(sum('unpaid'))} foot={`${count('unpaid')} orders awaiting payment`} />
+        <StatCard Icon={RefreshCw} title="Refunded" value={money(sum('refunded'))} foot={`${count('refunded')} cancelled after payment`} />
+      </div>
+      <div className="flex flex-wrap items-center gap-2 mb-4">
+        <div className="relative w-full sm:max-w-xs">
+          <Search size={16} className="absolute left-3 top-1/2 -translate-y-1/2 text-muted" />
+          <Input value={q} onChange={(e) => setQ(e.target.value)} placeholder="Search order, retailer, mobile…" className="pl-9" aria-label="Search delivery fees" />
+        </div>
+        {(['All', 'Paid', 'Not paid', 'Refunded'] as const).map((t) => (
+          <button key={t} onClick={() => setTab(t)} className={cn('rounded-full px-3 py-1.5 text-sm', tab === t ? 'bg-ink text-white' : 'bg-subtle')}>{t}</button>
+        ))}
+      </div>
+      <Card className="overflow-hidden">
+        <div className="overflow-x-auto"><table className="w-full text-sm">
+          <thead className="bg-canvas text-muted text-left"><tr>
+            <th className="px-3 py-3">Order</th><th className="px-3 py-3">Retailer</th><th className="px-3 py-3">Type</th><th className="px-3 py-3">Delivery fee</th><th className="px-3 py-3">Paid on</th><th className="px-3 py-3">Fee status</th>
+          </tr></thead>
+          <tbody>
+            {visible.map((o) => {
+              const st = feeState(o)
+              return (
+                <tr key={o._id} className="border-t border-border">
+                  <td className="px-3 py-3 font-medium">{o.orderNumber}</td>
+                  <td className="px-3 py-3">
+                    <div>{o.retailer?.businessName || o.retailer?.name || 'Unknown retailer'}</div>
+                    <div className="text-xs text-muted">{o.recipientMobile || o.retailer?.email}</div>
+                  </td>
+                  <td className="px-3 py-3">{o.paymentMethod === 'online' ? 'Online' : 'COD'}</td>
+                  <td className="px-3 py-3 tabular-nums">{money(fee(o))}</td>
+                  <td className="px-3 py-3 text-muted">{o.deliveryFeePaid && o.deliveryFeePaidAt ? new Date(o.deliveryFeePaidAt).toLocaleDateString() : '—'}</td>
+                  <td className="px-3 py-3"><Badge className={feeTone(st)}>{feeLabel(st)}</Badge></td>
+                </tr>
+              )
+            })}
+          </tbody>
+        </table></div>
+        {!visible.length && <EmptyState title="No matching orders" body="Orders appear here as soon as a retailer checks out." />}
       </Card>
     </div>
   )
@@ -343,18 +447,18 @@ export function AdminRefunds() {
   })
   return (
     <div>
-      <div className="flex items-center justify-between mb-4">
+      <div className="flex flex-wrap items-center justify-between gap-3 mb-4">
         <h2 className="text-2xl font-semibold">Refund</h2>
         <Button variant="secondary" onClick={() => void load()}>Refresh</Button>
       </div>
       <p className="text-sm text-muted mb-3">Refunds are sent manually outside the gateway. Mark complete after you transfer the money.</p>
       <div className="flex flex-wrap gap-2 mb-4">
         {['All', 'Pending', 'Completed'].map((t) => (
-          <button key={t} onClick={() => setTab(t)} className={cn('rounded-full px-3 py-1.5 text-sm', t === tab ? 'bg-[#242526] text-white' : 'bg-[#f3f4f6]')}>{t}</button>
+          <button key={t} onClick={() => setTab(t)} className={cn('rounded-full px-3 py-1.5 text-sm', t === tab ? 'bg-ink text-white' : 'bg-subtle')}>{t}</button>
         ))}
       </div>
       <Card className="overflow-hidden">
-        <table className="w-full text-sm">
+        <div className="overflow-x-auto"><table className="w-full text-sm">
           <thead className="bg-canvas text-muted text-left"><tr>
             <th className="px-3 py-3">Order</th><th className="px-3 py-3">Retailer</th><th className="px-3 py-3">Amount</th><th className="px-3 py-3">Status</th><th className="px-3 py-3"></th>
           </tr></thead>
@@ -371,7 +475,7 @@ export function AdminRefunds() {
               </tr>
             ))}
           </tbody>
-        </table>
+        </table></div>
         {!visible.length && <EmptyState title="No matching refunds" body="Cancelled prepaid orders appear here for manual payout." />}
       </Card>
 
@@ -395,7 +499,7 @@ export function AdminRefunds() {
               </button>
             </div>
 
-            <div className="mt-4 rounded-xl bg-[#f7f8f8] border border-border p-3 text-sm">
+            <div className="mt-4 rounded-xl bg-field border border-border p-3 text-sm">
               <div className="flex justify-between">
                 <span className="text-muted">Refund amount</span>
                 <span className="font-semibold tabular-nums">{money(selected.refundAmount)}</span>
@@ -415,7 +519,7 @@ export function AdminRefunds() {
               placeholder="Add a note (optional)"
               rows={3}
               autoFocus
-              className="w-full rounded-lg border border-border bg-[#f7f8f8] px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-primary/30 disabled:opacity-60"
+              className="w-full rounded-lg border border-border bg-field px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-primary/30 disabled:opacity-60"
             />
 
             {error ? <p className="text-sm text-danger mt-3">{error}</p> : null}
@@ -518,7 +622,7 @@ export function AdminPayouts() {
       </Card>
       <Card className="overflow-hidden mb-6">
         <div className="px-4 py-3 font-medium border-b border-border">Supplier balances (pending payouts accrued at payment / COD collect)</div>
-        <table className="w-full text-sm">
+        <div className="overflow-x-auto"><table className="w-full text-sm">
           <thead className="bg-canvas text-muted text-left"><tr><th className="px-4 py-3">Supplier</th><th className="px-4 py-3">Earned</th><th className="px-4 py-3">Paid</th><th className="px-4 py-3">Pending batch</th><th className="px-4 py-3">Available</th><th className="px-4 py-3"></th></tr></thead>
           <tbody>
             {data.balances.map((b: any) => (
@@ -534,11 +638,11 @@ export function AdminPayouts() {
               </tr>
             ))}
           </tbody>
-        </table>
+        </table></div>
       </Card>
       <Card className="overflow-hidden">
         <div className="px-4 py-3 font-medium border-b border-border">Payout ledger</div>
-        <table className="w-full text-sm">
+        <div className="overflow-x-auto"><table className="w-full text-sm">
           <thead className="bg-canvas text-muted text-left"><tr><th className="px-4 py-3">Supplier</th><th className="px-4 py-3">Net to supplier</th><th className="px-4 py-3">Commission</th><th className="px-4 py-3">Orders</th><th className="px-4 py-3">Status</th><th className="px-4 py-3">Date</th><th className="px-4 py-3"></th></tr></thead>
           <tbody>
             {data.payouts.map((p: any) => (
@@ -558,7 +662,7 @@ export function AdminPayouts() {
             ))}
             {!data.payouts.length && <tr><td colSpan={7} className="p-8 text-center text-muted">No payouts yet</td></tr>}
           </tbody>
-        </table>
+        </table></div>
       </Card>
     </div>
   )
@@ -645,7 +749,7 @@ export function AdminDisputes() {
       <Input className="max-w-sm mb-4" placeholder="Search complaints" value={q} onChange={(e) => setQ(e.target.value)} />
       {error ? <p className="text-sm text-danger mb-2">{error}</p> : null}
       <Card className="overflow-hidden">
-        <table className="w-full text-sm">
+        <div className="overflow-x-auto"><table className="w-full text-sm">
           <thead className="bg-canvas text-muted text-left"><tr><th className="px-4 py-3">Subject</th><th className="px-4 py-3">Related</th><th className="px-4 py-3">Reporter</th><th className="px-4 py-3">Status</th><th className="px-4 py-3">Actions</th></tr></thead>
           <tbody>
             {filtered.map((c) => (
@@ -671,14 +775,14 @@ export function AdminDisputes() {
               </tr>
             ))}
           </tbody>
-        </table>
+        </table></div>
         {!filtered.length && <EmptyState title="No disputes" />}
       </Card>
 
       {viewing ? (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
           <div className="absolute inset-0 bg-black/40" onClick={() => { if (!busy) setViewing(null) }} aria-hidden />
-          <div className="relative w-full max-w-lg max-h-[85vh] overflow-y-auto rounded-2xl bg-white shadow-xl p-6" role="dialog" aria-modal="true" aria-labelledby="dispute-modal-title">
+          <div className="relative w-full max-w-lg max-h-[85vh] overflow-y-auto overscroll-contain rounded-2xl bg-white shadow-xl p-6" role="dialog" aria-modal="true" aria-labelledby="dispute-modal-title">
             <div className="flex items-start justify-between gap-4">
               <div>
                 <h3 id="dispute-modal-title" className="text-lg font-semibold">{viewing.subject}</h3>
@@ -694,9 +798,9 @@ export function AdminDisputes() {
             </div>
             <div className="mt-3"><Badge className={statusTone(viewing.status)}>{viewing.status}{viewing.resolvedAt ? ` · resolved ${new Date(viewing.resolvedAt).toLocaleDateString()}` : ''}</Badge></div>
 
-            <div className="mt-4 rounded-xl bg-[#f7f8f8] border border-border p-3 space-y-3">
+            <div className="mt-4 rounded-xl bg-field border border-border p-3 space-y-3">
               {thread.map((m, i) => (
-                <div key={i} className={cn('rounded-lg p-3', m.from === 'admin' ? 'ml-8 bg-[#fff4ef] border border-[#f2ccc1]' : 'bg-white border border-border')}>
+                <div key={i} className={cn('rounded-lg p-3', m.from === 'admin' ? 'ml-8 bg-brand-50 border border-brand-200' : 'bg-white border border-border')}>
                   <div className="flex items-center justify-between gap-2 text-xs">
                     <span className="font-semibold">{m.from === 'admin' ? 'SoukCart support' : 'Retailer'}</span>
                     <span className="text-muted">{m.at ? new Date(m.at).toLocaleString() : ''}</span>
@@ -715,7 +819,7 @@ export function AdminDisputes() {
                 disabled={busy}
                 rows={3}
                 placeholder={`Reply to ${viewing.reporter?.name || 'the retailer'}…`}
-                className="w-full rounded-lg border border-border bg-[#f7f8f8] px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-primary/30 disabled:opacity-60"
+                className="w-full rounded-lg border border-border bg-field px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-primary/30 disabled:opacity-60"
               />
             </div>
 
@@ -789,14 +893,14 @@ export function AdminProducts() {
       </div>
       <div className="flex flex-wrap gap-2 mb-4">
         <Input className="max-w-xs" placeholder="Search products or suppliers" value={q} onChange={(e) => setQ(e.target.value)} />
-        <select className="h-10 rounded-[8px] border border-border bg-[#f7f8f8] px-3 text-sm" value={sort} onChange={(e) => setSort(e.target.value)}>
+        <select className="h-10 rounded-[8px] border border-border bg-field px-3 text-sm" value={sort} onChange={(e) => setSort(e.target.value)}>
           <option value="newest">Newest</option>
           <option value="name">Name A–Z</option>
           <option value="status">Status</option>
         </select>
       </div>
       <Card className="overflow-hidden">
-        <table className="w-full text-sm">
+        <div className="overflow-x-auto"><table className="w-full text-sm">
           <thead className="bg-canvas text-muted text-left"><tr><th className="px-3 py-3">Product</th><th className="px-3 py-3">Supplier</th><th className="px-3 py-3">Email</th><th className="px-3 py-3">Price</th><th className="px-3 py-3">Stock</th><th className="px-3 py-3">Status</th><th className="px-3 py-3"></th></tr></thead>
           <tbody>
             {visible.map((p) => (
@@ -853,7 +957,7 @@ export function AdminProducts() {
               </tr>
             ))}
           </tbody>
-        </table>
+        </table></div>
       </Card>
       {preview ? (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-4" onClick={() => setPreview(null)}>
@@ -916,7 +1020,7 @@ export function AdminCategories() {
         <StatCard Icon={CheckCircle2} title="Active" value={cats.filter((c)=>c.isActive !== false).length} foot="Visible in catalog" />
       </div>
       <Card className="overflow-hidden">
-        <table className="w-full text-sm">
+        <div className="overflow-x-auto"><table className="w-full text-sm">
           <thead className="bg-canvas text-muted text-left"><tr><th className="px-4 py-3">Name</th><th className="px-4 py-3">Slug</th><th className="px-4 py-3">Status</th><th className="px-4 py-3">Actions</th></tr></thead>
           <tbody>
             {cats.map((c) => (
@@ -940,7 +1044,7 @@ export function AdminCategories() {
               </tr>
             ))}
           </tbody>
-        </table>
+        </table></div>
       </Card>
     </div>
   )
@@ -982,7 +1086,7 @@ export function AdminVerifications() {
         />
       </div>
       <Card className="overflow-hidden">
-        <table className="w-full text-sm">
+        <div className="overflow-x-auto"><table className="w-full text-sm">
           <thead className="bg-canvas text-muted text-left">
             <tr>
               <th className="px-4 py-3">Supplier</th>
@@ -1001,7 +1105,7 @@ export function AdminVerifications() {
               >
                 <td className="px-4 py-3">
                   <div className="flex items-center gap-2">
-                    <span className="h-8 w-8 rounded-full bg-[#374151] text-white text-xs flex items-center justify-center">{(u.businessName || u.name)?.charAt(0)}</span>
+                    <span className="h-8 w-8 rounded-full bg-ink-soft text-white text-xs flex items-center justify-center">{(u.businessName || u.name)?.charAt(0)}</span>
                     <div>
                       <div className="font-medium">{u.businessName || u.name}</div>
                       {u.businessName && u.name && u.businessName !== u.name ? <div className="text-xs text-muted">{u.name}</div> : null}
@@ -1020,7 +1124,7 @@ export function AdminVerifications() {
               </tr>
             )}
           </tbody>
-        </table>
+        </table></div>
       </Card>
     </div>
   )
@@ -1033,11 +1137,16 @@ export function AdminVerificationDetail() {
   const [reason, setReason] = useState('')
   const [preview, setPreview] = useState<string | null>(null)
   useEffect(() => {
+    let ignore = false
     void api.get<{ users: any[] }>('/admin/verifications').then((d) => {
+      if (ignore) return
       const u = d.users.find((x) => x._id === id)
       setUser(u)
       setReason(u?.verificationRejectReason || '')
     })
+    return () => {
+      ignore = true
+    }
   }, [id])
   if (!user) return <p className="text-muted">Loading…</p>
   async function decide(status: string) {
@@ -1054,7 +1163,7 @@ export function AdminVerificationDetail() {
       <div className="grid md:grid-cols-2 gap-4 mt-4">
         <Card className="p-4"><div className="font-semibold mb-2">NID</div><button
           type="button"
-          className="h-48 rounded-xl bg-[#fff4ef] border border-[#f2ccc1] overflow-hidden flex items-center justify-center text-sm text-muted w-full cursor-zoom-in"
+          className="h-48 rounded-xl bg-brand-50 border border-brand-200 overflow-hidden flex items-center justify-center text-sm text-muted w-full cursor-zoom-in"
           onClick={() => nidSrc && setPreview(nidSrc)}
           title={nidSrc ? 'View full size' : 'No document'}
         >
@@ -1074,7 +1183,7 @@ export function AdminVerificationDetail() {
             <>
               <div>
                 <Label>Rejection reason</Label>
-                <textarea className="w-full min-h-20 rounded-[8px] border border-border bg-[#f7f8f8] p-3 text-sm" value={reason} onChange={(e) => setReason(e.target.value)} placeholder="Sent to the supplier if you reject" />
+                <textarea className="w-full min-h-20 rounded-[8px] border border-border bg-field p-3 text-sm" value={reason} onChange={(e) => setReason(e.target.value)} placeholder="Sent to the supplier if you reject" />
               </div>
               <div className="flex gap-2">
                 <Button onClick={() => decide('approved')}>Approve</Button>
@@ -1128,7 +1237,7 @@ export function AdminUsers() {
   return (
     <div>
       <p className="text-xs uppercase tracking-wide text-muted">Users</p>
-      <div className="flex items-center justify-between mb-4">
+      <div className="flex flex-wrap items-center justify-between gap-3 mb-4">
         <h2 className="text-2xl font-semibold">Accounts.</h2>
         <Button onClick={() => setOpen((v) => !v)}>+ New user</Button>
       </div>
@@ -1140,7 +1249,7 @@ export function AdminUsers() {
             <div><Label htmlFor="new-user-password">Password</Label><Input id="new-user-password" type="password" required minLength={6} value={form.password} onChange={(e)=>setForm({...form,password:e.target.value})} /></div>
             <div>
               <Label htmlFor="new-user-role">Role</Label>
-              <select id="new-user-role" className="w-full h-10 rounded-[8px] border border-border bg-[#f7f8f8] px-3 text-sm" value={form.role} onChange={(e)=>setForm({...form,role:e.target.value})}>
+              <select id="new-user-role" className="w-full h-10 rounded-[8px] border border-border bg-field px-3 text-sm" value={form.role} onChange={(e)=>setForm({...form,role:e.target.value})}>
                 <option value="retailer">Retailer</option>
                 <option value="supplier">Supplier</option>
                 <option value="admin">Admin</option>
@@ -1155,14 +1264,14 @@ export function AdminUsers() {
         </Card>
       )}
       <Card className="overflow-hidden">
-        <table className="w-full text-sm">
+        <div className="overflow-x-auto"><table className="w-full text-sm">
           <thead className="bg-canvas text-muted text-left"><tr><th className="px-4 py-3">User</th><th className="px-4 py-3">Email</th><th className="px-4 py-3">Type</th><th className="px-4 py-3">Verified</th><th className="px-4 py-3">ID</th><th className="px-4 py-3"></th></tr></thead>
           <tbody>
             {users.map((u) => (
               <tr key={u._id} className="border-t border-border">
                 <td className="px-4 py-3">
                   <div className="flex items-center gap-2">
-                    <span className="h-8 w-8 rounded-full bg-[#374151] text-white text-xs flex items-center justify-center">{u.name?.charAt(0)}</span>
+                    <span className="h-8 w-8 rounded-full bg-ink-soft text-white text-xs flex items-center justify-center">{u.name?.charAt(0)}</span>
                     <span className="font-medium">{u.name}{u.isActive === false ? ' (inactive)' : ''}</span>
                   </div>
                 </td>
@@ -1182,7 +1291,7 @@ export function AdminUsers() {
               </tr>
             ))}
           </tbody>
-        </table>
+        </table></div>
       </Card>
     </div>
   )

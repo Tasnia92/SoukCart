@@ -14,17 +14,35 @@ export function RetailerProductDetail() {
   const { add } = useCart()
 
   useEffect(() => {
+    let ignore = false
     setError('')
+    setProduct(null)
     setRelated([])
-    void api.get<{ product: any }>(`/products/${id}`).then(async (d) => {
-      setProduct(d.product)
-      setQty(d.product.moq || 1)
-      const catId = String(d.product.category?._id || d.product.category || '')
-      const catalog = (await api.get<{ products: any[] }>('/products?scope=catalog')).products || []
-      const others = catalog.filter((p) => p._id !== d.product._id)
-      const same = others.filter((p) => String(p.category?._id || p.category || '') === catId)
-      setRelated((same.length ? same : others).slice(0, 4))
-    }).catch((e) => setError(e instanceof Error ? e.message : 'Not found'))
+    // Start both requests together; the catalog doesn't depend on the product.
+    const productP = api.get<{ product: any }>(`/products/${id}`)
+    const catalogP = api
+      .get<{ products: any[] }>('/products?scope=catalog')
+      .then((d) => d.products || [])
+      .catch(() => [] as any[])
+    void (async () => {
+      try {
+        const { product: p } = await productP
+        if (ignore) return
+        setProduct(p)
+        setQty(p.moq || 1)
+        const catId = String(p.category?._id || p.category || '')
+        const catalog = await catalogP
+        if (ignore) return
+        const others = catalog.filter((x) => x._id !== p._id)
+        const same = others.filter((x) => String(x.category?._id || x.category || '') === catId)
+        setRelated((same.length ? same : others).slice(0, 4))
+      } catch (e) {
+        if (!ignore) setError(e instanceof Error ? e.message : 'Not found')
+      }
+    })()
+    return () => {
+      ignore = true
+    }
   }, [id])
 
   if (error) {
@@ -41,7 +59,7 @@ export function RetailerProductDetail() {
     <div>
       <Link to="/retailer/products" className="text-primary text-sm font-medium">Back to storefront</Link>
       <div className="mt-4 grid md:grid-cols-2 gap-8">
-        <img src={product.imageUrl} alt={product.name} className="rounded-2xl border border-border w-full aspect-square object-cover bg-canvas" />
+        <img src={product.imageUrl} alt={product.name} className="img-outline rounded-2xl w-full aspect-square object-cover bg-canvas" />
         <div>
           <p className="text-xs uppercase text-muted">Product details</p>
           <h2 className="text-3xl font-semibold mt-1 text-balance">{product.name}</h2>
@@ -84,7 +102,7 @@ export function RetailerProductDetail() {
           <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
             {related.map((p) => (
               <Link key={p._id} to={`/retailer/products/${p._id}`} className="rounded-xl border border-border overflow-hidden hover:border-primary">
-                <img src={p.imageUrl} alt={p.name} className="h-28 w-full object-cover bg-canvas" />
+                <img src={p.imageUrl} alt={p.name} className="img-outline h-28 w-full object-cover bg-canvas" />
                 <div className="p-3">
                   <div className="text-sm font-medium line-clamp-1">{p.name}</div>
                   <div className="text-sm text-muted tabular-nums">{money(p.price)}</div>

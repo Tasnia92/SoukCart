@@ -12,7 +12,7 @@ import Order from './models/Order.js';
 import Payout from './models/Payout.js';
 import Complaint from './models/Complaint.js';
 
-const uri = process.env.MONGODB_URI || 'mongodb://127.0.0.1:27017/nekcart';
+const uri = process.env.MONGODB_URI || 'mongodb://127.0.0.1:27017/soukcart';
 
 await connectDB(uri);
 

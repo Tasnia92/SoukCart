@@ -80,7 +80,7 @@ export function RetailerProducts() {
           onClick={() => setCategory('all')}
           className={cn(
             'rounded-full px-3 py-1.5 text-sm border',
-            category === 'all' ? 'bg-[#242526] text-white border-[#242526]' : 'bg-[#f3f4f6] border-transparent text-foreground',
+            category === 'all' ? 'bg-ink text-white border-ink' : 'bg-subtle border-transparent text-foreground',
           )}
         >
           All ({products.length})
@@ -91,7 +91,7 @@ export function RetailerProducts() {
             onClick={() => setCategory(name)}
             className={cn(
               'rounded-full px-3 py-1.5 text-sm border',
-              category === name ? 'bg-[#242526] text-white border-[#242526]' : 'bg-[#f3f4f6] border-transparent text-foreground',
+              category === name ? 'bg-ink text-white border-ink' : 'bg-subtle border-transparent text-foreground',
             )}
           >
             {name} ({count})
@@ -102,7 +102,7 @@ export function RetailerProducts() {
         {filtered.map((p) => (
           <Card key={p._id} className="overflow-hidden flex flex-col rounded-[12px]">
             <Link to={`/retailer/products/${p._id}`} className="block aspect-[4/3] bg-canvas overflow-hidden">
-              <img src={p.imageUrl || 'https://placehold.co/400x240'} alt={p.name} loading="lazy" className="h-full w-full object-contain" />
+              <img src={p.imageUrl || 'https://placehold.co/400x240'} alt={p.name} loading="lazy" className="img-outline h-full w-full object-contain" />
             </Link>
             <div className="p-3 flex flex-col gap-1.5 flex-1">
               <Link to={`/retailer/products/${p._id}`} className="font-semibold text-sm hover:text-primary line-clamp-1">{p.name}</Link>

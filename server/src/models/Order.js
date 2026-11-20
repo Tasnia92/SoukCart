@@ -48,6 +48,8 @@ const orderSchema = new mongoose.Schema(
     },
     deliveryFeePaid: { type: Boolean, default: false },
     deliveryPaymentStatus: { type: String, enum: ['unpaid', 'paid'], default: 'unpaid' },
+    /** When the first SSL payment (delivery fee, + goods for online) was received. */
+    deliveryFeePaidAt: Date,
     productAmountPaid: { type: Boolean, default: false },
     sslTranId: String,
     sslValId: String,
@@ -108,5 +110,6 @@ orderSchema.index({ supplier: 1, createdAt: -1 });
 orderSchema.index({ 'items.supplier': 1, status: 1 });
 orderSchema.index({ status: 1, paymentStatus: 1, createdAt: 1 });
 orderSchema.index({ manualRefundStatus: 1 });
+orderSchema.index({ deliveryFeePaid: 1, deliveryFeePaidAt: 1 });
 
 export default mongoose.model('Order', orderSchema);

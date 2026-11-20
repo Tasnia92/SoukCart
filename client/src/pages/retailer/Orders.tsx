@@ -10,17 +10,17 @@ import { usePoll } from '@/lib/poll'
 const filters = ['All', 'Pending', 'Shipped', 'Delivered', 'Cancelled'] as const
 
 function statusTone(status: string) {
-  if (status === 'cancelled' || status === 'supplier_cancelled' || status === 'refunded') return 'bg-[#f6b2be] text-[#e84461]'
-  if (status === 'delivered') return 'bg-[#d1fae5] text-[#047857]'
-  if (status === 'out_for_delivery' || status === 'shipped' || status === 'delivery_initiated') return 'bg-[#dbeafe] text-[#1d4ed8]'
-  if (status === 'placed' || status === 'supplier_approved' || status === 'awaiting_payment') return 'bg-[#fef3c7] text-[#b45309]'
+  if (status === 'cancelled' || status === 'supplier_cancelled' || status === 'refunded') return 'bg-danger-soft text-danger-ink'
+  if (status === 'delivered') return 'bg-success-soft text-success'
+  if (status === 'out_for_delivery' || status === 'shipped' || status === 'delivery_initiated') return 'bg-info-soft text-info'
+  if (status === 'placed' || status === 'supplier_approved' || status === 'awaiting_payment') return 'bg-warning-soft text-warning'
   return ''
 }
 
 function payBadges(o: any) {
   const bits: string[] = []
   if (o.paymentStatus === 'failed') bits.push('Payment failed — retry')
-  if (o.deliveryFeePaid) bits.push(`Delivery ${money(120)} paid`)
+  if (o.deliveryFeePaid) bits.push(`Delivery ${money(o.deliveryFee ?? 120)} paid`)
   if (o.productAmountPaid) bits.push('Products paid')
   else if (o.paymentMethod === 'cod' && o.deliveryFeePaid) bits.push('COD due')
   if (o.manualRefundStatus === 'pending') bits.push(`Refund pending ${money(o.refundAmount)}`)
@@ -103,7 +103,7 @@ export function RetailerOrders() {
 
   return (
     <div>
-      <div className="flex items-center justify-between gap-3 mb-4">
+      <div className="flex flex-wrap items-center justify-between gap-3 mb-4">
         <h2 className="text-2xl font-semibold">Orders</h2>
         <Link to="/retailer/products"><Button>+ Place order</Button></Link>
       </div>
@@ -120,7 +120,7 @@ export function RetailerOrders() {
               onClick={() => setFilter(f)}
               className={cn(
                 'rounded-full px-3 py-1.5 text-sm',
-                filter === f ? 'bg-[#242526] text-white' : 'bg-[#f3f4f6] text-foreground',
+                filter === f ? 'bg-ink text-white' : 'bg-subtle text-foreground',
               )}
             >
               {f} {count}
@@ -144,7 +144,7 @@ export function RetailerOrders() {
               id="order-type-filter"
               value={typeFilter}
               onChange={(e) => setTypeFilter(e.target.value as typeof typeFilter)}
-              className="h-10 rounded-[8px] border border-border bg-[#f7f8f8] px-3 text-sm"
+              className="h-10 rounded-[8px] border border-border bg-field px-3 text-sm"
             >
               <option value="All">All types</option>
               <option value="COD">COD</option>
@@ -157,7 +157,7 @@ export function RetailerOrders() {
               id="order-pay-filter"
               value={payFilter}
               onChange={(e) => setPayFilter(e.target.value as typeof payFilter)}
-              className="h-10 rounded-[8px] border border-border bg-[#f7f8f8] px-3 text-sm"
+              className="h-10 rounded-[8px] border border-border bg-field px-3 text-sm"
             >
               <option value="All">All statuses</option>
               <option value="Paid">Paid</option>
@@ -171,7 +171,7 @@ export function RetailerOrders() {
         </Card>
       ) : null}
       <Card className="overflow-hidden rounded-[12px]">
-        <table className="w-full text-sm">
+        <div className="overflow-x-auto"><table className="w-full text-sm">
           <thead className="bg-canvas text-left text-muted">
             <tr>
               <th className="px-3 py-3 w-8">
@@ -185,7 +185,8 @@ export function RetailerOrders() {
               <th className="px-3 py-3 font-medium">Order</th>
               <th className="px-3 py-3 font-medium">Product</th>
               <th className="px-3 py-3 font-medium">Type</th>
-              <th className="px-3 py-3 font-medium">Price</th>
+              <th className="px-3 py-3 font-medium">Products</th>
+              <th className="px-3 py-3 font-medium">Delivery fee</th>
               <th className="px-3 py-3 font-medium">Date</th>
               <th className="px-3 py-3 font-medium">Status</th>
               <th className="px-3 py-3 font-medium w-10"></th>
@@ -208,7 +209,7 @@ export function RetailerOrders() {
                   <td className="px-3 py-3 font-medium">{o.orderNumber}</td>
                   <td className="px-3 py-3">
                     <div className="flex items-center gap-2 min-w-[160px]">
-                      <img src={first?.imageUrl || 'https://placehold.co/72x72'} alt={first?.name || 'Product'} className="h-9 w-9 rounded-md object-cover bg-canvas border border-border" />
+                      <img src={first?.imageUrl || 'https://placehold.co/72x72'} alt={first?.name || 'Product'} className="img-outline h-9 w-9 rounded-md object-cover bg-canvas" />
                       <div>
                         <div className="font-medium line-clamp-1">{first?.name || '—'}</div>
                         <div className="text-xs text-muted">{o.items?.length || 0} item(s){suppliers.length ? ` · ${suppliers.join(', ')}` : ''}</div>
@@ -217,6 +218,10 @@ export function RetailerOrders() {
                   </td>
                   <td className="px-3 py-3 capitalize">{(o.paymentMethod || 'cod').toUpperCase() === 'COD' ? 'COD' : (o.paymentMethod || 'Online')}</td>
                   <td className="px-3 py-3 tabular-nums">{money(o.subtotal)}</td>
+                  <td className="px-3 py-3 tabular-nums">
+                    {money(o.deliveryFee ?? 120)}
+                    <div className="text-[11px] text-muted">{o.deliveryFeePaid ? 'Paid' : 'Not paid'}</div>
+                  </td>
                   <td className="px-3 py-3 text-muted">{new Date(o.createdAt).toLocaleDateString()}</td>
                   <td className="px-3 py-3">
                     <div className="space-y-1">
@@ -244,7 +249,7 @@ export function RetailerOrders() {
               )
             })}
           </tbody>
-        </table>
+        </table></div>
         {!visible.length && <p className="p-8 text-center text-muted">No orders yet.</p>}
       </Card>
       <CancelOrderModal

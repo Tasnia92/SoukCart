@@ -26,7 +26,7 @@ Open http://localhost:5173
 
 > `npm run dev` runs the API (`app/server`) and the client (`app/client`) together via
 > `concurrently`. The API reads its config from `app/server/.env` — set `MONGODB_URI` there to a
-> local MongoDB (`mongodb://127.0.0.1:27017/nekcart`) or MongoDB Atlas before seeding.
+> local MongoDB (`mongodb://127.0.0.1:27017/soukcart`) or MongoDB Atlas before seeding.
 
 ### Seed
 The seed script wipes every collection and creates **only** the admin user (no categories, products, orders, suppliers or retailers).

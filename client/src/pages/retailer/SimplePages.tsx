@@ -26,7 +26,7 @@ function fmtDate(at?: string | null) {
 function StepNode({ Icon, done, title, subtitle }: { Icon: LucideIcon; done: boolean; title: string; subtitle: string | null }) {
   return (
     <div className="flex w-28 flex-col items-center text-center sm:w-36">
-      <span className={cn('flex h-9 w-9 shrink-0 items-center justify-center rounded-full', done ? 'bg-[#111213] text-white' : 'bg-[#eef0f1] text-muted')}>
+      <span className={cn('flex h-9 w-9 shrink-0 items-center justify-center rounded-full', done ? 'bg-ink text-white' : 'bg-subtle text-muted')}>
         <Icon size={15} strokeWidth={2.2} />
       </span>
       <div className="mt-2 text-sm font-semibold leading-snug">{title}</div>
@@ -48,7 +48,7 @@ function OrderTimeline({ status, createdAt, confirmedAt, deliveryInitiatedAt, sh
     <div className="flex w-full items-start">
       {nodes.map((n, i) => (
         <Fragment key={n.title}>
-          {i > 0 && <div className={cn('mt-[17px] h-[2px] flex-1', nodes[i].done ? 'bg-[#111213]' : 'bg-[#eef0f1]')} />}
+          {i > 0 && <div className={cn('mt-[17px] h-[2px] flex-1', nodes[i].done ? 'bg-ink' : 'bg-subtle')} />}
           <StepNode Icon={n.Icon} done={n.done} title={n.title} subtitle={n.subtitle} />
         </Fragment>
       ))}
@@ -94,7 +94,7 @@ export function RetailerTracking() {
               <button
                 type="button"
                 onClick={() => setOpenId(open ? null : o._id)}
-                className="flex w-full items-center gap-3 p-4 text-left transition hover:bg-canvas"
+                className="flex w-full items-center gap-3 p-4 text-start transition-colors hover:bg-canvas"
               >
                 <div className="min-w-0 flex-1">
                   <div className="flex items-center gap-2">
@@ -198,7 +198,7 @@ export function RetailerHelp() {
         <Card className="p-5">
           <form onSubmit={submit} className="space-y-3">
             <div><Label htmlFor="help-subject">Subject (min 3 characters)</Label><Input id="help-subject" value={subject} onChange={(e) => setSubject(e.target.value)} required minLength={3} /></div>
-            <div><Label htmlFor="help-message">Description (min 10 characters)</Label><textarea id="help-message" className="w-full min-h-28 rounded-[8px] border border-border bg-[#f7f8f8] p-3 text-sm" value={message} onChange={(e) => setMessage(e.target.value)} required minLength={10} /></div>
+            <div><Label htmlFor="help-message">Description (min 10 characters)</Label><textarea id="help-message" className="w-full min-h-28 rounded-[8px] border border-border bg-field p-3 text-sm" value={message} onChange={(e) => setMessage(e.target.value)} required minLength={10} /></div>
             {ok ? <p className="text-sm text-primary">{ok}</p> : null}
             {err ? <p className="text-sm text-danger">{err}</p> : null}
             <Button type="submit">Submit complaint</Button>
@@ -214,9 +214,9 @@ export function RetailerHelp() {
               <div className="text-sm text-muted mt-1">{c.status}{c.order?.orderNumber ? ` · ${c.order.orderNumber}` : ''}{c.resolvedAt ? ` · resolved ${new Date(c.resolvedAt).toLocaleString()}` : ''}</div>
               <p className="text-sm mt-2">{c.message}</p>
               {(c.messages || []).filter((m: any) => m.from === 'admin').map((m: any, i: number) => (
-                <div key={i} className="mt-3 rounded-lg bg-[#fff4ef] border border-[#f2ccc1] p-3">
+                <div key={i} className="mt-3 rounded-lg bg-brand-50 border border-brand-200 p-3">
                   <div className="flex items-center justify-between gap-2 text-xs">
-                    <span className="font-semibold text-[#991B1B]">SoukCart support</span>
+                    <span className="font-semibold text-brand-700">SoukCart support</span>
                     <span className="text-muted">{m.at ? new Date(m.at).toLocaleString() : ''}</span>
                   </div>
                   <p className="text-sm mt-1 whitespace-pre-wrap">{m.body}</p>
@@ -238,7 +238,7 @@ export function RetailerNotifications() {
 type Address = { id: string; label: string; line: string; phone: string }
 
 function addressKey(userId?: string) {
-  return `nekcart_addresses_${userId || 'anon'}`
+  return `soukcart_addresses_${userId || 'anon'}`
 }
 
 export function RetailerSettings() {
@@ -326,7 +326,7 @@ export function RetailerSettings() {
   return (
     <div>
       <h2 className="text-2xl font-semibold mb-4">Account</h2>
-      <div className="inline-flex rounded-xl bg-[#f3f4f6] p-1 mb-4">
+      <div className="inline-flex rounded-xl bg-subtle p-1 mb-4">
         {([
           ['profile', 'Profile'],
           ['addresses', 'Delivery addresses'],
@@ -335,7 +335,7 @@ export function RetailerSettings() {
           <button
             key={k}
             onClick={() => setTab(k)}
-            className={`h-9 px-4 rounded-lg text-sm font-medium ${tab === k ? 'bg-[#242526] text-white' : 'text-muted'}`}
+            className={`h-9 px-4 rounded-lg text-sm font-medium ${tab === k ? 'bg-ink text-white' : 'text-muted'}`}
           >
             {label}
           </button>

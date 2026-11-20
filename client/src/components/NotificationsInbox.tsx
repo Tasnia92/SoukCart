@@ -22,7 +22,7 @@ export function NotificationsInbox({ heading = 'Notifications' }: { heading?: st
   return (
     <div>
       <p className="text-xs uppercase tracking-wide text-muted">Inbox</p>
-      <div className="flex items-center justify-between gap-3 mb-4">
+      <div className="flex flex-wrap items-center justify-between gap-3 mb-4">
         <h2 className="text-2xl font-semibold">{heading}</h2>
         <Button
           variant="secondary"
@@ -37,9 +37,9 @@ export function NotificationsInbox({ heading = 'Notifications' }: { heading?: st
         {items.map((n) => (
           <div
             key={n._id}
-            className={`px-3 py-3 border-b border-border last:border-0 flex gap-3 items-start ${n.isRead ? '' : 'bg-[#fff8f5]'}`}
+            className={`px-3 py-3 border-b border-border last:border-0 flex gap-3 items-start ${n.isRead ? '' : 'bg-brand-50'}`}
           >
-            <div className="h-10 w-10 rounded-full bg-[#f3f4f6] flex items-center justify-center shrink-0">
+            <div className="h-10 w-10 rounded-full bg-subtle flex items-center justify-center shrink-0">
               <Package size={16} className="text-muted" />
             </div>
             <div className="flex-1 min-w-0">
