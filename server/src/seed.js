@@ -31,7 +31,7 @@ await Promise.all([
   Complaint.deleteMany({}),
 ]);
 
-const password = await bcrypt.hash('admin123456', 10);
+const password = await bcrypt.hash('Admin123456', 10);
 
 const admin = await User.create({
   name: 'Admin',
@@ -41,5 +41,5 @@ const admin = await User.create({
 });
 
 console.log('Seed complete — only the admin user was created.');
-console.log({ name: admin.name, email: admin.email, password: 'admin123456' });
+console.log({ name: admin.name, email: admin.email, password: 'Admin123456' });
 await mongoose.disconnect();
