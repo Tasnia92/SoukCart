@@ -1,36 +1,52 @@
-# soukcart
-Ground-up B2B marketplace from UI Twin specs + project plan. Not a clone of the old SoukCart repo.
+# SoukCart
+
+B2B marketplace where retailers order from verified suppliers and admins manage the platform.
 
 ## Stack
-- client: React + Vite + Tailwind + React Context
-- server: Express + Mongoose
-- DB: MongoDB Atlas (cloud) — `app/server/.env` → `MONGODB_URI`
 
-## Quick start (one command)
+- Client: React, Vite, Tailwind
+- Server: Express, Mongoose
+- Database: MongoDB
+- Payments: SSLCommerz (sandbox)
+- Image uploads: Cloudinary
 
-From the `app` folder:
+## Setup
 
-```bash
-# 1) Install deps (first time only)
-npm install                      # app root (concurrently), then:
-npm run install:all              # server + client deps
+1. Install dependencies:
 
-# 2) Seed Atlas (wipes DB, creates ONLY the admin user)
-npm run seed
+   ```bash
+   npm install
+   ```
 
-# 3) Start backend + frontend together
-npm run dev
-```
+2. Copy `server/.env.example` to `server/.env` and set `MONGODB_URI`, `JWT_SECRET`, the SSLCommerz store credentials and the Cloudinary keys.
 
-Open http://localhost:5173
+3. Seed the database. This wipes all data and creates the admin user:
 
-> `npm run dev` runs the API (`app/server`) and the client (`app/client`) together via
-> `concurrently`. The API reads its config from `app/server/.env` — set `MONGODB_URI` there to a
-> local MongoDB (`mongodb://127.0.0.1:27017/soukcart`) or MongoDB Atlas before seeding.
+   ```bash
+   npm run seed
+   ```
 
-### Seed
-The seed script wipes every collection and creates **only** the admin user (no categories, products, orders, suppliers or retailers).
+4. Start the API and client:
 
-| Role | Name | Email | Password |
-| --- | --- | --- | --- |
-| Admin | Admin | admin@soukcart.com | admin123456 |
+   ```bash
+   npm run dev
+   ```
+
+The client runs at http://localhost:5173 and the API at http://localhost:5001.
+
+## Admin login
+
+Sign in at `/admin`.
+
+- Email: `admin@soukcart.com`
+- Password: `admin123456`
+
+Change this password after the first login.
+
+## Scripts
+
+| Command | Description |
+| --- | --- |
+| `npm run dev` | Run server and client together |
+| `npm run seed` | Reset the database and create the admin |
+| `npm run build` | Build the client |
