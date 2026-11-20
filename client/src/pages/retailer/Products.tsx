@@ -102,7 +102,7 @@ export function RetailerProducts() {
         {filtered.map((p) => (
           <Card key={p._id} className="overflow-hidden flex flex-col rounded-[12px]">
             <Link to={`/retailer/products/${p._id}`} className="block aspect-[4/3] bg-canvas overflow-hidden">
-              <img src={p.imageUrl || 'https://placehold.co/400x240'} alt={p.name} loading="lazy" className="img-outline h-full w-full object-contain" />
+              <img src={p.imageUrl || 'https://placehold.co/400x240'} alt={p.name} loading="lazy" className="img-outline h-full w-full object-cover" />
             </Link>
             <div className="p-3 flex flex-col gap-1.5 flex-1">
               <Link to={`/retailer/products/${p._id}`} className="font-semibold text-sm hover:text-primary line-clamp-1">{p.name}</Link>
