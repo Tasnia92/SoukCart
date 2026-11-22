@@ -58,7 +58,7 @@ function OrderTimeline({ status, createdAt, confirmedAt, deliveryInitiatedAt, sh
 
 function invoiceCsv(o: any) {
   const rows: Array<Array<string | number>> = [['Item', 'Quantity', 'Unit price', 'Line total']]
-  for (const it of o.items || []) rows.push([it.name, it.quantity, it.price, it.lineTotal])
+  for (const it of (o.items || []).filter((i: any) => !i.cancelledAt)) rows.push([it.name, it.quantity, it.price, it.lineTotal])
   rows.push(['Subtotal', '', '', o.subtotal])
   rows.push(['Delivery fee', '', '', o.deliveryFee ?? 120])
   return rows
@@ -102,7 +102,7 @@ export function RetailerTracking() {
                     <Badge>{statusLabel(o.status)}</Badge>
                   </div>
                   <div className="mt-1 truncate text-xs text-muted tabular-nums">
-                    {o.items?.[0]?.name}{o.items?.length > 1 ? ` +${o.items.length - 1} more` : ''}
+                    {(o.items || []).filter((it: any) => !it.cancelledAt).map((it: any) => it.name).join(', ')}
                     {' · '}{money(o.subtotal)}
                   </div>
                 </div>
@@ -134,9 +134,9 @@ export function RetailerTracking() {
                   </div>
                   <div className="mt-8 space-y-2 border-t border-border pt-4 text-sm">
                     {(o.items || []).map((it: any, i: number) => (
-                      <div key={i} className="flex items-center justify-between gap-3">
-                        <span className="truncate text-muted">{it.name} × {it.quantity}</span>
-                        <span className="shrink-0 font-medium tabular-nums">{money(it.lineTotal)}</span>
+                      <div key={i} className={`flex items-center justify-between gap-3${it.cancelledAt ? ' opacity-60' : ''}`}>
+                        <span className={`truncate text-muted${it.cancelledAt ? ' line-through' : ''}`}>{it.name} × {it.quantity}{it.cancelledAt ? ' (cancelled by supplier)' : ''}</span>
+                        <span className={`shrink-0 font-medium tabular-nums${it.cancelledAt ? ' line-through' : ''}`}>{money(it.lineTotal)}</span>
                       </div>
                     ))}
                     <div className="flex items-center justify-between gap-3 pt-2">

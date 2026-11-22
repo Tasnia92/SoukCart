@@ -23,11 +23,34 @@ export function supplierShare(items, supplierId, commissionRate = DEFAULT_COMMIS
   const sid = String(supplierId);
   const subtotal = Number(
     items
-      .filter((i) => String(i.supplier) === sid)
+      .filter((i) => String(i.supplier?._id || i.supplier) === sid)
       .reduce((s, i) => s + (i.lineTotal || 0), 0)
       .toFixed(2)
   );
   const commissionAmount = Number((subtotal * commissionRate).toFixed(2));
   const supplierAmount = Number((subtotal - commissionAmount).toFixed(2));
   return { subtotal, commissionAmount, supplierAmount };
+}
+
+/** Lines a supplier has not cancelled. */
+export function activeItems(items = []) {
+  return items.filter((i) => !i.cancelledAt);
+}
+
+/**
+ * What one supplier earns from an order: their non-cancelled lines minus commission.
+ * Legacy orders without per-line suppliers fall back to the order-level amounts.
+ */
+export function supplierOrderShare(order, supplierId) {
+  const rate = order.commissionRate ?? DEFAULT_COMMISSION_RATE;
+  const sid = String(supplierId);
+  const hasLines = (order.items || []).some((i) => String(i.supplier?._id || i.supplier) === sid);
+  if (!hasLines) {
+    return {
+      subtotal: Number((order.subtotal || 0).toFixed(2)),
+      commissionAmount: Number((order.commissionAmount || 0).toFixed(2)),
+      supplierAmount: Number((order.supplierAmount || 0).toFixed(2)),
+    };
+  }
+  return supplierShare(activeItems(order.items), sid, rate);
 }

@@ -1,6 +1,6 @@
 import Order from '../models/Order.js';
-import { notifyUser, notifyMany } from './notify.js';
-import { DELIVERY_FEE } from './calculations.js';
+import { notifyUser } from './notify.js';
+import { DELIVERY_FEE, supplierOrderShare } from './calculations.js';
 import { accruePayoutsForOrder, uniqueSupplierIds } from './payout.service.js';
 import { CANCELLED_STATUSES } from './refund.service.js';
 import { httpError } from '../utils/httpError.js';
@@ -187,13 +187,17 @@ export async function activateOrderAfterPayment(order, sslData = {}) {
     });
   }
 
-  await notifyMany(uniqueSupplierIds(order), {
-    title: 'Order ready to confirm',
-    body: `Order ${order.orderNumber} — Tk ${order.subtotal} merchandise. Confirm your items or cancel.`,
-    relatedOrder: order._id,
-    link: '/supplier/orders',
-    type: 'new_order',
-  });
+  // Each supplier is told the value of their own products only.
+  for (const sid of uniqueSupplierIds(order)) {
+    const share = supplierOrderShare(order, sid);
+    await notifyUser(sid, {
+      title: 'Order ready to confirm',
+      body: `Order ${order.orderNumber} — Tk ${share.subtotal} of your products. Confirm your items or cancel.`,
+      relatedOrder: order._id,
+      link: '/supplier/orders',
+      type: 'new_order',
+    });
+  }
 
   return order;
 }

@@ -8,6 +8,7 @@ type InvoiceItem = {
   price?: number
   quantity?: number
   lineTotal?: number
+  cancelledAt?: string
   supplier?: { businessName?: string; name?: string }
 }
 
@@ -42,7 +43,8 @@ function supplierName(s?: { businessName?: string; name?: string }) {
 }
 
 export function InvoiceSheet({ order, className }: { order: InvoiceOrder; className?: string }) {
-  const items = order.items || []
+  // Lines a supplier cancelled are not billed.
+  const items = (order.items || []).filter((it) => !it.cancelledAt)
   const subtotal = order.subtotal || 0
   const deliveryFee = order.deliveryFee ?? 120
   const total = subtotal + deliveryFee

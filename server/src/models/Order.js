@@ -21,6 +21,9 @@ const orderItemSchema = new mongoose.Schema(
     imageUrl: String,
     confirmedAt: Date,
     stockReserved: { type: Boolean, default: false },
+    /** Set when this line's supplier cancelled their part of a multi-supplier order. */
+    cancelledAt: Date,
+    cancelledBy: { type: mongoose.Schema.Types.ObjectId, ref: 'User' },
   },
   { _id: true }
 );

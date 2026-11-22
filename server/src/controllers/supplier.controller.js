@@ -4,10 +4,10 @@ import Product from '../models/Product.js';
 import Payout from '../models/Payout.js';
 import Notification from '../models/Notification.js';
 import Settings from '../models/Settings.js';
-import { computeSupplierBalance } from '../services/payout.service.js';
+import { computeSupplierBalance, activeSupplierIds } from '../services/payout.service.js';
 import { setStock } from '../services/stock.service.js';
 import { notifyAdmins } from '../services/notify.js';
-import { DEFAULT_COMMISSION_RATE, supplierShare } from '../services/calculations.js';
+import { DEFAULT_COMMISSION_RATE, supplierOrderShare } from '../services/calculations.js';
 import { toShopSlug } from '../utils/slug.js';
 import { asyncHandler } from '../utils/asyncHandler.js';
 
@@ -124,7 +124,7 @@ export const retailers = asyncHandler(async (req, res) => {
       lastOrderAt: null,
     };
     row.orders += 1;
-    row.gross += o.subtotal || 0;
+    row.gross += supplierOrderShare(o, req.user._id).subtotal;
     const t = new Date(o.createdAt).getTime();
     if (!row.lastOrderAt || t > new Date(row.lastOrderAt).getTime()) row.lastOrderAt = o.createdAt;
     map.set(id, row);
@@ -208,14 +208,16 @@ export const earnings = asyncHandler(async (req, res) => {
   }
 
   const rawRecent = await Order.find(recentFilter).sort({ updatedAt: -1 }).limit(20);
-  const recent = rawRecent.map((o) => {
-    const obj = o.toObject();
-    const rate = o.commissionRate ?? DEFAULT_COMMISSION_RATE;
-    const share = supplierShare(o.items || [], supplierId, rate);
-    obj.supplierAmount =
-      share.subtotal > 0 ? share.supplierAmount : Number((o.supplierAmount || 0).toFixed(2));
-    return obj;
-  });
+  const recent = rawRecent
+    .filter((o) => activeSupplierIds(o).includes(String(supplierId)))
+    .map((o) => {
+      const obj = o.toObject();
+      const share = supplierOrderShare(o, supplierId);
+      obj.subtotal = share.subtotal;
+      obj.commissionAmount = share.commissionAmount;
+      obj.supplierAmount = share.supplierAmount;
+      return obj;
+    });
 
   res.json({
     balance,

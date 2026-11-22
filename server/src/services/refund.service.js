@@ -49,7 +49,15 @@ export function refundAmountFor(order) {
   const onlinePaid =
     order.paymentMethod === 'online' &&
     (order.productAmountPaid || order.paymentStatus === 'paid' || order.deliveryFeePaid);
-  if (onlinePaid) return Number((Number(order.subtotal || 0) + fee).toFixed(2));
+  if (onlinePaid) {
+    // Refund what was charged: every line (including ones a supplier cancelled
+    // earlier, which were not refunded at the time) plus the delivery fee.
+    const items = order.items || [];
+    const paidGoods = items.length
+      ? items.reduce((s, i) => s + Number(i.lineTotal || 0), 0)
+      : Number(order.subtotal || 0);
+    return Number((paidGoods + fee).toFixed(2));
+  }
   if (order.deliveryFeePaid) return Number(fee.toFixed(2));
   return 0;
 }
@@ -80,7 +88,8 @@ export async function cancelAndQueueRefund(order, actor, reason = '', { stale = 
   }
 
   // REFUND-FLOW 5/6 · restore stock that was reserved on supplier confirm
-  const confirmedItems = (order.items || []).filter((i) => i.confirmedAt || i.stockReserved);
+  // Lines a supplier already cancelled had their stock released at that time.
+  const confirmedItems = (order.items || []).filter((i) => !i.cancelledAt && (i.confirmedAt || i.stockReserved));
   if (confirmedItems.length) {
     await releaseStockForItems(confirmedItems, {
       orderId: order._id,
@@ -88,7 +97,7 @@ export async function cancelAndQueueRefund(order, actor, reason = '', { stale = 
       note: reason,
     });
     for (const item of order.items) {
-      if (item.confirmedAt || item.stockReserved) item.stockReserved = false;
+      if (!item.cancelledAt && (item.confirmedAt || item.stockReserved)) item.stockReserved = false;
     }
   }
 

@@ -1,7 +1,7 @@
 import Order from '../models/Order.js';
 import Payout from '../models/Payout.js';
 import User from '../models/User.js';
-import { DEFAULT_COMMISSION_RATE, supplierShare } from './calculations.js';
+import { supplierOrderShare } from './calculations.js';
 import { httpError } from '../utils/httpError.js';
 
 function weekWindow(ref = new Date()) {
@@ -23,6 +23,17 @@ export function uniqueSupplierIds(order) {
   return [...ids];
 }
 
+/** Suppliers who still have at least one non-cancelled line on the order. */
+export function activeSupplierIds(order) {
+  const items = order.items || [];
+  if (!items.some((i) => i.supplier)) return uniqueSupplierIds(order);
+  const ids = new Set();
+  for (const item of items) {
+    if (item.supplier && !item.cancelledAt) ids.add(String(item.supplier._id || item.supplier));
+  }
+  return [...ids];
+}
+
 // ── ADMIN-FLOW 4/7 · PAYOUTS — accrue pending payouts (runs automatically) ──
 // SEARCH: admin-flow, accrue payout, pending payout, delivered
 // DOES:   once a merchandise-paid order is delivered, creates one "pending" Payout
@@ -34,9 +45,8 @@ export async function accruePayoutsForOrder(order) {
     order.productAmountPaid === true || order.paymentStatus === 'paid';
   if (!merchandisePaid) return [];
 
-  const rate = order.commissionRate ?? DEFAULT_COMMISSION_RATE;
   const created = [];
-  for (const sid of uniqueSupplierIds(order)) {
+  for (const sid of activeSupplierIds(order)) {
     const existing = await Payout.findOne({
       supplier: sid,
       orderIds: order._id,
@@ -44,13 +54,9 @@ export async function accruePayoutsForOrder(order) {
     });
     if (existing) continue;
 
-    const share = supplierShare(order.items, sid, rate);
-    const amount =
-      share.subtotal > 0
-        ? share.supplierAmount
-        : Number((order.supplierAmount || 0).toFixed(2));
-    const commissionTotal =
-      share.subtotal > 0 ? share.commissionAmount : Number((order.commissionAmount || 0).toFixed(2));
+    const share = supplierOrderShare(order, sid);
+    const amount = share.supplierAmount;
+    const commissionTotal = share.commissionAmount;
     if (amount <= 0) continue;
 
     const payout = await Payout.create({
@@ -94,7 +100,8 @@ export async function getEligibleOrders(supplierId) {
   };
   if (reservedIds.length) filter._id = { $nin: reservedIds };
 
-  return Order.find(filter).sort({ createdAt: 1 });
+  const orders = await Order.find(filter).sort({ createdAt: 1 });
+  return orders.filter((o) => activeSupplierIds(o).includes(String(supplierId)));
 }
 
 // ── ADMIN-FLOW 4/7 · PAYOUTS — supplier balance shown on the admin payout page ──
@@ -118,12 +125,10 @@ export async function computeSupplierBalance(supplierId) {
 
   const eligible = await getEligibleOrders(supplierId);
   const legacyAvailable = Number(eligible.reduce((s, o) => {
-    const share = supplierShare(o.items || [], supplierId, o.commissionRate ?? DEFAULT_COMMISSION_RATE);
-    return s + (share.subtotal > 0 ? share.supplierAmount : o.supplierAmount || 0);
+    return s + supplierOrderShare(o, supplierId).supplierAmount;
   }, 0).toFixed(2));
   const legacyCommission = Number(eligible.reduce((s, o) => {
-    const share = supplierShare(o.items || [], supplierId, o.commissionRate ?? DEFAULT_COMMISSION_RATE);
-    return s + (share.subtotal > 0 ? share.commissionAmount : o.commissionAmount || 0);
+    return s + supplierOrderShare(o, supplierId).commissionAmount;
   }, 0).toFixed(2));
 
   const available = Number((pendingPayouts + legacyAvailable).toFixed(2));
@@ -151,7 +156,7 @@ async function updateOrdersPayoutSettled(orderIds) {
   for (const orderId of orderIds) {
     const order = await Order.findById(orderId);
     if (!order) continue;
-    const allSids = uniqueSupplierIds(order);
+    const allSids = activeSupplierIds(order);
     const paidPayouts = await Payout.find({ orderIds: orderId, status: 'paid' });
     const paidSids = new Set(paidPayouts.map((p) => String(p.supplier)));
     if (allSids.every((sid) => paidSids.has(sid))) {
@@ -230,12 +235,10 @@ export async function createPayoutForSupplier(supplierId, { status = 'paid', not
 
   const orderIds = eligible.map((o) => o._id);
   const supplierAmount = Number(eligible.reduce((s, o) => {
-    const share = supplierShare(o.items || [], supplierId, o.commissionRate ?? DEFAULT_COMMISSION_RATE);
-    return s + (share.subtotal > 0 ? share.supplierAmount : o.supplierAmount || 0);
+    return s + supplierOrderShare(o, supplierId).supplierAmount;
   }, 0).toFixed(2));
   const commissionTotal = Number(eligible.reduce((s, o) => {
-    const share = supplierShare(o.items || [], supplierId, o.commissionRate ?? DEFAULT_COMMISSION_RATE);
-    return s + (share.subtotal > 0 ? share.commissionAmount : o.commissionAmount || 0);
+    return s + supplierOrderShare(o, supplierId).commissionAmount;
   }, 0).toFixed(2));
   const payAmount = amount != null ? Number(amount) : supplierAmount;
 

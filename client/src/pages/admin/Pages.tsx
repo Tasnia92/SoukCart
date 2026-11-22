@@ -271,7 +271,7 @@ export function AdminOrders() {
                   {(o.items || []).length ? (
                     <ul className="space-y-0.5">
                       {(o.items as any[]).map((i, idx) => (
-                        <li key={idx} className="text-sm">
+                        <li key={idx} className={cn('text-sm', i.cancelledAt && 'line-through text-muted')}>
                           <span className="text-muted">{i.quantity}×</span> {i.name}
                           {i.unit ? <span className="text-muted"> /{i.unit}</span> : null}
                         </li>

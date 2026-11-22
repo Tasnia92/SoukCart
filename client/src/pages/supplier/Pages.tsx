@@ -96,8 +96,6 @@ export function SupplierDashboard() {
 }
 
 export function SupplierOrders() {
-  const { user } = useAuth()
-  const uid = String(user?.id || user?._id || '')
   const [orders, setOrders] = useState<any[]>([])
   const [tab, setTab] = useState('All')
   const [cancelTarget, setCancelTarget] = useState<any | null>(null)
@@ -129,19 +127,23 @@ export function SupplierOrders() {
       setCancelling(false)
     }
   }
+  // The server already sends only this supplier's own lines and amounts.
   function mineUnconfirmed(o: any) {
-    const lines = (o.items || []).filter((i: any) => String(i.supplier?._id || i.supplier || o.supplier?._id || o.supplier) === uid)
-    const pool = lines.length ? lines : o.items || []
-    return pool.some((i: any) => !i.confirmedAt)
+    return (o.items || []).some((i: any) => !i.confirmedAt && !i.cancelledAt)
+  }
+  function isCancelledForMe(o: any) {
+    return o.myLinesCancelled || String(o.status).includes('cancel') || o.status === 'refunded'
+  }
+  function tabMatch(o: any, t: string) {
+    if (t === 'All') return true
+    if (t === 'Cancelled') return isCancelledForMe(o)
+    if (isCancelledForMe(o)) return false
+    if (t === 'Pending') return o.status === 'placed' || o.status === 'supplier_approved'
+    if (t === 'Confirmed') return ['supplier_confirmed', 'delivery_initiated', 'shipped', 'out_for_delivery', 'delivered'].includes(o.status)
+    return true
   }
   const tabs = ['All', 'Pending', 'Confirmed', 'Cancelled'] as const
-  const visible = orders.filter((o) => {
-    if (tab === 'All') return true
-    if (tab === 'Pending') return o.status === 'placed' || o.status === 'supplier_approved'
-    if (tab === 'Confirmed') return ['supplier_confirmed', 'delivery_initiated', 'shipped', 'out_for_delivery', 'delivered'].includes(o.status)
-    if (tab === 'Cancelled') return String(o.status).includes('cancel') || o.status === 'refunded'
-    return true
-  })
+  const visible = orders.filter((o) => tabMatch(o, tab))
   return (
     <div>
       <div className="flex flex-wrap items-center justify-between gap-3 mb-4">
@@ -156,12 +158,7 @@ export function SupplierOrders() {
       </div>
       <div className="flex gap-2 mb-4 flex-wrap">
         {tabs.map((t) => (
-          <button key={t} onClick={() => setTab(t)} className={cn('rounded-full px-3 py-1.5 text-sm', tab === t ? 'bg-ink text-white' : 'bg-subtle')}>{t} {orders.filter((o)=>{
-            if (t==='All') return true
-            if (t==='Pending') return o.status==='placed'||o.status==='supplier_approved'
-            if (t==='Confirmed') return ['supplier_confirmed','delivery_initiated','shipped','out_for_delivery','delivered'].includes(o.status)
-            return String(o.status).includes('cancel') || o.status === 'refunded'
-          }).length}</button>
+          <button key={t} onClick={() => setTab(t)} className={cn('rounded-full px-3 py-1.5 text-sm', tab === t ? 'bg-ink text-white' : 'bg-subtle')}>{t} {orders.filter((o) => tabMatch(o, t)).length}</button>
         ))}
       </div>
       <Card className="overflow-hidden">
@@ -173,18 +170,28 @@ export function SupplierOrders() {
             {visible.map((o) => (
               <tr key={o._id} className="border-t border-border">
                 <td className="px-3 py-3 font-medium">{o.orderNumber}</td>
-                <td className="px-3 py-3">{o.items?.[0]?.name || '—'}{o.items?.length>1?` +${o.items.length-1}`:''}</td>
+                <td className="px-3 py-3">
+                  {(o.items || []).length ? (
+                    <ul className="space-y-0.5">
+                      {(o.items as any[]).map((i, idx) => (
+                        <li key={idx} className={cn('text-sm', i.cancelledAt && 'line-through text-muted')}>
+                          <span className="text-muted">{i.quantity}×</span> {i.name}
+                        </li>
+                      ))}
+                    </ul>
+                  ) : '—'}
+                </td>
                 <td className="px-3 py-3">{o.retailer?.name}</td>
                 <td className="px-3 py-3">{(o.paymentMethod||'cod').toUpperCase()}</td>
                 <td className="px-3 py-3 tabular-nums">{money(o.subtotal)}</td>
                 <td className="px-3 py-3 text-muted">{new Date(o.createdAt).toLocaleDateString()}</td>
-                <td className="px-3 py-3"><Badge>{statusLabel(o.status)}</Badge></td>
+                <td className="px-3 py-3"><Badge>{o.myLinesCancelled ? 'Cancelled by you' : statusLabel(o.status)}</Badge></td>
                 <td className="px-3 py-3">
                   <div className="flex gap-1 justify-end">
                     {['placed', 'supplier_approved'].includes(o.status) && mineUnconfirmed(o) && (
                       <Button className="h-8 text-xs" onClick={()=>act(o._id,'supplier_confirmed')}>Confirm</Button>
                     )}
-                    {canCancelStatus(o.status) && (
+                    {canCancelStatus(o.status) && !o.myLinesCancelled && (
                       <Button variant="secondary" className="h-8 text-xs" onClick={() => setCancelTarget(o)}>Cancel</Button>
                     )}
                   </div>

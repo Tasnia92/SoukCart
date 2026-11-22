@@ -4,13 +4,15 @@ import Settings from '../models/Settings.js';
 import {
   lineTotal,
   orderTotals,
+  activeItems,
+  supplierOrderShare,
   amountDueNow,
   DELIVERY_FEE,
   DEFAULT_COMMISSION_RATE,
 } from './calculations.js';
 import { notifyUser, notifyAdmins, notifyMany } from './notify.js';
-import { reserveStockForItems } from './stock.service.js';
-import { accruePayoutsForOrder, uniqueSupplierIds } from './payout.service.js';
+import { accruePayoutsForOrder, activeSupplierIds } from './payout.service.js';
+import { reserveStockForItems, releaseStockForItems } from './stock.service.js';
 import { cancelAndQueueRefund, CANCELLED_STATUSES, canCancelOrder } from './refund.service.js';
 import { httpError } from '../utils/httpError.js';
 
@@ -79,13 +81,109 @@ export function isPaidEnoughToConfirm(order) {
   return order.deliveryFeePaid === true;
 }
 
+function isSupplierLine(order, item, supplierId) {
+  return String(item.supplier?._id || item.supplier || order.supplier?._id || order.supplier) === String(supplierId);
+}
+
+/** This supplier's lines that have not been cancelled. */
 function supplierItems(order, supplierId) {
-  const sid = String(supplierId);
-  return (order.items || []).filter((i) => String(i.supplier || order.supplier) === sid);
+  return activeItems(order.items).filter((i) => isSupplierLine(order, i, supplierId));
 }
 
 function allLinesConfirmed(order) {
-  return (order.items || []).length > 0 && order.items.every((i) => i.confirmedAt);
+  const live = activeItems(order.items);
+  return live.length > 0 && live.every((i) => i.confirmedAt);
+}
+
+/**
+ * Supplier's view of an order: only their own lines, and money fields that
+ * reflect only their products. `myLinesCancelled` is true when this supplier
+ * cancelled their part while the rest of the order carries on.
+ */
+export function scopeOrderForSupplier(order, supplierId) {
+  const obj = typeof order.toObject === 'function' ? order.toObject() : { ...order };
+  const mine = (obj.items || []).filter((i) => isSupplierLine(obj, i, supplierId));
+  const share = supplierOrderShare(obj, supplierId);
+  return {
+    ...obj,
+    items: mine,
+    subtotal: share.subtotal,
+    commissionAmount: share.commissionAmount,
+    supplierAmount: share.supplierAmount,
+    myLinesCancelled: mine.length > 0 && mine.every((i) => i.cancelledAt),
+  };
+}
+
+/** Shape an order for whoever is looking at it. */
+export function orderForViewer(order, user) {
+  if (user?.role === 'supplier') return scopeOrderForSupplier(order, user._id);
+  return order;
+}
+
+function recomputeTotals(order) {
+  const totals = orderTotals(activeItems(order.items), order.commissionRate);
+  order.subtotal = totals.subtotal;
+  order.commissionAmount = totals.commissionAmount;
+  order.supplierAmount = totals.supplierAmount;
+}
+
+// ── ORDER-FLOW 8/8 · PARTIAL CANCEL (one supplier drops out of a multi-supplier order) ──
+// SEARCH: order-flow, partial cancel, supplier cancel lines
+// DOES:   cancels only this supplier's lines, releases their reserved stock and
+//         recomputes totals. The rest of the order continues: if every remaining
+//         line is confirmed it becomes "supplier_confirmed" (ready to ship).
+//         No refund is queued because the order still ships. When this supplier
+//         holds the last active lines, the whole order is cancelled instead.
+export async function cancelSupplierLines(order, supplierUser) {
+  if (!orderHasSupplier(order, supplierUser._id)) throw httpError('Forbidden', 403);
+  const mine = supplierItems(order, supplierUser._id);
+  if (!mine.length) throw httpError('You have no active items on this order', 400);
+  const others = activeItems(order.items).filter((i) => !isSupplierLine(order, i, supplierUser._id));
+  if (!others.length) return cancelAndQueueRefund(order, supplierUser);
+
+  const reserved = mine.filter((i) => i.stockReserved);
+  if (reserved.length) {
+    await releaseStockForItems(reserved, {
+      orderId: order._id,
+      actorId: supplierUser._id,
+      note: 'supplier cancelled their items',
+    });
+  }
+  const now = new Date();
+  for (const item of mine) {
+    item.cancelledAt = now;
+    item.cancelledBy = supplierUser._id;
+    item.stockReserved = false;
+  }
+  order.markModified('items');
+  recomputeTotals(order);
+
+  const readyToShip = allLinesConfirmed(order);
+  if (readyToShip && ['placed', 'supplier_approved'].includes(order.status)) {
+    order.status = 'supplier_confirmed';
+    order.confirmedAt = now;
+  }
+  await order.save();
+
+  const who = supplierUser.businessName || supplierUser.name || 'A supplier';
+  const names = mine.map((i) => i.name).join(', ');
+  await notifyUser(order.retailer, {
+    title: 'Supplier cancelled items',
+    body: `${who} cancelled ${names} on order ${order.orderNumber}. The rest of your order continues.`,
+    relatedOrder: order._id,
+    link: '/retailer/orders',
+    type: 'order_cancelled',
+  });
+  await notifyAdmins({
+    title: readyToShip ? 'Order ready for delivery' : 'Supplier cancelled items',
+    body: readyToShip
+      ? `${who} cancelled their items on ${order.orderNumber}. Remaining items are confirmed. Start delivery when ready.`
+      : `${who} cancelled their items on ${order.orderNumber}. Waiting for remaining suppliers.`,
+    relatedOrder: order._id,
+    link: '/admin/orders',
+    type: readyToShip ? 'supplier_confirmed' : 'order_cancelled',
+  });
+  return order;
 }
 
 // ── ORDER-FLOW 1/8 · PLACE ORDER (order starts here) ──
@@ -221,7 +319,7 @@ export async function confirmSupplierLines(order, supplierUser) {
   await reserveStockForItems(pending, { orderId: order._id, actorId: supplierUser._id });
   const now = new Date();
   for (const item of order.items) {
-    if (String(item.supplier || order.supplier) === String(supplierUser._id) && !item.confirmedAt) {
+    if (isSupplierLine(order, item, supplierUser._id) && !item.cancelledAt && !item.confirmedAt) {
       item.confirmedAt = now;
       item.stockReserved = true;
     }
@@ -287,7 +385,7 @@ export async function collectCod(order, admin) {
 }
 
 function notifyDelivery(order, nextStatus) {
-  const supplierIds = uniqueSupplierIds(order);
+  const supplierIds = activeSupplierIds(order);
   if (nextStatus === 'delivery_initiated') {
     return Promise.all([
       notifyUser(order.retailer, {
@@ -364,6 +462,8 @@ export async function setOrderStatus(order, nextStatus, actor) {
     if (!canCancelOrder(order)) {
       throw httpError('Cannot cancel after delivery has started', 400);
     }
+    // A supplier only cancels their own items; the rest of the order carries on.
+    if (actor.role === 'supplier') return cancelSupplierLines(order, actor);
     return cancelAndQueueRefund(order, actor);
   }
 

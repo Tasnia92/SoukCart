@@ -5,6 +5,7 @@ import {
   confirmSupplierLines,
   collectCod,
   assertOrderAccess,
+  orderForViewer,
 } from '../services/order.service.js';
 import { createSslCommerzSession, sslConfigured, retryPayment } from '../services/payment.service.js';
 import { asyncHandler } from '../utils/asyncHandler.js';
@@ -83,7 +84,7 @@ export const myOrders = asyncHandler(async (req, res) => {
   }
 
   const orders = await Order.find(filter).populate(populate).sort({ createdAt: -1 });
-  res.json({ orders });
+  res.json({ orders: orders.map((o) => orderForViewer(o, req.user)) });
 });
 
 export const getOrder = asyncHandler(async (req, res) => {
@@ -94,7 +95,7 @@ export const getOrder = asyncHandler(async (req, res) => {
   } catch (e) {
     return res.status(e.status || 403).json({ message: e.message });
   }
-  res.json({ order });
+  res.json({ order: orderForViewer(order, req.user) });
 });
 
 // ── ORDER-FLOW 6/8 & 8/8 · STATUS CHANGE (delivery / cancel / refund / confirm / COD) ──
@@ -107,7 +108,7 @@ export const updateStatus = asyncHandler(async (req, res) => {
   try {
     const updated = await setOrderStatus(order, req.body.status, req.user);
     const fresh = await Order.findById(updated._id).populate(populate);
-    res.json({ order: fresh || updated });
+    res.json({ order: orderForViewer(fresh || updated, req.user) });
   } catch (e) {
     res.status(e.status || 500).json({ message: e.message, availableQty: e.availableQty });
   }
@@ -121,7 +122,7 @@ export const confirmOrder = asyncHandler(async (req, res) => {
   try {
     const updated = await confirmSupplierLines(order, req.user);
     const fresh = await Order.findById(updated._id).populate(populate);
-    res.json({ order: fresh || updated });
+    res.json({ order: orderForViewer(fresh || updated, req.user) });
   } catch (e) {
     res.status(e.status || 500).json({ message: e.message, availableQty: e.availableQty });
   }
@@ -151,7 +152,7 @@ export const collectCodPayment = asyncHandler(async (req, res) => {
   try {
     const updated = await collectCod(order, req.user);
     const fresh = await Order.findById(updated._id).populate(populate);
-    res.json({ order: fresh || updated });
+    res.json({ order: orderForViewer(fresh || updated, req.user) });
   } catch (e) {
     res.status(e.status || 500).json({ message: e.message });
   }

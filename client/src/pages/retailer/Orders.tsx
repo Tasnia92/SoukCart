@@ -194,8 +194,6 @@ export function RetailerOrders() {
           </thead>
           <tbody>
             {visible.map((o) => {
-              const first = o.items?.[0]
-              const suppliers = [...new Set((o.items || []).map((i: any) => i.supplier?.businessName || i.supplier?.name || o.supplier?.businessName).filter(Boolean))]
               return (
                 <tr key={o._id} className="border-t border-border">
                   <td className="px-3 py-3">
@@ -208,12 +206,20 @@ export function RetailerOrders() {
                   </td>
                   <td className="px-3 py-3 font-medium">{o.orderNumber}</td>
                   <td className="px-3 py-3">
-                    <div className="flex items-center gap-2 min-w-[160px]">
-                      <img src={first?.imageUrl || 'https://placehold.co/72x72'} alt={first?.name || 'Product'} className="img-outline h-9 w-9 rounded-md object-cover bg-canvas" />
-                      <div>
-                        <div className="font-medium line-clamp-1">{first?.name || '—'}</div>
-                        <div className="text-xs text-muted">{o.items?.length || 0} item(s){suppliers.length ? ` · ${suppliers.join(', ')}` : ''}</div>
-                      </div>
+                    <div className="space-y-2 min-w-[180px]">
+                      {(o.items || []).map((it: any, idx: number) => (
+                        <div key={idx} className={cn('flex items-center gap-2', it.cancelledAt && 'opacity-60')}>
+                          <img src={it.imageUrl || 'https://placehold.co/72x72'} alt={it.name || 'Product'} className="img-outline h-9 w-9 rounded-md object-cover bg-canvas" />
+                          <div>
+                            <div className={cn('font-medium line-clamp-1', it.cancelledAt && 'line-through')}>{it.name || '—'}</div>
+                            <div className="text-xs text-muted">
+                              {it.quantity}× · {it.supplier?.businessName || it.supplier?.name || o.supplier?.businessName || 'Supplier'}
+                              {it.cancelledAt ? ' · Cancelled by supplier' : ''}
+                            </div>
+                          </div>
+                        </div>
+                      ))}
+                      {!o.items?.length && <span className="text-muted">—</span>}
                     </div>
                   </td>
                   <td className="px-3 py-3 capitalize">{(o.paymentMethod || 'cod').toUpperCase() === 'COD' ? 'COD' : (o.paymentMethod || 'Online')}</td>
