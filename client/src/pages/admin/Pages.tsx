@@ -65,7 +65,6 @@ export function AdminHome() {
       note: `${money(orderValue?.prevMonth?.subtotal)} previous month`,
       value: money(orderValue?.thisMonth?.subtotal),
       delta: pctDelta(orderValue?.thisMonth?.subtotal, orderValue?.prevMonth?.subtotal),
-      foot: `Products only · ${money(orderValue?.thisMonth?.deliveryFees)} delivery fees separate`,
       to: '/admin/delivery-fees',
     },
     {

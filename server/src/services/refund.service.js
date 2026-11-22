@@ -50,16 +50,53 @@ export function refundAmountFor(order) {
     order.paymentMethod === 'online' &&
     (order.productAmountPaid || order.paymentStatus === 'paid' || order.deliveryFeePaid);
   if (onlinePaid) {
-    // Refund what was charged: every line (including ones a supplier cancelled
-    // earlier, which were not refunded at the time) plus the delivery fee.
+    // Refund what was charged (every line plus the delivery fee) minus any
+    // partial refunds already sent for supplier-cancelled lines. A partial
+    // refund still pending is included here, so this amount replaces it.
     const items = order.items || [];
     const paidGoods = items.length
       ? items.reduce((s, i) => s + Number(i.lineTotal || 0), 0)
       : Number(order.subtotal || 0);
-    return Number((paidGoods + fee).toFixed(2));
+    const alreadySent = Number(order.refundedTotal || 0);
+    return Number(Math.max(0, paidGoods + fee - alreadySent).toFixed(2));
   }
   if (order.deliveryFeePaid) return Number(fee.toFixed(2));
   return 0;
+}
+
+/** True when the retailer has paid for the goods online (not just the delivery fee). */
+export function goodsPaidOnline(order) {
+  return order.paymentMethod === 'online' && (order.productAmountPaid === true || order.paymentStatus === 'paid');
+}
+
+// ── REFUND-FLOW 3/6 · PARTIAL REFUND (one supplier cancels, rest still ships) ──
+// SEARCH: refund-flow, partial refund, supplier cancelled lines refund
+// DOES:   for online-paid orders, adds the cancelled lines' value to the pending
+//         manual refund. The delivery fee is kept because the order still ships.
+//         COD orders get nothing: the retailer simply pays less on delivery.
+//         Caller saves the order.
+export async function queuePartialRefund(order, cancelledItems, who = 'A supplier') {
+  if (!goodsPaidOnline(order)) return 0;
+  const amount = Number(cancelledItems.reduce((s, i) => s + Number(i.lineTotal || 0), 0).toFixed(2));
+  if (amount <= 0) return 0;
+  const pending = order.manualRefundStatus === 'pending' ? Number(order.refundAmount || 0) : 0;
+  order.manualRefundStatus = 'pending';
+  order.refundAmount = Number((pending + amount).toFixed(2));
+  await notifyAdmins({
+    title: 'Refund pending',
+    body: `Order ${order.orderNumber}: Tk ${amount} queued for manual refund (${who} cancelled their items).`,
+    relatedOrder: order._id,
+    link: '/admin/refunds',
+    type: 'refund_pending',
+  });
+  await notifyUser(order.retailer, {
+    title: 'Refund pending',
+    body: `${who} cancelled items on order ${order.orderNumber}. A Tk ${amount} refund will be sent by admin.`,
+    relatedOrder: order._id,
+    link: '/retailer/orders',
+    type: 'refund_pending',
+  });
+  return amount;
 }
 
 // ── REFUND-FLOW 2/6 · CANCEL GUARD (may this order still be cancelled?) ──
@@ -170,7 +207,9 @@ export async function completeManualRefund(order, admin, note = '') {
   }
   order.manualRefundStatus = 'completed';
   order.refundedAt = new Date();
-  order.paymentStatus = 'refunded';
+  order.refundedTotal = Number((Number(order.refundedTotal || 0) + Number(order.refundAmount || 0)).toFixed(2));
+  // A partial refund (order still active) leaves the order paid for the rest.
+  order.paymentStatus = CANCELLED_STATUSES.includes(order.status) ? 'refunded' : 'partial_refund';
   if (note) order.refundNote = note;
   await order.save();
 

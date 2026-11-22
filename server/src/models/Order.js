@@ -102,6 +102,8 @@ const orderSchema = new mongoose.Schema(
       default: 'none',
     },
     refundAmount: { type: Number, default: 0 },
+    /** Sum of refunds already sent (partial refunds for supplier-cancelled lines). */
+    refundedTotal: { type: Number, default: 0 },
     refundedAt: Date,
     refundNote: String,
   },

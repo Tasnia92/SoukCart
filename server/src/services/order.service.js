@@ -13,7 +13,7 @@ import {
 import { notifyUser, notifyAdmins, notifyMany } from './notify.js';
 import { accruePayoutsForOrder, activeSupplierIds } from './payout.service.js';
 import { reserveStockForItems, releaseStockForItems } from './stock.service.js';
-import { cancelAndQueueRefund, CANCELLED_STATUSES, canCancelOrder } from './refund.service.js';
+import { cancelAndQueueRefund, CANCELLED_STATUSES, canCancelOrder, queuePartialRefund } from './refund.service.js';
 import { httpError } from '../utils/httpError.js';
 
 // ════════════════════════════════════════════════════════════════════════════
@@ -132,7 +132,8 @@ function recomputeTotals(order) {
 // DOES:   cancels only this supplier's lines, releases their reserved stock and
 //         recomputes totals. The rest of the order continues: if every remaining
 //         line is confirmed it becomes "supplier_confirmed" (ready to ship).
-//         No refund is queued because the order still ships. When this supplier
+//         If the goods were paid online, their value is queued as a manual
+//         refund (delivery fee kept, the order still ships). When this supplier
 //         holds the last active lines, the whole order is cancelled instead.
 export async function cancelSupplierLines(order, supplierUser) {
   if (!orderHasSupplier(order, supplierUser._id)) throw httpError('Forbidden', 403);
@@ -158,6 +159,10 @@ export async function cancelSupplierLines(order, supplierUser) {
   order.markModified('items');
   recomputeTotals(order);
 
+  const who = supplierUser.businessName || supplierUser.name || 'A supplier';
+  // Retailer gets a separate "Refund pending" notification when money is owed.
+  await queuePartialRefund(order, mine, who);
+
   const readyToShip = allLinesConfirmed(order);
   if (readyToShip && ['placed', 'supplier_approved'].includes(order.status)) {
     order.status = 'supplier_confirmed';
@@ -165,7 +170,6 @@ export async function cancelSupplierLines(order, supplierUser) {
   }
   await order.save();
 
-  const who = supplierUser.businessName || supplierUser.name || 'A supplier';
   const names = mine.map((i) => i.name).join(', ');
   await notifyUser(order.retailer, {
     title: 'Supplier cancelled items',
